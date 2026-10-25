@@ -765,7 +765,7 @@ async function submit(form: HTMLFormElement, answered: boolean, capture: FormCap
     // 担当者が一人もいない台帳では、最初の担当者の登録だけを本人の名前で記録する。
     const noActors = Object.keys(ledger.masters.actors).length === 0;
     if (capture.metadata === null && noActors && capture.op !== allOps['masterActor']) throw new Error('最初に担当者（自分の名前）を登録する');
-    const actor = capture.metadata?.actor ?? (noActors ? v.text('name') : actorSelect.value);
+    const actor = noActors && capture.units === null ? v.text('name') : capture.metadata?.actor ?? actorSelect.value;
     if (capture.metadata === null && !noActors && !own(ledger.masters.actors, actor)?.active) throw new Error(`担当者「${actor}」は利用停止中、または登録されていない`);
     const fingerprint = fingerprintOf(capture.op.label, { ...values.raw, actor });
     if (capture.units !== null && capture.metadata !== null) {
@@ -784,6 +784,7 @@ async function submit(form: HTMLFormElement, answered: boolean, capture: FormCap
     }
     if (!v.checked('occurredUnknown') && v.text('occurredAt') === '') throw new Error('実際の日時を入力するか、不明を選ぶ');
     capture.metadata ??= { actor, recordedAt: nowIso() };
+    if (noActors) capture.metadata.actor = actor;
     const meta: Meta = {
       eventId,
       occurredAt: v.checked('occurredUnknown') ? null : fromLocal(v.text('occurredAt')),

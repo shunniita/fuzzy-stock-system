@@ -1,5 +1,26 @@
 import { test, expect } from '@playwright/test';
-import { backupButton, downloadVia, goTo, pickFile, record, recorded, row, waitForApp } from './helpers.ts';
+import { backupButton, downloadVia, goTo, pickFile, record, recorded, row, waitForApp, waitForPersistence } from './helpers.ts';
+import { snapshotOf } from './conflict-helpers.ts';
+
+for (const emptyName of ['', '   ']) {
+  test(`P1-BLANK: 最初の担当者名${JSON.stringify(emptyName)}を訂正すると本人の名前で一度だけ保存する`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-26T09:00:00+09:00'));
+    await page.goto('/'); await waitForApp(page);
+    await expect(await record(page, 'masterActor', { name: emptyName })).toContainText('担当者の名前');
+    expect((await snapshotOf(page)).ledger.history).toEqual([]);
+    await page.clock.setFixedTime(new Date('2026-10-26T10:00:00+09:00'));
+    const form = page.getByRole('form', { name: '操作の入力' });
+    await form.locator('[name=name]').fill('練習担当');
+    await form.getByRole('button', { name: '記録する', exact: true }).click();
+    await waitForPersistence(page);
+    await expect(page.locator('#actor')).toHaveValue('練習担当');
+    const saved = await snapshotOf(page);
+    expect(saved.ledger.history).toHaveLength(1);
+    expect(saved.ledger.history[0]).toMatchObject({ actor: '練習担当', recordedAt: '2026-10-26T09:00:00+09:00' });
+    await page.reload(); await waitForApp(page);
+    expect((await snapshotOf(page)).ledger).toEqual(saved.ledger);
+  });
+}
 
 test('P1-BLANK: 空の台帳から担当者・場所・品目・現物を登録し、再読込・バックアップ・復元で保つ', async ({ page }) => {
   await page.goto('/'); await waitForApp(page);
