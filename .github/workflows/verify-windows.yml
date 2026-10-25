@@ -1,0 +1,120 @@
+name: Windows verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-windows.yml
+      - .gitattributes
+      - package*.json
+      - tsconfig*.json
+      - playwright.config.ts
+      - vitest.config.ts
+      - start-local.cmd
+      - manual/**
+      - LICENSE
+      - src/**
+      - tests/**
+      - scripts/**
+      - web/**
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-verification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: windows-2025
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      NODE_USE_SYSTEM_CA: '1'
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Record runtime and revision
+        run: |
+          New-Item -ItemType Directory -Path ci-logs | Out-Null
+          $edge = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $edge) { throw 'The runner must provide Microsoft Edge.' }
+          @(
+            "commit=$env:GITHUB_SHA"
+            "runner=$env:ImageOS/$env:ImageVersion"
+            "node=$(node --version)"
+            "npm=$(npm.cmd --version)"
+            "edge=$((Get-Item -LiteralPath $edge).VersionInfo.ProductVersion)"
+            "powershell=$((Get-Command powershell.exe).Source)"
+            "libreoffice=$([bool](Test-Path -LiteralPath 'C:\Program Files\LibreOffice\program\soffice.exe'))"
+            'workers=1 retries=0 browser=msedge timezone=Asia/Tokyo'
+          ) | Tee-Object -FilePath ci-logs/runtime.log
+      - name: Install locked dependencies
+        run: |
+          npm.cmd ci --allow-remote=all 2>&1 | Tee-Object -FilePath ci-logs/install.log
+          exit $LASTEXITCODE
+      - name: Audit locked dependencies
+        run: |
+          npm.cmd audit --include=dev --audit-level=high --json 2> ci-logs/dependency-audit.stderr.log | Tee-Object -FilePath ci-logs/dependency-audit.json
+          $auditExit = $LASTEXITCODE
+          exit $auditExit
+      - name: Typecheck
+        run: |
+          npm.cmd run typecheck 2>&1 | Tee-Object -FilePath ci-logs/typecheck.log
+          exit $LASTEXITCODE
+      - name: Local server connection regression
+        run: |
+          node scripts/test-local-server.mjs 2>&1 | Tee-Object -FilePath ci-logs/local-server.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-local-server-race.mjs 2>&1 | Tee-Object -Append -FilePath ci-logs/local-server.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-local-server-startup.mjs 2>&1 | Tee-Object -Append -FilePath ci-logs/local-server.log
+          $startupExit = $LASTEXITCODE
+          if (Test-Path -LiteralPath .local-logs/server-startup/result.json) { Copy-Item -LiteralPath .local-logs/server-startup/result.json -Destination ci-logs/local-server-startup.json }
+          exit $startupExit
+      - name: Unit tests
+        run: |
+          npm.cmd test 2>&1 | Tee-Object -FilePath ci-logs/unit.log
+          exit $LASTEXITCODE
+      - name: Storage lineage regression
+        run: |
+          node scripts/test-storage-lineage.mjs 2>&1 | Tee-Object -FilePath ci-logs/storage-lineage.log
+          exit $LASTEXITCODE
+      - name: Release packaging guards
+        run: |
+          npm.cmd run release:check 2>&1 | Tee-Object -FilePath ci-logs/release-guards.log
+          exit $LASTEXITCODE
+      - name: Build and test in Edge
+        run: |
+          npm.cmd run e2e -- --workers=1 --retries=0 --trace=retain-on-failure 2>&1 | Tee-Object -FilePath ci-logs/e2e.log
+          exit $LASTEXITCODE
+      - name: Verify packaged app in Edge
+        run: |
+          node scripts/package-release.mjs 2> ci-logs/release-package.stderr.log | Tee-Object -FilePath ci-logs/release-package.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $release = Get-Content -Raw -LiteralPath ci-logs/release-package.json | ConvertFrom-Json
+          npm.cmd run release:smoke -- $release.archive 2>&1 | Tee-Object -FilePath ci-logs/release-smoke.log
+          exit $LASTEXITCODE
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ci-logs/
+            test-results/
+            dist/release/
+          retention-days: 7
+          if-no-files-found: warn

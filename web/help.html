@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>使い方 — fuzzy-stock-system</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #203047; background: #f3f6fb; font: 1rem/1.8 'Segoe UI', 'Yu Gothic UI', Meiryo, sans-serif; }
+    main { max-width: 50rem; margin: 2rem auto; padding: 2rem clamp(1rem, 5vw, 3rem); background: white; overflow-wrap: anywhere; }
+    h1 { font-size: 1.6rem; line-height: 1.4; }
+    h2 { font-size: 1.2rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #dce3ed; }
+    h3 { font-size: 1rem; margin-top: 1.5rem; }
+    a { color: #173f98; text-underline-offset: .2em; }
+    a:focus-visible { outline: 3px solid #2457c5; outline-offset: 4px; }
+    li { margin-block: .6rem; }
+    dt { font-weight: bold; margin-top: 1rem; }
+    dd { margin: .3rem 0 1rem; }
+    code { font-family: Consolas, monospace; }
+    @media (max-width: 40rem) { main { margin: 0; } }
+    @media print { body { background: white; } main { margin: 0; max-width: none; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>fuzzy-stock-system の使い方</h1>
+  <p>物の数と、その数を確かめた根拠を記録します。数が分からない物は0にせず、不明のまま残せます。</p>
+  <nav aria-label="このページの目次">
+    <ul>
+      <li><a href="#start">初めて使う</a></li>
+      <li><a href="#daily">使う・移す・数え直す</a></li>
+      <li><a href="#quantity">数量の読み方</a></li>
+      <li><a href="#save">保存を確認する</a></li>
+      <li><a href="#backup">バックアップ・復元・更新</a></li>
+      <li><a href="#more">詳しいガイド</a></li>
+    </ul>
+  </nav>
+  <section id="start">
+    <h2>初めて使う</h2>
+    <p>一台のWindows PCで、一人が使うソフトです。操作するタブは一つにし、起動用の黒い画面を開いたまま使います。</p>
+    <ol>
+      <li><strong>はじめに</strong>の案内で、担当者の登録の横にある<strong>入力欄で開く</strong>を押します。名前を入力して<strong>記録する</strong>を押します。</li>
+      <li>続いて、置き場所、品目と単位を同じように登録します。品番・コードには、場所や品目を見分ける名前を入れます。先頭の0もそのまま残ります。場所の登録では、<strong>記録の対象</strong>の選択欄で<strong>記録の対象</strong>を選びます。</li>
+      <li><strong>現物の登録・使用・移動</strong>から、開始時点の現物を登録する操作を選びます。新しい保管単位のID、品目、単位、場所、案件・用途、数量と根拠、実際の日時を入力します。</li>
+      <li>用途の指定がなければ<strong>共通在庫</strong>、製造中の物でなければ作業の状態は<strong>作業なし</strong>にします。</li>
+      <li><strong>記録する</strong>を押し、結果と<strong>保存の状態</strong>を確認します。在庫一覧でも登録した数を確認します。</li>
+    </ol>
+    <p>保管単位は、一つの箱・袋・束など、まとめて記録する現物です。IDはその保管単位を区別するための名前で、品目のコードや単位とは別です。</p>
+    <p>例：品目「水2L」、単位「本」、場所「食品棚」を用意します。水12本を数え、IDを<code>WATER-01</code>、数量の根拠を<strong>数えた</strong>、数量を<code>12</code>として登録します。</p>
+  </section>
+  <section id="daily">
+    <h2>使う・移す・数え直す</h2>
+    <h3>使った分を記録する</h3>
+    <p><strong>現物の登録・使用・移動</strong>の<strong>使用</strong>で、対象、使った数と根拠、使用先、実際の日時を入力します。12本から2本使ったなら、入力する数は<code>2</code>です。記録後に残りが10本になったことを確認します。</p>
+    <h3>別の場所へ移す</h3>
+    <p>全部を移したときは<strong>移動（保管単位全部）</strong>で対象と移動先を選びます。一部だけなら<strong>一部を分けて移動</strong>を使い、分けた分の新しいIDと数量を入力します。</p>
+    <h3>現物に合わせて直す</h3>
+    <p><strong>数え直し・訂正・照合</strong>の<strong>数えて確認・訂正（原因不明でもよい）</strong>を使います。記録が10本でも、数えたら9本だった場合は、対象全体の数<code>9</code>を入力します。差の<code>-1</code>ではありません。原因が分からなければ<strong>原因不明</strong>のままで構いません。</p>
+    <p>受け取りとして登録した物では、過去に届いた総数を直すかどうかも選びます。今の残りだけを直す場合は、実際に受け取った数を変えない選択肢を選んでください。</p>
+    <h3>履歴を見る</h3>
+    <p>在庫一覧のIDを押すと、その保管単位の詳細と履歴が開きます。取り分けた物や分割した物も、現物の動きと記録の訂正を分けて確認します。</p>
+  </section>
+  <section id="quantity">
+    <h2>数量の読み方</h2>
+    <dl>
+      <dt>数えた</dt><dd>実際に数えた数です。</dd>
+      <dt>表示の数（ラベル・パッケージ）</dt><dd>「12本入り」などの表示を使った数です。中身を数えたことにはしません。</dd>
+      <dt>だいたい</dt><dd>見積もった数です。使ったり分けたりしても、確かな数へ自動で変わりません。</dd>
+      <dt>数が不明</dt><dd>まだ分からない数です。0とは区別し、既知の数量の合計へ足しません。</dd>
+      <dt>記録上の数</dt><dd>登録・使用などの記録から求めた現在の数です。今の現物を数えた結果とは区別します。</dd>
+      <dt>確認が必要</dt><dd>記録の食い違いや未確認の内容があります。対象の詳細と<strong>確認・履歴</strong>で理由を確認します。</dd>
+    </dl>
+  </section>
+  <section id="save">
+    <h2>保存を確認する</h2>
+    <p><strong>保存した</strong>と表示されたことを確認してから終了します。保存中は操作を重ねず、結果を待ちます。</p>
+    <p>保存結果が不明なときは、画面の<strong>照会する</strong>で結果を調べます。結果を確かめずに同じ内容を新しい操作として登録し直すと、二重の記録になるおそれがあります。既知の一部保存がある場合は、保存された分を確認し、画面の案内に従って残りを再試行します。</p>
+    <p>更新競合が出たときは、元入力を控え、最新の記録と照合します。照合結果の保存だけでは、元の使用や受け取りは登録されません。</p>
+    <p>タブ終了後の入力回収は<strong>管理</strong>で有効にできます。入力中の内容をすべて自動保存する機能ではありません。退避の失敗や容量不足が出たら、元のタブを閉じる前に入力の原文を控えてください。</p>
+  </section>
+  <section id="backup">
+    <h2>バックアップ・復元・更新</h2>
+    <p>記録は同じアドレス・ブラウザー・プロファイルの中に保存します。別のPCとは共有しません。InPrivateは使わず、ブラウザーの保存データを消さないでください。在庫記録を外部へ送信する機能はありません。</p>
+    <h3>バックアップを取る</h3>
+    <p><strong>管理</strong>の<strong>復元用バックアップを保存</strong>でJSONファイルを保存し、別に保管します。Excel出力は閲覧用で、復元には使えません。</p>
+    <h3>バックアップへ戻す</h3>
+    <p>現在の記録もバックアップしてから、<strong>バックアップから復元</strong>で戻したいJSONを選びます。内容と置き換わる範囲を確認し、<strong>復元する</strong>を押します。復元確認が閉じた後に在庫と履歴を確認します。</p>
+    <h3>翌日再開する・新版へ更新する</h3>
+    <p>再開時は同じアドレス・ブラウザー・プロファイルで開きます。初期化する必要はありません。記録が空に見えた場合も、先にアドレスなどを確かめてください。</p>
+    <p>更新時はバックアップを取り、旧版のタブと起動用の黒い画面を閉じてから新版を起動します。ポート設定を変えていた場合は同じ設定を使います。旧版へ戻すときは更新前のバックアップを使い、更新後の記録を失う範囲を確認します。</p>
+    <p>入力回収を有効にした保存先で、それに未対応の旧版を起動しないでください。旧版を確認する場合は、新版のタブと黒い画面を閉じ、旧版のフォルダーに<code>local-settings.txt</code>を作り、未使用のポート（例：<code>port=4190</code>）を指定します。別の保存先で旧版を起動し、更新前のバックアップを復元します。詳しくはZIPのREADMEを参照してください。</p>
+  </section>
+  <section id="more">
+    <h2>詳しいガイド</h2>
+    <p>配布ZIPの<code>manual</code>フォルダーに、作業別の手順、画面と用語、困ったときの対処、利用確認チェックリストを同梱しています。各ファイルはテキストとしても読めます。</p>
+    <p>v1.1.0には簡単操作モード、一括取込、使用期限の通知はありません。製造工程には工程「R組立」と次工程の場所コード「N」の固定部分があります。日用品の記録には、作業の状態を<strong>作業なし</strong>にして使います。</p>
+  </section>
+</main>
+</body>
+</html>
