@@ -1,0 +1,20 @@
+{
+  "writerRevision": "945f22d8910e28a964f1f15567ca1284950c2df4",
+  "snapshotVersion": 10,
+  "pendingVersion": 9,
+  "draftVersion": 1,
+  "data": "fictional only",
+  "cases": [
+    "masterItem",
+    "receive"
+  ],
+  "sha256": "8206eb934e5fe32d7b7ecb5b6e989ccac4664132fa210a538a5a2e76032c61eb",
+  "writerSources": {
+    "src/ui/storage.ts": "a44df7d48217d4f70792e1a02602581f1ef2fd73e4cffda35e24a6a49781f2d1",
+    "src/ui/storageparse.ts": "79c53d0d1cd5358f3c5f88c876fc069ca8bcbc729982234b4ecde16f060f5a6c",
+    "src/ui/conflictrecord.ts": "28ccc5078173b571ea5c59ecbb7efc1bfe04a5bb6517d42e9d506173c9f0bec6",
+    "src/domain/ledger.ts": "decac8972ec15840f424cb04e4b5d4bf5c3424ed9ab4f314f52a08e75acb0c77",
+    "src/domain/supply.ts": "8e019ee743a4fa73c12b1ac7de4d2e738b9385ddfaaa03ed0a74ef1d3c5957c0",
+    "src/domain/masters.ts": "a083456ebc38cc8cce9f99d08160ac49f8ac0e78e3e52a416c469103d691ceb8"
+  }
+}

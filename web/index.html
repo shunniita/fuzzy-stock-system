@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>fuzzy-stock-system</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">{"imports":{"xlsx":"./dist/vendor/xlsx.mjs"}}</script>
+  </head>
+  <body>
+    <section id="boot" role="status" aria-live="polite">
+      <p id="boot-message">画面を起動中です。操作できるようになるまでお待ちください。</p>
+      <button id="boot-retry" type="button" hidden>画面を再読み込みする</button>
+    </section>
+    <noscript>
+      <style>#boot { display: none; }</style>
+      <p role="alert">JavaScriptが無効のため起動できません。JavaScriptを有効にしてから再読み込みしてください。</p>
+    </noscript>
+    <div id="app" inert>
+    <header>
+      <h1>fuzzy-stock-system</h1>
+      <div class="prototype-note">
+        <p role="note">記録はこのブラウザーの中だけに保存されます</p>
+        <button type="button" class="link" id="about-link">このソフトについて</button>
+        <a href="help.html" target="_blank" rel="noopener">使い方</a>
+      </div>
+      <div class="bar">
+        <label>記録する人 <select id="actor"></select></label>
+        <span id="actor-unavailable" hidden>保存記録を読み込めないため担当者を選択できません。</span>
+        <span id="updated"></span>
+      </div>
+      <input type="file" id="backup-file" accept=".json,application/json" hidden aria-label="復元に使うバックアップのファイル" />
+      <section id="save" aria-labelledby="save-h"><h2 id="save-h" tabindex="-1">保存の状態</h2></section>
+      <section id="conflict" aria-labelledby="conflict-h" hidden><h2 id="conflict-h">更新競合の照合</h2></section>
+      <nav aria-label="行き先" id="destinations">
+        <button type="button" id="nav-stock">在庫と入力</button>
+        <button type="button" id="nav-supply">不足・依頼・案件・用途</button>
+        <button type="button" id="nav-issues">確認・履歴（<span id="issue-count">0件</span>）</button>
+        <button type="button" id="nav-masters">登録情報</button>
+        <button type="button" id="nav-management">管理</button>
+      </nav>
+    </header>
+    <main id="workspace">
+      <p id="unreadable-content" hidden>保存記録を読み込めないため、現在の台帳を表示できません。上部の保存の状態から回復操作を選んでください。</p>
+      <div id="page-stock" class="destination">
+        <section id="getting-started" aria-labelledby="getting-started-h" hidden><h2 id="getting-started-h">はじめに</h2></section>
+        <section id="list" aria-labelledby="list-h"><h2 id="list-h">在庫一覧</h2></section>
+        <section id="detail" aria-labelledby="detail-h"><h2 id="detail-h" tabindex="-1">保管単位の詳細</h2></section>
+        <section id="production" aria-labelledby="production-h"><h2 id="production-h">製造（工程内・工程完了・中断）</h2></section>
+      </div>
+      <div id="page-supply" class="destination">
+        <section id="supply" aria-labelledby="supply-h"><h2 id="supply-h">不足・依頼（必要な数・申告・依頼・割り当て）</h2></section>
+        <section id="case" aria-labelledby="case-h"><h2 id="case-h">案件・用途詳細</h2></section>
+        <section id="followup" aria-labelledby="followup-h"><h2 id="followup-h">未着・不足・対応一覧</h2></section>
+        <section id="consumables" aria-labelledby="consumables-h"><h2 id="consumables-h">共通消耗品（箱・バラ数量・補充確認）</h2></section>
+      </div>
+      <div id="page-issues" class="destination">
+        <section id="issues" aria-labelledby="issues-h"><h2 id="issues-h">確認が必要な記録</h2></section>
+        <section id="history" aria-labelledby="history-h"><h2 id="history-h">履歴</h2></section>
+      </div>
+      <div id="page-masters" class="destination">
+        <section id="masters" aria-labelledby="masters-h"><h2 id="masters-h">登録情報（品目・場所・案件・用途・担当者）</h2></section>
+      </div>
+      <div id="page-management" class="destination">
+        <section id="management-actions" aria-labelledby="management-h">
+          <h2 id="management-h">管理</h2>
+          <div class="management-group" role="group" aria-label="初期化">
+            <button type="button" id="reset-seed">標準サンプルデータで初期化</button>
+            <button type="button" id="reset-scn02">不足・補充サンプルデータで初期化</button>
+            <button type="button" id="reset-empty">空の台帳で初期化</button>
+            <button type="button" id="reset-practice">練習用の台帳で初期化</button>
+          </div>
+          <div class="management-group" role="group" aria-label="バックアップと復元">
+            <button type="button" id="backup-save">復元用バックアップを保存</button>
+            <button type="button" id="shared-enable">タブ終了後の入力回収を有効にする</button>
+            <button type="button" id="shared-raw">保存先の原資料を控える</button>
+          <p id="shared-status"></p>
+            <button type="button" id="backup-restore">バックアップから復元</button>
+          </div>
+          <div class="management-group" role="group" aria-label="閲覧用の出力">
+            <button type="button" id="view-export">閲覧用に出力（Excel・復元には使えない）</button>
+          </div>
+        </section>
+        <section id="management-feedback" aria-labelledby="management-feedback-h"><h2 id="management-feedback-h" tabindex="-1">管理の結果・確認</h2></section>
+        <section id="about" aria-labelledby="about-h">
+          <h2 id="about-h" tabindex="-1">このソフトについて</h2>
+          <p>保管単位は、箱・束など、ひとまとまりとして記録する現物を指します。数量の単位（個・本・箱など）とは別です。</p>
+          <p class="banner" role="note">この端末のブラウザーにだけ保存（別の端末へは移らない）。復元用バックアップはファイルとして各自で保管する。権限による制限はまだなく、画面を使える人は誰でも登録情報の変更と、バックアップと復元ができる。案件・用途の付け替えは、数量の分かる未使用の案件・用途を指定した物に限る。コード入力は専用形式に対応。読取機器との連携・帳票からの取込・依頼の自動作成には対応していない。</p>
+        </section>
+      </div>
+      <section id="input" aria-labelledby="input-h"><h2 id="input-h">入力</h2></section>
+    </main>
+    </div>
+    <script type="module">
+      const boot = document.getElementById('boot');
+      const message = document.getElementById('boot-message');
+      const retry = document.getElementById('boot-retry');
+      retry.addEventListener('click', () => location.reload());
+      try {
+        await import('./dist/ui/main.js');
+        document.getElementById('app').inert = false;
+        boot.hidden = true;
+      } catch {
+        message.textContent = '画面を起動できませんでした。時間を置いて再読み込みしてください。再読み込みボタンから保存記録を消すことはありません。';
+        retry.hidden = false;
+      }
+    </script>
+  </body>
+</html>

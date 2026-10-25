@@ -1,0 +1,44 @@
+import { expect, type Page } from '@playwright/test';
+import { backupButton, cell, downloadVia, goTo, pickFile, recorded, row, waitForApp } from './helpers.ts';
+import { snapshotOf } from './conflict-helpers.ts';
+
+export async function verifyPublicFlow(page: Page): Promise<{ registered: number; used: number; recounted: number; history: number }> {
+  await waitForApp(page);
+  await expect(page.locator('#getting-started')).toBeVisible();
+  await expect(page.locator('#actor')).toHaveValue('');
+  await recorded(page, 'masterActor', { name: '練習担当' });
+  await recorded(page, 'masterLocation', { code: 'S1', name: '食品棚', inScope: 'true' });
+  await recorded(page, 'masterLocation', { code: 'S2', name: '押し入れ', inScope: 'true' });
+  await recorded(page, 'masterItem', { code: 'W', name: '水2L', units: '本' });
+  await expect(page.locator('#getting-started')).toBeHidden();
+  await recorded(page, 'register', { newId: 'WATER-01', item: 'W', location: 'S1', project: 'common', basis: 'counted', value: '12' });
+  await expect(cell(page, 'WATER-01', '記録上の数と根拠')).toHaveText('12本・数えた');
+  await recorded(page, 'use', { lot: 'WATER-01', basis: 'counted', value: '2', usedFor: '日常用' }, '12:01');
+  await expect(cell(page, 'WATER-01', '記録上の数と根拠')).toHaveText('記録上の数10本');
+  await recorded(page, 'move', { lot: 'WATER-01', location: 'S2' }, '12:02');
+  await expect(cell(page, 'WATER-01', '場所')).toContainText('S2');
+  await recorded(page, 'recount', { lot: 'WATER-01', value: '9', causeUnknown: true }, '12:03');
+  await expect(cell(page, 'WATER-01', '記録上の数と根拠')).toHaveText('9本・数えた');
+  await row(page, 'WATER-01').getByRole('button', { name: 'WATER-01', exact: true }).click();
+  await expect(page.locator('#detail')).toContainText('日常用');
+  await expect(page.locator('#detail')).toContainText('9本を数えた');
+  const before = await snapshotOf(page);
+  expect(before.ledger.history.map(event => event.kind)).toEqual(['master', 'master', 'master', 'master', 'register', 'use', 'move', 'recount']);
+  const backup = await downloadVia(page, backupButton);
+  await goTo(page, 'management');
+  await page.getByRole('button', { name: '空の台帳で初期化' }).click();
+  await page.getByRole('button', { name: '初期化する', exact: true }).click();
+  await goTo(page, 'stock');
+  await expect(row(page, 'WATER-01')).toHaveCount(0);
+  await expect(page.locator('#getting-started')).toBeVisible();
+  await pickFile(page, backup.path);
+  const confirmation = page.getByRole('region', { name: '復元の確認' });
+  await confirmation.getByRole('button', { name: '復元する', exact: true }).click();
+  await expect(confirmation).toBeHidden();
+  await page.reload(); await waitForApp(page);
+  const after = await snapshotOf(page);
+  expect(after.ledger).toEqual(before.ledger);
+  expect(after.supply).toEqual(before.supply);
+  await expect(cell(page, 'WATER-01', '記録上の数と根拠')).toHaveText('9本・数えた');
+  return { registered: 12, used: 2, recounted: 9, history: after.ledger.history.length };
+}

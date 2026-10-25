@@ -1,0 +1,12 @@
+/tests/fixtures/precision-v5/cases.ts text eol=lf
+/tests/fixtures/n1-legacy-pending.ts text eol=lf
+/tests/fixtures/n1-v5-pending.ts text eol=lf
+/tests/fixtures/conflict-v5/cases.ts text eol=lf
+/tests/fixtures/public-operation-v10/cases.ts text eol=lf
+/web/index.html text eol=lf
+/web/style.css text eol=lf
+/LICENSE text eol=crlf
+/start-local.cmd text eol=crlf
+/web/_local-server.ps1 text eol=crlf
+/manual/*.md text eol=lf
+/web/help.html text eol=lf

@@ -1,0 +1,54 @@
+import { expect, test } from '@playwright/test';
+import { snapshotOf } from './conflict-helpers.ts';
+import { cell, goTo, lot, recorded, startEmpty, storageBytes, waitForApp } from './helpers.ts';
+
+test('AT-52・MOD-05の限定追補: 構成を登録しない架空2セットから、中身や必要明細を生成しない', async ({ page }) => {
+  await startEmpty(page);
+  await recorded(page, 'masterItem', { code: 'KIT-U', name: '架空の構成未登録セット', units: 'セット' }, '08:00');
+  const before = await snapshotOf(page);
+  expect(before.ledger.lots).toEqual({});
+  expect(before.supply.receiptTemplates).toEqual({});
+  await recorded(page, 'register', lot('K1', 'KIT-U', 'S1', 'counted', '2', { unit: 'セット' }), '09:00');
+  await expect(cell(page, 'K1', '記録上の数と根拠')).toHaveText('2セット・数えた');
+  const saved = await snapshotOf(page), bytes = await storageBytes(page);
+  expect(Object.keys(saved.ledger.lots)).toEqual(['K1']);
+  expect(saved.ledger.lots['K1']).toMatchObject({ item: 'KIT-U', unit: 'セット', project: { kind: 'case', id: 'A-001' }, quantity: { kind: 'known', numeric: { value: 2 } } });
+  expect(saved.ledger.history.slice(0, -1)).toEqual(before.ledger.history);
+  expect(saved.ledger.history.at(-1)).toMatchObject({ kind: 'register', changes: [{ before: null, after: { id: 'K1' } }] });
+  expect(saved.ledger.issues).toEqual(before.ledger.issues);
+  expect(saved.supply).toEqual(before.supply);
+  await goTo(page, 'supply');
+  await expect(page.locator('#case')).toContainText('必要明細は未登録');
+  await expect(page.locator('#case')).toContainText('必要な数が分からないので、不足は判定不能');
+  await page.reload(); await waitForApp(page);
+  await expect(cell(page, 'K1', '記録上の数と根拠')).toHaveText('2セット・数えた');
+  expect(await snapshotOf(page)).toEqual(saved);
+  expect(await storageBytes(page)).toEqual(bytes);
+});
+
+test('AT-52・NEED-02aの限定追補: 必要量を取得していなければ、在庫7個と依頼3個があっても充足を断定しない', async ({ page }) => {
+  await startEmpty(page);
+  await recorded(page, 'register', lot('P-7', 'P', 'S1', 'counted', '7'), '08:00');
+  const before = await snapshotOf(page);
+  await recorded(page, 'requestRecord', { project: 'A-001', item: 'P', unit: '個', quantity: '3', vendor: '架空の依頼先', requestedOn: '2026-09-29', replyKind: 'none' }, '09:00');
+  await goTo(page, 'supply');
+  const group = page.locator('#supply [data-group="A-001/P/個"]');
+  await expect(group).toContainText('必要明細は未登録');
+  await expect(group).toContainText('不足 判定不能：必要な数が未登録');
+  await expect(group).toContainText('手配対象数 保留（不足が不明のため。0ではない）');
+  await expect(group).not.toContainText('手配対象数 0個');
+  const saved = await snapshotOf(page), bytes = await storageBytes(page);
+  expect(saved.ledger).toEqual(before.ledger);
+  expect(saved.supply.needs).toEqual({});
+  expect(saved.supply.declarations).toEqual({});
+  expect(saved.supply.receipts).toEqual({});
+  expect(Object.values(saved.supply.requests)).toHaveLength(1);
+  expect(Object.values(saved.supply.requests)[0]).toMatchObject({ quantity: 3, arrivals: [], reply: { kind: 'none' } });
+  await goTo(page, 'stock');
+  await expect(cell(page, 'P-7', '記録上の数と根拠')).toHaveText('7個・数えた');
+  await page.reload(); await waitForApp(page); await goTo(page, 'supply');
+  await expect(group).toContainText('不足 判定不能：必要な数が未登録');
+  await expect(group).toContainText('手配対象数 保留（不足が不明のため。0ではない）');
+  expect(await snapshotOf(page)).toEqual(saved);
+  expect(await storageBytes(page)).toEqual(bytes);
+});
