@@ -22,6 +22,36 @@ for (const emptyName of ['', '   ']) {
   });
 }
 
+for (const action of ['再試行する', '取りやめる']) {
+  test(`P1-BLANK: 最初の担当者の登録が保存途中で閉じられても、「${action}」は登録した本人の名前で記録する`, async ({ page }) => {
+    await page.goto('/'); await waitForApp(page);
+    // pendingの書込直後の保存内容を取っておき、保存完了前に閉じた状態を再現する。
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key: string, value: string): void {
+        original.call(this, key, value);
+        if (key !== 'fuzzy-stock/pending') return;
+        Storage.prototype.setItem = original;
+        sessionStorage.setItem('closedAt', JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)]))));
+      };
+    });
+    await recorded(page, 'masterActor', { name: '練習担当' });
+    await page.evaluate(() => {
+      const closed = JSON.parse(sessionStorage.getItem('closedAt') ?? 'null') as Record<string, string>;
+      localStorage.clear();
+      for (const [key, value] of Object.entries(closed)) localStorage.setItem(key, value);
+    });
+    await page.reload(); await waitForApp(page);
+    await expect(page.locator('#actor')).toHaveValue('');
+    await page.getByRole('button', { name: action, exact: true }).click();
+    await waitForPersistence(page);
+    const saved = await snapshotOf(page);
+    expect(saved.saveChecks).toHaveLength(1);
+    expect(saved.saveChecks[0]?.resolution).toMatchObject({ outcome: action === '再試行する' ? 'retried' : 'abandoned', actor: '練習担当' });
+    expect(JSON.stringify(saved)).not.toMatch(/"actor":"\s*"/);
+  });
+}
+
 test('P1-BLANK: 空の台帳から担当者・場所・品目・現物を登録し、再読込・バックアップ・復元で保つ', async ({ page }) => {
   await page.goto('/'); await waitForApp(page);
   const guide = page.locator('#getting-started');
