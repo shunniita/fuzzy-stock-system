@@ -1,20 +1,23 @@
-import type { Project } from './ledger.ts';
-import type { Step } from './scalar.ts';
+import type { Ledger, MasterChange, Project } from './ledger.ts';
+import { validateScalar, type Step } from './scalar.ts';
 
 // 元の資料（全社の品目一覧など）の情報。手元の名称とは別に持つ（MST-06）。
 export type Source = { name: string; revision: string };
 
 // 時点つきの値。先頭だけfromがnull（最初から）で、fromの昇順。途中へは差し込まない（ADR-024）。
-export type PerBox = { from: string | null; value: number };
+export type PerBox = { from: string | null; value: number | null };
 export type ScopeEntry = { from: string | null; inScope: boolean };
 
 // 箱の本数への換算（SUP-01）。箱ごとの1箱あたりの数は、その箱の受け取りの時点の値を使う（MST-05）。
 export type Packaging = { boxUnit: string; pieceUnit: string; perBox: readonly PerBox[] };
 
+export type ConsumableSetting = { pieceUnit: string; rule: { threshold: number; standardOrder: { value: number; unit: string } } | null };
+
 // idは記録が指す変わらない識別、codeは画面と出力で見せる既存ID。codeがnullなら仮の品目・案件・用途（MST-07）。
 export type ItemMaster = {
   type: 'item'; id: string; code: string | null; name: string; source: Source | null;
   units: readonly string[]; unitSteps: Readonly<Record<string, Step>>; trial: boolean; active: boolean; packaging: Packaging | null;
+  consumable: ConsumableSetting | null;
 };
 export type LocationMaster = { type: 'location'; id: string; code: string; name: string; trial: boolean; active: boolean; scope: readonly ScopeEntry[] };
 export type CaseMaster = { type: 'case'; id: string; code: string | null; name: string | null; source: Source | null; active: boolean };
@@ -46,7 +49,7 @@ export function deepFreeze<T>(value: T): T {
 }
 
 const item = (id: string, name: string, units: string[], trial = true, packaging: Packaging | null = null): ItemMaster =>
-  ({ type: 'item', id, code: id, name, source: null, units, unitSteps: integerUnitSteps(units), trial, active: true, packaging });
+  ({ type: 'item', id, code: id, name, source: null, units, unitSteps: integerUnitSteps(units), trial, active: true, packaging, consumable: null });
 const location = (id: string, name: string, trial = true): LocationMaster =>
   ({ type: 'location', id, code: id, name, trial, active: true, scope: [{ from: null, inScope: true }] });
 const byId = <T extends { id: string }>(list: T[]): Record<string, T> => Object.fromEntries(list.map((m) => [m.id, m]));
@@ -75,7 +78,7 @@ function entryAt<T extends { from: string | null }>(entries: readonly T[], at: s
   return found;
 }
 
-export const perBoxAt = (packaging: Packaging, at: string): number => entryAt(packaging.perBox, at).value;
+export const perBoxAt = (packaging: Packaging, at: string): number | null => entryAt(packaging.perBox, at).value;
 export const inScopeAt = (location: LocationMaster, at: string): boolean => entryAt(location.scope, at).inScope;
 
 // 画面は案件・用途を共通在庫・所属不明の値（common・unassigned）と案件・用途の内部の識別で選ぶので、案件・用途の内部の識別にこの値を使わない。
@@ -107,6 +110,90 @@ export function quantityStepOf(masters: Masters, itemId: string, unit: string): 
   const item = own(masters.items, itemId);
   return item === undefined ? 1 : own(item.unitSteps, unit) ?? 1;
 }
+
+export function checkedConsumable(item: ItemMaster, setting: ConsumableSetting | null): ConsumableSetting | null {
+  if (setting === null) return null;
+  const step = own(item.unitSteps, setting.pieceUnit);
+  if (step === undefined) throw new Error('集計単位は品目の管理単位から選ぶ');
+  if (item.packaging !== null && setting.pieceUnit !== item.packaging.pieceUnit) throw new Error('集計単位は包装の中身の単位とそろえる');
+  if (setting.rule === null) return { pieceUnit: setting.pieceUnit, rule: null };
+  const { threshold, standardOrder } = setting.rule;
+  validateScalar(threshold, step);
+  const orderStep = own(item.unitSteps, standardOrder.unit);
+  if (orderStep === undefined) throw new Error('標準依頼の単位は品目の管理単位から選ぶ');
+  if (validateScalar(standardOrder.value, orderStep) <= 0) throw new Error('標準依頼数量は0より大きくする');
+  return { pieceUnit: setting.pieceUnit, rule: { threshold, standardOrder: { ...standardOrder } } };
+}
+
+export function checkPackagingUnits(item: ItemMaster, packaging: Packaging): void {
+  if (packaging.boxUnit === packaging.pieceUnit || !item.units.includes(packaging.boxUnit) || !item.units.includes(packaging.pieceUnit)) {
+    throw new Error('包装と中身には異なる管理単位を選ぶ');
+  }
+  if (item.consumable !== null && item.consumable.pieceUnit !== packaging.pieceUnit) throw new Error('包装の中身の単位は共通消耗品の集計単位とそろえる');
+}
+
+const itemSettings = (item: ItemMaster) => ({ packaging: item.packaging, consumable: item.consumable });
+const sameSettings = (a: ItemMaster, b: ItemMaster) => JSON.stringify(itemSettings(a)) === JSON.stringify(itemSettings(b));
+
+function requirePerBoxChange(before: ItemMaster, after: ItemMaster, meta: { occurredAt: string | null; recordedAt: string }): void {
+  const old = before.packaging, next = after.packaging, last = next?.perBox.at(-1);
+  if (old === null || next === null || last === undefined || last.value === null
+    || JSON.stringify({ ...before, packaging: next }) !== JSON.stringify(after)
+    || old.boxUnit !== next.boxUnit || old.pieceUnit !== next.pieceUnit
+    || next.perBox.length !== old.perBox.length + 1 || JSON.stringify(next.perBox.slice(0, -1)) !== JSON.stringify(old.perBox)
+    || !Number.isSafeInteger(last.value) || last.value < 1 || last.value === old.perBox.at(-1)?.value
+    || last.from === null || last.from !== meta.occurredAt || Date.parse(last.from) > Date.parse(meta.recordedAt)) {
+    throw new Error('入り数の変更は包装単位と既存設定を保って一件だけ追加する');
+  }
+  const previous = old.perBox.at(-1)?.from;
+  if (previous != null && Date.parse(last.from) <= Date.parse(previous)) throw new Error('入り数の適用時点は前回より後にする');
+}
+
+export function requireConsistentItemSettings(ledger: Ledger): void {
+  const seen = new Map<string, ItemMaster>();
+  for (const event of ledger.history) {
+    if (event.kind !== 'master') continue;
+    for (const { before, after } of event.masters) {
+      if (after.type !== 'item') continue;
+      const previous = seen.get(after.id);
+      if ((before !== null && (before.type !== 'item' || before.id !== after.id))
+        || (previous !== undefined && (before === null || before.type !== 'item' || !sameSettings(previous, before)))) {
+        throw new Error('品目の設定の変更前が直前の変更後と一致しない');
+      }
+      if (before?.type === 'item') {
+        if (event.action === 'perBox') requirePerBoxChange(before, after, event);
+        if (event.action !== 'consumable' && JSON.stringify(before.consumable) !== JSON.stringify(after.consumable)) throw new Error('共通消耗品以外の操作で設定を変えられない');
+        if (event.action !== 'packaging' && event.action !== 'perBox' && JSON.stringify(before.packaging) !== JSON.stringify(after.packaging)) throw new Error('包装以外の操作で包装を変えられない');
+      } else if (after.packaging !== null || after.consumable !== null) throw new Error('新規品目の包装・共通消耗品設定は未設定から始める');
+      seen.set(after.id, after);
+    }
+  }
+  for (const [id, historical] of seen) {
+    const current = own(ledger.masters.items, id);
+    if (current === undefined || !sameSettings(historical, current)) throw new Error('現在の品目設定が最後の変更履歴と一致しない');
+  }
+}
+
+// 保存する単位では、元の設定から新しいmaster履歴だけを適用した結果と現在値を照合する。
+export function requireItemSettingsTransition(before: Masters, after: Masters, changes: readonly MasterChange[]): void {
+  const items = new Map(Object.values(before.items).map(item => [item.id, item]));
+  for (const change of changes) {
+    if (change.after.type !== 'item') continue;
+    const previous = items.get(change.after.id);
+    if (previous === undefined ? change.before !== null : change.before?.type !== 'item' || !sameSettings(previous, change.before)) throw new Error('保存する品目設定の変更前が元の設定と一致しない');
+    items.set(change.after.id, change.after);
+  }
+  if (items.size !== Object.keys(after.items).length || [...items].some(([id, item]) => {
+    const current = own(after.items, id);
+    return current === undefined || !sameSettings(item, current);
+  })) throw new Error('保存する品目設定が変更履歴に対応していない');
+}
+
+// 練習開始時だけの架空設定。旧版補完に使うfixedMastersへは混ぜない。
+export const practiceMasters: Masters = deepFreeze({ ...fixedMasters, items: { ...fixedMasters.items,
+  S: { ...fixedMasters.items.S!, consumable: { pieceUnit: '本', rule: { threshold: 3000, standardOrder: { value: 1, unit: '箱' } } } },
+  V: { ...fixedMasters.items.V!, consumable: { pieceUnit: '本', rule: null } },
+} });
 
 // 精度不明の単位と、登録済みの整数単位の小数拒否を区別する。整数の既存契約は変えない。
 export function inputStepOf(masters: Masters, itemId: string, unit: string, value: number | null): Step {

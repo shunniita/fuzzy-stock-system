@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { emptyLedger, practiceLedger } from '../../src/domain/ledger.ts';
-import { fixedMasters } from '../../src/domain/masters.ts';
+import { practiceMasters } from '../../src/domain/masters.ts';
 import { emptySupply } from '../../src/domain/supply.ts';
 import { initial, parse, serialize } from '../../src/ui/storage.ts';
 
@@ -11,7 +11,7 @@ describe('P1 1.1・1.2・4.1: 空の台帳と練習用の台帳', () => {
     expect(parse(serialize(original))).toEqual(original);
   });
   test('練習用の台帳は固定の架空登録情報だけを持ち、在庫と履歴は空', () => {
-    expect(practiceLedger.masters).toBe(fixedMasters);
+    expect(practiceLedger.masters).toBe(practiceMasters);
     expect(practiceLedger.lots).toEqual({});
     expect(practiceLedger.history).toEqual([]);
   });

@@ -1,5 +1,5 @@
-import { codeOwner, deepFreeze, fixedMasters, inScopeAt, inputStepOf, masterTypeDisplayLabel, own, perBoxAt, quantityStepOf, refOf, reservedCaseIds, unassignedCode, type LocationMaster, type Master, type Masters, type Source } from './masters.ts';
-import { checkTrialReview, effectiveFrom, masterOf, masterRef, registered, type NewMaster, type TrialReview } from './master-edit.ts';
+import { checkedConsumable, codeOwner, deepFreeze, practiceMasters, inScopeAt, inputStepOf, masterTypeDisplayLabel, own, perBoxAt, quantityStepOf, refOf, reservedCaseIds, unassignedCode, type ConsumableSetting, type LocationMaster, type Master, type Masters, type Source } from './masters.ts';
+import { initialPackaging, checkTrialReview, effectiveFrom, masterOf, masterRef, registered, type NewMaster, type TrialReview } from './master-edit.ts';
 import { add, observe, quantityOf, sameQuantity, subtract, type Basis, type Observation, type Quantity } from './quantity.ts';
 import { sumScalarsFinal, validateScalar, type Step } from './scalar.ts';
 import type { Scan } from './code.ts';
@@ -173,7 +173,7 @@ export { deepFreeze };
 
 // 利用者の台帳は登録情報も空から始める。架空の登録情報は練習用と試験で明示して使う。
 export const emptyLedger: Ledger = deepFreeze({ lots: {}, history: [], issues: {}, stops: {}, masters: { items: {}, locations: {}, cases: {}, actors: {} } });
-export const practiceLedger: Ledger = deepFreeze({ lots: {}, history: [], issues: {}, stops: {}, masters: fixedMasters });
+export const practiceLedger: Ledger = deepFreeze({ lots: {}, history: [], issues: {}, stops: {}, masters: practiceMasters });
 
 const timestamp = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 
@@ -1255,6 +1255,8 @@ export type MasterRequest =
   | { action: 'code'; type: 'item' | 'location' | 'case'; id: string; code: string; reason: string }
   | { action: 'source'; type: 'item' | 'case'; code: string; source: Source }
   | { action: 'perBox'; id: string; value: number; reason: string }
+  | { action: 'packaging'; id: string; boxUnit: string; pieceUnit: string; value: number; reason: string }
+  | { action: 'consumable'; id: string; setting: ConsumableSetting | null; reason: string }
   | { action: 'scope'; id: string; inScope: boolean; reason: string };
 
 export type MasterChange = { before: Master | null; after: Master };
@@ -1347,6 +1349,18 @@ function planPerBox(ledger: Ledger, meta: Meta, request: Request<'perBox'>): Mas
   const from = effectiveFrom(meta, m.packaging.perBox);
   if (m.packaging.perBox[m.packaging.perBox.length - 1]?.value === request.value) throw new Error('今と同じ1箱あたりの数');
   return planOne(m, { ...m, packaging: { ...m.packaging, perBox: [...m.packaging.perBox, { from, value: request.value }] } });
+}
+
+function planItemSetting(ledger: Ledger, meta: Meta, request: Request<'packaging'> | Request<'consumable'>): MasterPlan {
+  const item = masterOf(ledger.masters, 'item', request.id);
+  if (item.type !== 'item') throw new Error('品目を選ぶ');
+  required(request.reason, '理由');
+  if (request.action === 'packaging') {
+    return planOne(item, { ...item, packaging: initialPackaging(item, meta, request.boxUnit, request.pieceUnit, request.value) });
+  }
+  const consumable = checkedConsumable(item, request.setting);
+  if (JSON.stringify(consumable) === JSON.stringify(item.consumable)) throw new Error('共通消耗品の設定に変更がない');
+  return planOne(item, { ...item, consumable });
 }
 
 // 実際の日時の訂正を反映した、記録ごとの時点（ミリ秒）。不明なら入力した日時（仮の記録から登録したまとまりは仮の記録の入力した日時）。
@@ -1502,6 +1516,7 @@ function masterPlan(ledger: Ledger, meta: Meta, request: MasterRequest, confirme
     case 'code': return planCode(ledger, request, confirmed);
     case 'source': return planSource(ledger, request, confirmed);
     case 'perBox': return planPerBox(ledger, meta, request);
+    case 'packaging': case 'consumable': return planItemSetting(ledger, meta, request);
     case 'scope': return planScope(ledger, meta, request);
   }
 }
@@ -1593,7 +1608,7 @@ export function changeMasters(ledger: Ledger, meta: Meta, request: MasterRequest
     ? { kind: 'master', action: 'trial', reason: request.reason, confirmed: false, masters: plan.changes, review: request.review === null ? null : { ...request.review } }
     : { kind: 'master', action: request.action, reason, confirmed: plan.confirmed, masters: plan.changes };
   const next = commit(ledger, detail, meta, [], [], [], withMasters(ledger.masters, plan.changes));
-  if (request.action === 'perBox') checkMergedPerBox(ledger, next, '1箱あたりの数を変えると');
+  if (request.action === 'perBox' || request.action === 'packaging') checkMergedPerBox(ledger, next, request.action === 'perBox' ? '1箱あたりの数を変えると' : '入り数を設定すると');
   return next;
 }
 

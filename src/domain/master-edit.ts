@@ -1,4 +1,4 @@
-import { checkedUnitSteps, codeOwner, masterTypeDisplayLabel, own, reservedCaseIds, unassignedCode, type Master, type Masters, type Source } from './masters.ts';
+import { checkPackagingUnits, checkedUnitSteps, codeOwner, masterTypeDisplayLabel, own, reservedCaseIds, unassignedCode, type ItemMaster, type Packaging, type Master, type Masters, type Source } from './masters.ts';
 import type { Step } from './scalar.ts';
 
 // 台帳の確定と履歴には触れない、登録情報の登録と変更の入力の検査（要件1〜7）。ledger.tsのmasterPlanがこれを使って変更後の登録情報を組む。
@@ -68,7 +68,7 @@ export function registered(masters: Masters, eventId: string, m: NewMaster): Mas
       if (m.code !== null) { required(m.code, '品番・コード'); codeFree(masters, 'item', m.code); }
       for (const unit of m.units) required(unit, '単位');
       if (m.units.length === 0 || new Set(m.units).size !== m.units.length) throw new Error('単位は重ならずに一つ以上入力する');
-      return { type: 'item', id: newMasterId(masters.items, m.code, 'item', eventId), code: m.code, name: m.name, source: sourceOf(m.source), units: [...m.units], unitSteps: checkedUnitSteps(m.unitSteps, m.units), trial: m.trial, active: true, packaging: null };
+      return { type: 'item', id: newMasterId(masters.items, m.code, 'item', eventId), code: m.code, name: m.name, source: sourceOf(m.source), units: [...m.units], unitSteps: checkedUnitSteps(m.unitSteps, m.units), trial: m.trial, active: true, packaging: null, consumable: null };
     }
     case 'location':
       required(m.code, '品番・コード');
@@ -96,4 +96,12 @@ export function effectiveFrom(meta: { occurredAt: string | null; recordedAt: str
   const previous = entries[entries.length - 1]?.from ?? null;
   if (previous !== null && Date.parse(meta.occurredAt) <= Date.parse(previous)) throw new Error(`適用時点は前回の変更の適用時点（${previous}）より後にする`);
   return meta.occurredAt;
+}
+
+export function initialPackaging(item: ItemMaster, meta: { occurredAt: string | null; recordedAt: string }, boxUnit: string, pieceUnit: string, value: number): Packaging {
+  if (item.packaging !== null) throw new Error('包装は設定済み。入り数の変更を使う');
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error('入り数は1以上の安全な整数にする');
+  const packaging = { boxUnit, pieceUnit, perBox: [{ from: null, value: null }, { from: effectiveFrom(meta, []), value }] };
+  checkPackagingUnits(item, packaging);
+  return packaging;
 }

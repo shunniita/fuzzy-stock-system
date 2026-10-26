@@ -1,6 +1,6 @@
 import { scanText } from './code-format.ts';
 import { creationsOf, occurredAtOf, perBoxOfLot, type Ledger, type Lot, type Stop } from '../domain/ledger.ts';
-import type { Notice, StockOfItem } from '../domain/packaging.ts';
+import type { Notice, StockOfItem, StockItem } from '../domain/packaging.ts';
 import type { Basis, Quantity } from '../domain/quantity.ts';
 import { requestProgressOf, type ReceiptStatus, type Reply, type Request, type SupplyEvent, type NeedQuantity, type Need } from '../domain/supply.ts';
 import type { DateStatus, Judgement, RequestSummary, ShortageView, UndecidableReason } from '../domain/shortage.ts';
@@ -8,7 +8,6 @@ import { basisLabel, holdLabel, itemRef, jst, locationRef, projectText, quantity
 import type { ReceiptTemplate } from '../domain/receipt-template.ts';
 import { own, quantityStepOf, type Masters } from '../domain/masters.ts';
 import { subtractScalar } from '../domain/scalar.ts';
-import type { StockItem } from './seed.ts';
 import { expandAssemblyRecipe } from '../domain/assembly-recipes.ts';
 import { historyItems, type ItemFormatter } from './history-item-format.ts';
 
@@ -253,6 +252,8 @@ export function stateTriadText(view: ShortageView, s: RequestSummary, openStops:
 export function consumableLinesText(ledger: Ledger, cfg: StockItem, lots: readonly Lot[], stock: StockOfItem, notice: Notice, requests: readonly Request[]): string[] {
   const { pieceUnit } = cfg;
   const packaging = own(ledger.masters.items, cfg.item)?.packaging ?? null;
+  const boxUnit = packaging?.boxUnit ?? '包装';
+  const countLabel = packaging === null ? '入り数' : `1${boxUnit}あたりの数`;
   const changed = packaging !== null && packaging.perBox.length > 1;
   const lines: string[] = [];
   if (packaging) {
@@ -260,30 +261,31 @@ export function consumableLinesText(ledger: Ledger, cfg: StockItem, lots: readon
     const perBoxText = (l: Lot): string => {
       if (!changed) return '';
       const perBox = perBoxOfLot(ledger, l, created);
-      return perBox === null ? '（1箱あたりの数が分からない）' : `（1箱あたりの数${perBox}${pieceUnit}）`;
+      return perBox === null ? `（${countLabel}が分からない）` : `（${countLabel}${perBox}${pieceUnit}）`;
     };
     const boxes = lots.filter((l) => l.unit === packaging.boxUnit);
-    lines.push(`未開封の箱：${boxes.length === 0 ? 'なし' : boxes.map((l) => `${l.id} ${quantityText(l.quantity, l.unit)}${perBoxText(l)}`).join('、')}`);
+    lines.push(`未開封の${boxUnit}：${boxes.length === 0 ? 'なし' : boxes.map((l) => `${l.id} ${quantityText(l.quantity, l.unit)}${perBoxText(l)}`).join('、')}`);
   }
   const loose = lots.filter((l) => l.unit === pieceUnit && !stock.levelOnly.some((x) => x.lotId === l.id));
   lines.push(`開封済み・バラの数量（${pieceUnit}）：${loose.length === 0 ? 'なし' : loose.map((l) => `${l.id} ${quantityText(l.quantity, l.unit)}`).join('、')}`);
   const pieces = stock.pieces ? quantityText(stock.pieces, pieceUnit) : '数値なし';
   const [first, ...later] = packaging?.perBox ?? [];
   const conversion = !packaging || !first ? ''
-    : later.length === 0 ? `。箱は1箱あたり${first.value}${pieceUnit}の表示で換算（現物を数えた値ではない）`
-    : `。箱は受け取りのときの1箱あたりの表示で換算（1箱あたり${first.value}${pieceUnit}、${later.map((p) => `${jst(p.from)}以後の受け取りは${p.value}${pieceUnit}`).join('、')}。現物を数えた値ではない）`;
+    : later.length === 0 ? `。${boxUnit}は1${boxUnit}あたり${first.value}${pieceUnit}の表示で換算（現物を数えた値ではない）`
+    : `。${boxUnit}は受け取りのときの1${boxUnit}あたりの表示で換算（${first.value === null ? '設定前の入り数は不明' : `1${boxUnit}あたり${first.value}${pieceUnit}`}、${later.map((p) => `${jst(p.from)}以後の受け取りは${p.value}${pieceUnit}`).join('、')}。現物を数えた値ではない）`;
   const subtotal = stock.unconverted.length > 0 && stock.pieces !== null && numericPart(stock.pieces) !== null;
   lines.push(`${subtotal ? '数量の数値部分の小計' : '数量合計'}（${pieceUnit}） ${pieces}${conversion}`);
-  const precisionIds = new Set(stock.precisionLimited.map((l) => l.id));
+  const precisionIds = new Set([...stock.precisionLimited, ...stock.stepMismatched].map((l) => l.id));
   const unconverted = stock.unconverted.filter((l) => !precisionIds.has(l.id));
-  if (unconverted.length > 0) lines.push(`合算していない分（1箱あたりの数が分からない包装・だいたいや数が不明の箱）：${unconverted.map((l) => `${l.id} ${quantityText(l.quantity, l.unit)}`).join('、')}`);
-  if (stock.precisionLimited.length > 0) lines.push(`合算していない分（整数の精度を保てる上限を超える）：${stock.precisionLimited.map((l) => `${l.id} ${quantityText(l.quantity, l.unit)}`).join('、')}`);
+  if (unconverted.length > 0) lines.push(`合算していない分（${countLabel}が分からない包装・だいたいや数が不明の${boxUnit}）：${unconverted.map((l) => `${l.id} ${quantityText(l.quantity, l.unit)}`).join('、')}`);
+  if (stock.precisionLimited.length > 0) lines.push(`合算していない分（${quantityStepOf(ledger.masters, cfg.item, pieceUnit) === 1 ? '整数' : '数量'}の精度を保てる上限を超える）：${stock.precisionLimited.map((l) => `${l.id} ${quantityText(l.quantity, l.unit)}`).join('、')}`);
+  if (stock.stepMismatched.length > 0) lines.push(`合算していない分（集計単位の最小単位に合わない）：${stock.stepMismatched.map(l => `${l.id} ${quantityText(l.quantity, l.unit)}`).join('、')}`);
   if (stock.levelOnly.length > 0) lines.push(`残量区分のみ（数量へは換算しない）：${stock.levelOnly.map((x) => `${x.lotId} ${remainderText[x.level]}`).join('、')}`);
 
   if (cfg.rule) {
     const rule = cfg.rule;
     if (notice.kind === 'none') {
-      lines.push(`補充基準${rule.threshold}${rule.pieceUnit}。補充確認は出ていない（基準以上、または比べられる数値も区分もない）`);
+      lines.push(`補充基準${rule.threshold}${rule.pieceUnit}。補充確認は出ていない（基準以上、または比べられる数値も区分もない）。標準依頼数量${rule.standardOrder.value}${rule.standardOrder.unit}`);
     } else {
       const basis = [
         notice.approximate ? '約（だいたい）を含む' : null,
@@ -297,6 +299,8 @@ export function consumableLinesText(ledger: Ledger, cfg: StockItem, lots: readon
       const head =
         stock.precisionLimited.length > 0
           ? `精度の上限で合算していない分があるので、補充の要否を断定できない`
+          : stock.stepMismatched.length > 0
+          ? '集計単位の最小単位に合わず合算していない分があるので、補充の要否を断定できない'
           : n !== null
           ? n < rule.threshold
             ? `数量の数値部分が補充基準${rule.threshold}${rule.pieceUnit}を下回る`

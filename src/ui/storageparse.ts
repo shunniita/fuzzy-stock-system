@@ -1,5 +1,5 @@
 import type { Cause, EventDetail, Issue, Ledger, LedgerEvent, Lot, MasterChange, Meta, Process, Project, Stage, Stop, TrialReview } from '../domain/ledger.ts';
-import { checkedUnitSteps, integerUnitSteps, inputStepOf, own, quantityStepOf, requireConsistentItemPrecisions, fixedMasters, reservedCaseIds, type ActorMaster, type CaseMaster, type ItemMaster, type LocationMaster, type Master, type Masters, type Packaging, type PerBox, type ScopeEntry, type Source } from '../domain/masters.ts';
+import { checkedConsumable, checkPackagingUnits, checkedUnitSteps, integerUnitSteps, inputStepOf, own, quantityStepOf, requireConsistentItemPrecisions, fixedMasters, reservedCaseIds, type ConsumableSetting, type ActorMaster, type CaseMaster, type ItemMaster, type LocationMaster, type Master, type Masters, type Packaging, type PerBox, type ScopeEntry, type Source } from '../domain/masters.ts';
 import type { Basis, Numeric, Observation, Quantity, Term, UnknownQuantity } from '../domain/quantity.ts';
 import type { Arrival, Declaration, Need, Reply, Request, Supply, SupplyDetail, SupplyEvent } from '../domain/supply.ts';
 import type { OpEntry, Pending, SaveCheck, Snapshot, UnitState } from './storage.ts';
@@ -17,6 +17,8 @@ import { validateRequests } from '../domain/request-history.ts';
 import type { EventItemLabels } from '../domain/history-labels.ts';
 import { createHistoryTargetCollector } from '../domain/history-targets.ts';
 import { assemblyRecipeRowLimit, assemblyRecipeTreeRowLimit } from '../domain/assembly-recipes.ts';
+import { requireConsistentItemSettings } from '../domain/masters.ts';
+import { initialPackaging } from '../domain/master-edit.ts';
 
 type Decoder<T> = (value: unknown, path: string) => T;
 
@@ -375,7 +377,7 @@ function eventDetail(o: Record<string, unknown>, path: string, table: QuantityTa
     case 'identify': return { kind, issueId: field(o, 'issueId', path, string), lotId: field(o, 'lotId', path, string), reason: field(o, 'reason', path, string) };
     case 'adopt': return { kind, issueId: field(o, 'issueId', path, string), lotId: field(o, 'lotId', path, string) };
     case 'assignProject': return { kind, lotId: field(o, 'lotId', path, string), before: field(o, 'before', path, project), after: field(o, 'after', path, project), reason: field(o, 'reason', path, string) };
-    case 'master': return o.action === 'trial' ? trialChange(o, path, version) : {
+    case 'master': return o.action === 'trial' ? trialChange(o, path, version) : o.action === 'packaging' || o.action === 'consumable' ? settingChange(o, path, version) : {
       kind, action: oneOf(o.action, `${path}.action`, ['register', 'rename', 'deactivate', 'reactivate', 'code', 'source', 'perBox', 'scope']), reason: field(o, 'reason', path, textOrNull),
       confirmed: field(o, 'confirmed', path, boolean), masters: array(o.masters, `${path}.masters`, (v, p) => masterChange(v, p, version)),
     };
@@ -440,8 +442,9 @@ function trialChange(o: Record<string, unknown>, path: string, version: number):
     exactKeys(pair, ['before', 'after'], p);
     const { before, after } = decoded;
     if (before === null || (before.type !== 'item' && before.type !== 'location') || after.type !== before.type || after.id !== before.id || !('trial' in after) || after.trial === before.trial) return invalid(p, '同じ品目/場所のtrial反転が必要');
-    exactKeys(record(pair.before, `${p}.before`), Object.keys(before).filter(key => version >= 5 || key !== 'unitSteps'), `${p}.before`);
-    exactKeys(record(pair.after, `${p}.after`), Object.keys(after).filter(key => version >= 5 || key !== 'unitSteps'), `${p}.after`);
+    const storedKeys = (m: Master) => Object.keys(m).filter(key => (version >= 5 || key !== 'unitSteps') && (version >= 11 || key !== 'consumable'));
+    exactKeys(record(pair.before, `${p}.before`), storedKeys(before), `${p}.before`);
+    exactKeys(record(pair.after, `${p}.after`), storedKeys(after), `${p}.after`);
     if (JSON.stringify({ ...before, trial: after.trial }) !== JSON.stringify(after)) return invalid(p, '試行変更でtrial以外の登録情報属性は変えない');
     return decoded;
   });
@@ -512,8 +515,9 @@ function timeline<T extends { from: string | null }>(value: unknown, path: strin
   return entries;
 }
 
-function perBox(value: unknown, path: string): PerBox {
+function perBox(value: unknown, path: string, version: number): PerBox {
   const o = record(value, path);
+  if (version >= 11 && o.value === null && o.from === null) return { from: null, value: null };
   const count = field(o, 'value', path, nonnegative);
   return count >= 1 ? { from: field(o, 'from', path, timeOrNull), value: count } : invalid(`${path}.value`, '1以上の整数が必要');
 }
@@ -523,9 +527,50 @@ function scopeEntry(value: unknown, path: string): ScopeEntry {
   return { from: field(o, 'from', path, timeOrNull), inScope: field(o, 'inScope', path, boolean) };
 }
 
-function packaging(value: unknown, path: string): Packaging {
+function packaging(value: unknown, path: string, version: number): Packaging {
   const o = record(value, path);
-  return { boxUnit: field(o, 'boxUnit', path, string), pieceUnit: field(o, 'pieceUnit', path, string), perBox: field(o, 'perBox', path, (v, p) => timeline(v, p, perBox)) };
+  const entries = field(o, 'perBox', path, (v, p) => timeline(v, p, (x, q) => perBox(x, q, version)));
+  if (entries[0]?.value === null && entries.length < 2) return invalid(path, '未知の初期値の後に設定時点の入り数が必要');
+  return { boxUnit: field(o, 'boxUnit', path, string), pieceUnit: field(o, 'pieceUnit', path, string), perBox: entries };
+}
+
+function settingChange(o: Record<string, unknown>, path: string, version: number): Extract<EventDetail, { kind: 'master' }> {
+  if (version < 11) return invalid(path, '旧版は包装・共通消耗品の設定操作を持たない');
+  exactKeys(o, [...eventMetaKeys(o, version), 'changes', 'action', 'reason', 'confirmed', 'masters'], path);
+  if (!Array.isArray(o.changes) || o.changes.length !== 0 || o.confirmed !== false) return invalid(path, '設定操作は現物を変更せずconfirmedはfalse');
+  const action = oneOf(o.action, `${path}.action`, ['packaging', 'consumable']);
+  const changes = array(o.masters, `${path}.masters`, (v, p) => {
+    const pair = record(v, p);
+    exactKeys(pair, ['before', 'after'], p);
+    const change = masterChange(v, p, version);
+    const { before, after } = change;
+    if (before?.type !== 'item' || after.type !== 'item' || before.id !== after.id) return invalid(p, '同じ品目の変更前後が必要');
+    exactKeys(record(pair.before, `${p}.before`), Object.keys(before), `${p}.before`);
+    exactKeys(record(pair.after, `${p}.after`), Object.keys(after), `${p}.after`);
+    const expected = action === 'consumable' ? { ...before, consumable: after.consumable } : { ...before, packaging: after.packaging };
+    if (JSON.stringify(expected) !== JSON.stringify(after) || JSON.stringify(before) === JSON.stringify(after)) return invalid(p, '設定操作は対象設定だけを変更する');
+    if (action === 'packaging') {
+      const packaging = after.packaging, last = packaging?.perBox.at(-1);
+      if (packaging === null || last?.value === null || last?.value === undefined) return invalid(p, '包装の初期設定が必要');
+      const expectedPackaging = initialPackaging(before, { occurredAt: field(o, 'occurredAt', path, timeOrNull), recordedAt: field(o, 'recordedAt', path, time) }, packaging.boxUnit, packaging.pieceUnit, last.value);
+      if (JSON.stringify(expectedPackaging) !== JSON.stringify(packaging)) return invalid(p, '包装は未知の初期値と適用時点の入り数で始める');
+    }
+    return change;
+  });
+  if (changes.length !== 1) return invalid(path, '設定操作は一つの品目だけが対象');
+  return { kind: 'master', action, reason: field(o, 'reason', path, nonblank), confirmed: false, masters: changes };
+}
+
+function consumable(value: unknown, path: string): ConsumableSetting {
+  const o = record(value, path);
+  exactKeys(o, ['pieceUnit', 'rule'], path);
+  return { pieceUnit: field(o, 'pieceUnit', path, nonblank), rule: nullable(o.rule, `${path}.rule`, (value, p) => {
+    const rule = record(value, p);
+    exactKeys(rule, ['threshold', 'standardOrder'], p);
+    const order = record(rule.standardOrder, `${p}.standardOrder`);
+    exactKeys(order, ['value', 'unit'], `${p}.standardOrder`);
+    return { threshold: field(rule, 'threshold', p, amount), standardOrder: { value: field(order, 'value', `${p}.standardOrder`, amount), unit: field(order, 'unit', `${p}.standardOrder`, nonblank) } };
+  }) };
 }
 
 function units(value: unknown, path: string): string[] {
@@ -542,11 +587,16 @@ function itemMaster(value: unknown, path: string, version: number): ItemMaster {
   const decodedUnits = field(o, 'units', path, units);
   if (version < 5 && Object.hasOwn(o, 'unitSteps')) return invalid(`${path}.unitSteps`, '旧版は精度属性を持たない');
   const unitSteps = version >= 5 ? checkedUnitSteps(o.unitSteps, decodedUnits) : integerUnitSteps(decodedUnits);
-  return {
+  if (version < 11 && Object.hasOwn(o, 'consumable')) return invalid(`${path}.consumable`, '旧版は共通消耗品の設定を持たない');
+  const item: ItemMaster = {
     type: masterType(o, path, 'item'), id: field(o, 'id', path, string), code: field(o, 'code', path, textOrNull), name: field(o, 'name', path, string),
     source: nullable(o.source, `${path}.source`, source), units: decodedUnits, unitSteps, trial: field(o, 'trial', path, boolean),
-    active: field(o, 'active', path, boolean), packaging: nullable(o.packaging, `${path}.packaging`, packaging),
+    active: field(o, 'active', path, boolean), packaging: nullable(o.packaging, `${path}.packaging`, (v, p) => packaging(v, p, version)),
+    consumable: version < 11 ? null : nullable(o.consumable, `${path}.consumable`, consumable),
   };
+  checkedConsumable(item, item.consumable);
+  if (item.packaging !== null) checkPackagingUnits(item, item.packaging);
+  return item;
 }
 
 function locationMaster(value: unknown, path: string): LocationMaster {
@@ -614,6 +664,7 @@ function ledger(value: unknown, path: string, table: QuantityTable | null, versi
     masters: o.masters === undefined && version < 3 ? fixedMasters : field(o, 'masters', path, (v, p) => masters(v, p, version)),
   };
   validateMasterPrecision(decoded, path);
+  requireConsistentItemSettings(decoded);
   validateSplitLineage(decoded, path);
   validateReworkLinks(decoded);
   for (const event of decoded.history) {
@@ -1031,8 +1082,8 @@ export function decodeSnapshot(value: unknown): Snapshot {
   if (opFloor < 1) return invalid(`${path}.opFloor`, '1以上の番号下限が必要');
   const saveChecks = array(o.saveChecks, `${path}.saveChecks`, saveCheck);
   if (new Set(saveChecks.map(check => check.opId)).size !== saveChecks.length) return invalid(`${path}.saveChecks`, '操作IDごとの解消記録は一件まで');
-  // 旧版も読み込むが保存先は書き換えない。次の確定からセット推計を持てる版10で書く。
-  const version = oneOf(o.version, `${path}.version`, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  // 旧版も読み込むが保存先は書き換えない。次の確定から共通消耗品の設定を持てる版11で書く。
+  const version = oneOf(o.version, `${path}.version`, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   if (version === 1 && o.quantities !== undefined) return invalid(`${path}.version`, '版1の写しは数量の表を持たない');
   const table = o.quantities === undefined ? null : quantityTable(o.quantities, `${path}.quantities`);
   const decodedLedger = ledger(o.ledger, `${path}.ledger`, table, version);
@@ -1048,7 +1099,7 @@ export function decodeSnapshot(value: unknown): Snapshot {
   const reviews = conflictReviews(o, path, version);
   requireDistinctRecordIds(decodedLedger, decodedSupply, reviews, path);
   return {
-    format: oneOf(o.format, `${path}.format`, ['fuzzy-stock-f0']), version: 10, revision: field(o, 'revision', path, nonnegative), lastWriter: field(o, 'lastWriter', path, string), opFloor,
+    format: oneOf(o.format, `${path}.format`, ['fuzzy-stock-f0']), version: 11, revision: field(o, 'revision', path, nonnegative), lastWriter: field(o, 'lastWriter', path, string), opFloor,
     ledger: decodedLedger, supply: decodedSupply, ops: dictionary(o.ops, `${path}.ops`, opEntry), saveChecks, conflictReviews: reviews,
   };
 }
@@ -1079,7 +1130,7 @@ export function decodePending(value: unknown): Pending {
   let version = 1;
   if (Object.hasOwn(envelope, 'format') || Object.hasOwn(envelope, 'version') || Object.hasOwn(envelope, 'pending')) {
     oneOf(envelope.format, `${path}.format`, ['fuzzy-stock-pending']);
-    version = oneOf(envelope.version, `${path}.version`, [4, 5, 6, 7, 8, 9, 10]);
+    version = oneOf(envelope.version, `${path}.version`, [4, 5, 6, 7, 8, 9, 10, 11]);
     o = record(envelope.pending, `${path}.pending`);
   }
   // 単位どうしは同じ数量の表を共有するので、検査済みの組も共有する。

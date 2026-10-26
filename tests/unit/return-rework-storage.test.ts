@@ -19,7 +19,7 @@ function adopted(value = 2, custom = false) {
   return adoptProvisional(l, meta('assign'), 'found', { id: 'returned', item, unit, project: { kind: 'case', id: 'A-001' }, location: 'T' }, true);
 }
 const begun = () => beginReturnedRework(adopted(), meta('repair-start'), request);
-const pendingOf = (s: Snapshot) => ({ format: 'fuzzy-stock-pending', version: 9, pending: { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op1', opLabel: '戻り手直し', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at, units: [{ ledger: s.ledger, supply: s.supply, targets: [], conflictReviews: [] }] } });
+const pendingOf = (s: Snapshot) => ({ format: 'fuzzy-stock-pending', version: 11, pending: { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op1', opLabel: '戻り手直し', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at, units: [{ ledger: s.ledger, supply: s.supply, targets: [], conflictReviews: [] }] } });
 const storeOf = () => {
   const data = new Map<string, string>();
   return { data, getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); }, removeItem: (key: string) => { data.delete(key); } } satisfies StoreLike & { data: Map<string, string> };

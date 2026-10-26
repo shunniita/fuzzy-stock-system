@@ -17,7 +17,7 @@ const recipe: ReceiptTemplate = { id: 'r1', name: '架空セット', product: 'R
 const saved = () => ({ ledger: practiceLedger, supply: saveReceiptTemplate(practiceLedger, emptySupply, meta('op1'), recipe) });
 const rows = (quantities: number[], shortfalls: number[]) => quantities.map((quantity, i) => ({ quantity, shortfall: shortfalls[i] ?? 0 }));
 const withShortfall = () => receiveTemplate(saved(), meta('op2'), 'r1', caseA, 10, rows([20, 7, 40], [0, 3, 0]), '架空商社');
-const pendingOf = (s: ReturnType<typeof initial>, version = 9) => ({ format: 'fuzzy-stock-pending', version, pending: { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op2', opLabel: '一括受入', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at, units: [{ ledger: s.ledger, supply: s.supply, targets: [], conflictReviews: [] }] } });
+const pendingOf = (s: ReturnType<typeof initial>, version = 11) => ({ format: 'fuzzy-stock-pending', version, pending: { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op2', opLabel: '一括受入', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at, units: [{ ledger: s.ledger, supply: s.supply, targets: [], conflictReviews: [] }] } });
 
 describe('セット 要件1', () => {
   test('製品を持ち案件・用途を持たない形で保存し、製品なしは拒否する', () => {
@@ -85,7 +85,7 @@ describe('案件・用途・個数からの受け取りと欠品 要件2・3', (
 // 版7の記録は、セットに案件・用途があり製品がなく、まとめて受け取りに案件・用途・手配先・不足がない。
 function asVersion7(snapshot: ReturnType<typeof initial>): Record<string, unknown> {
   const text = JSON.stringify({ ...snapshot, version: 7 }, (key, value: unknown) => {
-    if (key === 'itemLabels') return undefined;
+    if (key === 'consumable' || key === 'itemLabels') return undefined;
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
     const o = value as Record<string, unknown>;
     if ('basis' in o && 'rows' in o && 'name' in o) { const { product: _p, ...rest } = o; return { ...rest, project: caseA }; }
@@ -108,7 +108,7 @@ describe('保存と互換性 要件4', () => {
     const old = asVersion7(initial(result.ledger, result.supply)), before = JSON.stringify(old);
     const decoded = decodeSnapshot(old);
     expect(JSON.stringify(old)).toBe(before);
-    expect(decoded.version).toBe(10);
+    expect(decoded.version).toBe(11);
     expect(decoded.supply.receiptTemplates['r1']).toEqual({ ...recipe, product: null, project: caseA });
     expect(decoded.supply.log.at(-1)).toMatchObject({ kind: 'templateReceipt', project: caseA, vendor: null, rows: [{ shortfall: 0 }, { shortfall: 0 }, { shortfall: 0 }] });
     const source = decoded.supply.log.at(-1)!;

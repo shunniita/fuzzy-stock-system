@@ -16,7 +16,7 @@ function olderText(snapshot: Snapshot, version: 1 | 2): string {
   delete value.ledger['masters'];
   delete (value as Record<string, unknown>)['conflictReviews'];
   value.version = version;
-  return JSON.stringify(value, (key, entry: unknown) => key === 'itemLabels' || key === 'receiptTemplates' ? undefined : entry);
+  return JSON.stringify(value, (key, entry: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'receiptTemplates' ? undefined : entry);
 }
 
 function wrap(snapshotText: string): Uint8Array {
@@ -36,7 +36,7 @@ describe('F1-B 1.2・9.4 以前の版の記録を固定の架空登録情報で�
     test(`版${version}の写しは、保管単位・履歴をそのままに、固定登録情報を補った現行版として読む`, () => {
       const original = current();
       const read = parse(olderText(original, version));
-      expect(read.version).toBe(10);
+      expect(read.version).toBe(11);
       expect(read.ledger.masters).toEqual(fixedMasters);
       expect(read.ledger.lots).toEqual(original.ledger.lots);
       expect(read.ledger.history).toEqual(original.ledger.history.map(e => ({ ...e, ...legacyEventLabels })));
@@ -64,12 +64,12 @@ describe('F1-B 1.2・9.1・9.7 版3の保存と検査', () => {
   test('現行版で書き、往復しても登録情報が同じ', () => {
     const changed: Masters = { ...fixedMasters, items: { ...fixedMasters.items, P: { ...fixedMasters.items.P!, name: '架空部品P改', active: false } } };
     const original = { ...current(), ledger: { ...current().ledger, masters: changed } };
-    expect(JSON.parse(serialize(original))).toMatchObject({ version: 10 });
+    expect(JSON.parse(serialize(original))).toMatchObject({ version: 11 });
     expect(parse(serialize(original)).ledger.masters).toEqual(changed);
   });
 
-  test('版11の写しは読まず、版11の写しを包んだバックアップは新しい版として断る', () => {
-    const text = serialize(current()).replace('"version":10', '"version":11');
+  test('版12の写しは読まず、版12の写しを包んだバックアップは新しい版として断る', () => {
+    const text = serialize(current()).replace('"version":11', '"version":12');
     expect(() => parse(text)).toThrow('version');
     expect(readBackup(wrap(text)).kind).toBe('newer');
   });

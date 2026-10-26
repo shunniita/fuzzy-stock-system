@@ -108,7 +108,7 @@ export function readBackup(bytes: Uint8Array): BackupRead {
   try { inner = parseExactJson(snapshotText); }
   catch { return { kind: 'unreadable', reason: '記録の検査を通らない（記録がJSONとして読めない）' }; }
   const innerVersion: unknown = typeof inner === 'object' && inner !== null ? Reflect.get(inner, 'version') : undefined;
-  if (typeof innerVersion === 'number' && Number.isInteger(innerVersion) && innerVersion > 10) return { kind: 'newer' };
+  if (typeof innerVersion === 'number' && Number.isInteger(innerVersion) && innerVersion > 11) return { kind: 'newer' };
   try {
     const snapshot = parse(snapshotText);
     return { kind: 'ok', snapshot, createdAt, counts: recordCountsOf(snapshot), ...(typeof recoveryText === 'string' ? { recovery: parseRecovery(recoveryText) } : {}) };

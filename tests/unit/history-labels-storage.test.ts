@@ -119,7 +119,7 @@ describe('履歴表示 task5 真正旧pendingの非破壊読込と未保存分�
     if (result.kind !== 'saved') throw new Error('残りの保存が必要');
     const final = result.snapshot, last = pending.units.at(-1)!;
     expect(final.ledger).toEqual(last.ledger); expect(final.supply).toEqual(last.supply);
-    expect(final.revision).toBe(3); expect(final.version).toBe(10);
+    expect(final.revision).toBe(3); expect(final.version).toBe(11);
     expect(final.ops.op20!.units).toEqual([['op20-r', 'op20-r-c'], ['op20-a1'], ['op20-a2']]);
     expect(store.writes.filter(key => key.includes('/slot-'))).toHaveLength(3 - saved);
     expect(final.saveChecks).toEqual(mode === 'partial1' ? [] : [{ opId: 'op20', opLabel: op.opLabel, attempt: attemptOf(pending), openedAt: at,

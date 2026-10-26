@@ -2,6 +2,7 @@ import { legacyEventLabels } from '../fixtures/history-labels.ts';
 import { describe, expect, test } from 'vitest';
 import { practiceLedger, merge, recordStop, recount, register, resolveIssue, use, type Ledger, type Meta } from '../../src/domain/ledger.ts';
 import type { Basis } from '../../src/domain/quantity.ts';
+import { fixedMasters } from '../../src/domain/masters.ts';
 import { emptySupply } from '../../src/domain/supply.ts';
 import { seedLedger, seedScn02 } from '../../src/ui/seed.ts';
 import { commit, fingerprintOf, initial, load, parse, sameSnapshot, serialize, type Pending, type Snapshot, type StoreLike } from '../../src/ui/storage.ts';
@@ -176,16 +177,16 @@ describe('F1-0 要件2: 往復で失わない', () => {
 });
 
 describe('F1-0 要件3: 版1からの移行', () => {
-  const v1Text = (snapshot: Snapshot) => JSON.stringify({ ...snapshot, version: 1 }, (key, value: unknown) => key === 'itemLabels' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value);
+  const v1Text = (snapshot: Snapshot) => JSON.stringify({ ...snapshot, version: 1 }, (key, value: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value);
 
-  test('版1の写しは当時表示不明を補い、業務内容を保って今の版（9）へ読む', () => {
+  test('版1の写しは当時表示不明を補い、業務内容を保って今の版（11）へ読む', () => {
     const original = initial(uses('unknown', 10), emptySupply);
     const decoded = parse(v1Text(original));
-    expect(decoded.version).toBe(10);
-    expect(decoded).toEqual({ ...original, ledger: { ...original.ledger, history: original.ledger.history.map(e => ({ ...e, ...legacyEventLabels })) } });
+    expect(decoded.version).toBe(11);
+    expect(decoded).toEqual({ ...original, ledger: { ...original.ledger, masters: fixedMasters, history: original.ledger.history.map(e => ({ ...e, ...legacyEventLabels })) } });
   });
 
-  test('版1の写しを読んだだけでは保存先を書かず、次の確定は今の版（9）で書く', () => {
+  test('版1の写しを読んだだけでは保存先を書かず、次の確定は今の版（11）で書く', () => {
     const store = new MemoryStore();
     const original = initial(uses('counted', 10), emptySupply);
     store.data.set('fuzzy-stock/head', 'A');
@@ -197,7 +198,7 @@ describe('F1-0 要件3: 版1からの移行', () => {
     const result = commit(store, loaded.snapshot, operation(), [{ conflictReviews: [], ledger: next, supply: loaded.snapshot.supply, targets: ['保管単位X'] }]);
     expect(result.kind).toBe('saved');
     const written = store.data.get('fuzzy-stock/slot-B') ?? '';
-    expect(JSON.parse(written)).toMatchObject({ version: 10, quantities: expect.any(Object) });
+    expect(JSON.parse(written)).toMatchObject({ version: 11, quantities: expect.any(Object) });
     expect(store.data.get('fuzzy-stock/slot-A')).toBe(v1Text(original));
   });
 
@@ -208,9 +209,9 @@ describe('F1-0 要件3: 版1からの移行', () => {
     store.data.set('fuzzy-stock/slot-A', v1Text(current));
     const next = use(current.ledger, meta(900), 'X', 'counted', 1, '架空作業');
     const pending: Pending = { ...operation(), progress: 'saving', unknownSince: null, baseRevision: 0, units: [{ conflictReviews: [], ledger: next, supply: current.supply, targets: ['保管単位X'] }] };
-    store.data.set('fuzzy-stock/pending', JSON.stringify(pending, (key, value: unknown) => key === 'itemLabels' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value));
+    store.data.set('fuzzy-stock/pending', JSON.stringify(pending, (key, value: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value));
     const loaded = load(store);
-    expect(loaded).toMatchObject({ kind: 'ok', pending: { ...pending, units: pending.units.map(u => ({ ...u, ledger: { ...u.ledger, history: u.ledger.history.map(e => ({ ...e, ...legacyEventLabels })) } })) } });
+    expect(loaded).toMatchObject({ kind: 'ok', pending: { ...pending, units: pending.units.map(u => ({ ...u, ledger: { ...u.ledger, masters: fixedMasters, history: u.ledger.history.map(e => ({ ...e, ...legacyEventLabels })) } })) } });
   });
 
   test('版1の本文に数量の番号があれば読み込めない', () => {
@@ -344,7 +345,7 @@ describe('F1-0 要件4: 不正な版2の拒否', () => {
         if (target === 'pending') store.data.set('fuzzy-stock/pending', JSON.stringify({
           ...operation(), progress: 'saving', unknownSince: null, baseRevision: 0,
           units: [{ ledger, supply: current.supply, targets: ['X'] }], quantities,
-        }, (key, value: unknown) => key === 'itemLabels' || key === 'unitSteps' || key === 'receiptTemplates' ? undefined : value));
+        }, (key, value: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'unitSteps' || key === 'receiptTemplates' ? undefined : value));
         const before = [...store.data];
         const loaded = load(store);
         expect(loaded).toMatchObject(copies === 2

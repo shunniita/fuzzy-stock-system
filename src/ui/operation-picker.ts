@@ -8,7 +8,7 @@ export const operationGroups = [
   { id: 'receipts', label: '受け取り・割り当て・返却', keys: ['receive', 'templateReceive', 'templateSave', 'templateDelete', 'allocate', 'receiptRevise', 'arrivalRevise', 'surplusAllocate', 'spareSwap', 'returnAck', 'remainder'] },
   { id: 'corrections', label: '数え直し・訂正・照合', keys: ['recount', 'declare', 'correctTime', 'void', 'resolve', 'needImportResolve'] },
   { id: 'provisional', label: '仮の記録・所属の整理', keys: ['provisional', 'identify', 'adopt', 'assignProject'] },
-  { id: 'masters', label: '登録情報の登録・変更', keys: ['masterItem', 'masterLocation', 'masterCase', 'masterActor', 'masterRename', 'masterDeactivate', 'masterReactivate', 'masterCode', 'masterSource', 'masterPerBox', 'masterScope'] },
+  { id: 'masters', label: '登録情報の登録・変更', keys: ['masterItem', 'masterLocation', 'masterCase', 'masterActor', 'masterRename', 'masterDeactivate', 'masterReactivate', 'masterCode', 'masterSource', 'masterPerBox', 'masterConsumable', 'masterScope'] },
 ];
 
 export function operationPicker(operations: Readonly<Record<string, { label: string }>>, current: string): { browsing: HTMLElement; operation: HTMLSelectElement } {

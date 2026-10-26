@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { codeOwner, fixedMasters, inScopeAt, perBoxAt, requireActive, type Masters, type Packaging } from '../../src/domain/masters.ts';
-import { stockItems } from '../../src/ui/seed.ts';
+import { consumablesOf } from '../../src/domain/packaging.ts';
+import { practiceMasters } from '../../src/domain/masters.ts';
 
 describe('F1-B 1.1 固定の架空登録情報', () => {
   test('9.5: 品目・場所・案件・用途・担当者は、F1-Aまでの固定の架空データと同じ', () => {
@@ -23,7 +24,7 @@ describe('F1-B 1.1 固定の架空登録情報', () => {
 
   test('6.2: ネジSの1箱あたりの数は最初から1000本（F1-Aまでの固定の値）、包装のないほかの品目は換算しない', () => {
     expect(fixedMasters.items.S?.packaging).toEqual({ boxUnit: '箱', pieceUnit: '本', perBox: [{ from: null, value: 1000 }] });
-    expect(stockItems.map((cfg) => cfg.item)).toEqual(['S', 'V']);
+    expect(consumablesOf(practiceMasters).map((cfg) => cfg.item)).toEqual(['S', 'V']);
     expect(Object.values(fixedMasters.items).filter((i) => i.packaging !== null).map((i) => i.id)).toEqual(['S']);
   });
 

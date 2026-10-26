@@ -117,8 +117,8 @@ export function positivePartMinus(plus: readonly number[], minus: readonly numbe
   return numberFromTicks(checkedTicks((difference > 0n ? difference : 0n) - checkedTicks(ticksFromNumber(subtrahend), step), step));
 }
 
-export function multiplyScalarByInteger(value: number, multiplier: number, step: Step): number {
+export function multiplyScalarByInteger(value: number, multiplier: number, step: Step, resultStep: Step = step): number {
   if (!Number.isSafeInteger(multiplier) || multiplier < 0) throw new Error('倍率は0以上の安全な整数にする');
   const ticks = checkedTicks(ticksFromNumber(value), step);
-  return numberFromTicks(checkedTicks(ticks * BigInt(multiplier), step));
+  return numberFromTicks(checkedTicks(ticks * BigInt(multiplier), resultStep));
 }

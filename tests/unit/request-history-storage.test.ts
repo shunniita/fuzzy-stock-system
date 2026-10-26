@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { deepFreeze, practiceLedger, type Meta } from '../../src/domain/ledger.ts';
+import { fixedMasters } from '../../src/domain/masters.ts';
 import { receiveTemplate, saveReceiptTemplate, type ReceiptTemplate } from '../../src/domain/receipt-template.ts';
 import { allocateArrival, cancelRequest, confirmOrder, emptySupply, receiveLot, recordReply, recordRequest, reviseArrival, reviseReceipt, type Supply } from '../../src/domain/supply.ts';
 import { backupTextOf, crc32, readBackup } from '../../src/ui/backup.ts';
@@ -20,7 +21,7 @@ const getRequest = (supply: Supply, id = 'q1') => {
 };
 const unitOf = (snapshot: Snapshot) => ({ ledger: snapshot.ledger, supply: snapshot.supply, targets: [], conflictReviews: [] });
 const pendingOf = (snapshot: Snapshot) => ({
-  format: 'fuzzy-stock-pending', version: 9,
+  format: 'fuzzy-stock-pending', version: 11,
   pending: { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op1', opLabel: '依頼', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at, units: [unitOf(snapshot)] },
 });
 const readAsBackup = (snapshot: Snapshot) => readBackup(new TextEncoder().encode(backupTextOf(snapshot, at)));
@@ -92,7 +93,7 @@ describe('依頼照合 要件3.2: 正当な既存データと後日変更', () =
     const seed = seedScn02();
     expectAccepted(initial(seed.ledger, seed.supply));
     expectAccepted(initial(practiceLedger, manual()));
-    expect(parse(serialize(initial(seed.ledger, seed.supply))).version).toBe(10);
+    expect(parse(serialize(initial(seed.ledger, seed.supply))).version).toBe(11);
   });
 
   test('回答・発注・到着・取消後訂正と、過剰割り当て中の訂正を受け付ける', () => {
@@ -127,17 +128,18 @@ describe('依頼照合 要件3.2: 正当な既存データと後日変更', () =
     const seed = seedScn02(), current = initial(seed.ledger, seed.supply);
     const withoutLabels = <T extends { itemLabels: unknown }>({ itemLabels: _, ...body }: T) => body;
     const oldSupply = { ...seed.supply, log: seed.supply.log.map(e => ({ ...e, itemLabels: { kind: 'legacy-unavailable' as const } })) };
-    const oldLedger = { ...seed.ledger, history: seed.ledger.history.map(e => ({ ...e, itemLabels: { kind: 'legacy-unavailable' as const } })) };
+    const oldLedger = { ...seed.ledger, masters: fixedMasters, history: seed.ledger.history.map(e => ({ ...e, itemLabels: { kind: 'legacy-unavailable' as const } })) };
     const { conflictReviews, ...withoutReviews } = current;
     const { receiptTemplates, ...withoutTemplates } = seed.supply;
     const { masters, ...withoutMasters } = seed.ledger;
-    const oldMasters = { ...masters, items: Object.fromEntries(Object.entries(masters.items).map(([id, master]) => {
+    const legacyMasters = { ...masters, items: Object.fromEntries(Object.entries(masters.items).map(([id, { consumable: _, ...master }]) => [id, master])) };
+    const oldMasters = { ...legacyMasters, items: Object.fromEntries(Object.entries(legacyMasters.items).map(([id, master]) => {
       const { unitSteps, ...old } = master;
       return [id, old];
     })) };
     const input = deepFreeze({ ...withoutReviews, version,
       ...(version >= 6 ? { conflictReviews } : {}),
-      ledger: { ...withoutMasters, history: seed.ledger.history.map(withoutLabels), ...(version >= 3 ? { masters: version >= 5 ? masters : oldMasters } : {}) },
+      ledger: { ...withoutMasters, history: seed.ledger.history.map(withoutLabels), ...(version >= 3 ? { masters: version >= 5 ? legacyMasters : oldMasters } : {}) },
       supply: { ...withoutTemplates, log: seed.supply.log.map(withoutLabels), ...(version >= 7 ? { receiptTemplates } : {}) },
     });
     const text = JSON.stringify(input);

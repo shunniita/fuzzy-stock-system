@@ -156,7 +156,7 @@ describe('保存と照合', () => {
     expect(readBackup(new TextEncoder().encode(backupTextOf(snapshot, at)))).toMatchObject({ kind: 'ok', snapshot });
   });
   test('版9の保存データにセット推計があれば拒否する', () => {
-    const wire = JSON.parse(serialize(initial(recorded().ledger, recorded().supply)));
+    const wire = JSON.parse(serialize(initial(recorded().ledger, recorded().supply)), (key, value: unknown) => key === 'consumable' ? undefined : value);
     expect(() => decodeSnapshot({ ...wire, version: 9 })).toThrow('旧版はセット推計を持たない');
   });
   test.each([

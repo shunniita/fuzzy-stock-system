@@ -172,7 +172,7 @@ describe('FH-F1A-05・F1-A 3.1〜3.4: 復元に使えないファイルを断る
     expect(readBackup(utf8(JSON.stringify({ ...envelope, version: 3 }))).kind).toBe('newer');
     // 新しい版は欄が増えているかもしれないので、欄の検査より前に版で判断する。
     expect(readBackup(utf8(JSON.stringify({ ...envelope, version: 7, extra: { a: 1 }, crc32: 'x' }))).kind).toBe('newer');
-    expect(readBackup(utf8(wrap(serialize(snapshot()).replace('"version":10', '"version":11')))).kind).toBe('newer');
+    expect(readBackup(utf8(wrap(serialize(snapshot()).replace('"version":11', '"version":12')))).kind).toBe('newer');
   });
 
   test('3.2: 作成時から変わっているもの（写しの1文字、作成日時）を断る', () => {
