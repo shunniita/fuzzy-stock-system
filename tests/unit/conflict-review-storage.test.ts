@@ -529,7 +529,8 @@ describe('競合保持: 復旧経路の総当たり（解消記録・索引・�
     // 総当たりが空振りでないこと。
     expect(claims).toBeGreaterThan(10);
     expect(blocked).toBeGreaterThan(50);
-  });
+  // 手元1.6秒の総当たりが、CIの並列実行では既定の5秒を超えたことがある。
+  }, 20_000);
 
   test('索引だけが失われた状態の照会は、保存先に照合記録があるのに保存0件とは答えない', async () => {
     const dropIndex = (store: Memory, reviews: readonly ConflictReview[]) => {

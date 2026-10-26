@@ -1688,7 +1688,8 @@ async function pendingAction(action: 'inquire' | 'retry' | 'abandon' | 'confirmS
       if (saveView.kind === 'unknown' || saveView.kind === 'partial') saveView = { ...saveView, inquiry };
       saveError = null;
     } else {
-      const actor = actorSelect.value;
+      // 最初の担当者の登録を確かめる時点では選べる担当者がいないため、登録しようとした本人を記録する。
+      const actor = Object.keys(ledger.masters.actors).length === 0 ? original.actor : actorSelect.value;
       const at = nowIso();
       if (action === 'retry') await applyCommit(await retry(browserStore, snapshot, original, actor, at), original.opId);
       else await applySettlement(action === 'abandon' ? await abandon(browserStore, snapshot, original, actor, at) : await confirmSaved(browserStore, snapshot, original, actor, at), original);
