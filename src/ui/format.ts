@@ -379,7 +379,6 @@ function masterRefText(m: Master): string {
   return `${masterTypeDisplayLabel[m.type]}${m.code ?? unassignedCode}${name}`;
 }
 
-// 登録情報の変更の前後を一つの文にする（要件10.2）。仮の既存IDは「既存IDなし（仮）」と書く（要件4.7）。
 export function consumableSettingText(setting: ConsumableSetting | null): string {
   if (setting === null) return '対象外';
   const rule = setting.rule;
@@ -392,6 +391,7 @@ export function packagingSettingText(packaging: Packaging | null): string {
   return `1${packaging.boxUnit}あたりの数：${packaging.perBox.map(entry => `${entry.from === null ? '最初から' : `${jst(entry.from)}から`}${entry.value === null ? '不明' : `${entry.value}${packaging.pieceUnit}`}`).join('、')}`;
 }
 
+// 登録情報の変更の前後を一つの文にする（要件10.2）。仮の既存IDは「既存IDなし（仮）」と書く（要件4.7）。
 function masterChangeText(action: MasterRequest['action'], { before, after }: MasterChange): string {
   const ref = masterRefText(after);
   switch (action) {
@@ -447,7 +447,7 @@ export type Totals = {
 // 絞り込んだ範囲の集計。単位の違う数量は合計しない（AT-10）ので、品目と単位の組ごとに行を分ける。
 export function totalsOf(ledger: Ledger, lots: readonly Lot[]): Totals[] {
   const groups = new Map<string, { item: string; unit: string }>();
-  for (const l of lots) groups.set(`${l.item} ${l.unit}`, { item: l.item, unit: l.unit });
+  for (const l of lots) groups.set(`${l.item}\0${l.unit}`, { item: l.item, unit: l.unit });
   const ids = new Set(lots.map((l) => l.id));
   return [...groups.values()].map(({ item, unit }) => {
     const inGroup = (l: Lot) => ids.has(l.id) && l.unit === unit;
