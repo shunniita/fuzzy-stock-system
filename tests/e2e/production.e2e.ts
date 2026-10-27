@@ -195,7 +195,7 @@ test('MFG-06: 次工程への引渡しの渡した先は次工程Nだけで、�
   await startEmpty(page);
   const form = page.getByRole('form', { name: '操作の入力' });
   await selectOperation(form.locator('[name=op]'), { label: '次の作業へ渡す' });
-  await expect(form.locator('[name=location] option')).toHaveText(['選ぶ', '次工程N（N）']);
+  await expect(form.locator('[name=location] option')).toHaveText(['次工程N（N）']);
 });
 
 test('AT-29・DAT-04: 材料が足りず使用が保留されても作業の開始は記録し、他の材料は減らし、確認事項が開いたことをその場で知らせる', async ({ page }) => {

@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
-  changeMasters, correctOccurredAt, practiceLedger, handOver, move, recordProvisional, recordStop, recount, register, split, start, use, voidRecord,
+  changeMasters, correctOccurredAt, practiceLedger as practiceBase, handOver, move, recordProvisional, recordStop, recount, register, split, start, use, voidRecord,
   type Ledger, type Meta, type Project,
 } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: 'R組立', criterion: 'inspection' });
 import { fixedMasters, type Masters } from '../../src/domain/masters.ts';
 
 const day = (time: string): string => `2026-10-09T${time}:00+09:00`;
@@ -15,7 +17,7 @@ const lotAt = (id: string, location: string, item = 'Q', project: Project = comm
 function prepared(): Ledger {
   const before = register(practiceLedger, meta('r0', '08:00'), lotAt('P-old', 'S1', 'P'), 'counted', 10);
   const masters: Masters = {
-    ...fixedMasters,
+    ...fixedMasters, processes: practiceLedger.masters.processes,
     items: { ...fixedMasters.items, P: { ...fixedMasters.items.P!, active: false } },
     cases: { ...fixedMasters.cases, 'A-001': { ...fixedMasters.cases['A-001']!, active: false } },
     locations: {
@@ -55,7 +57,7 @@ describe('F1-B 2.1・3.4 新しい記録に利用停止の登録情報を使わ�
 
   test('作業の中断も新しい記録なので、中断した品目・不足品目・案件・用途に利用停止の登録情報を使わない', () => {
     const l = prepared();
-    const stop = { process: '架空工程', item: 'R', unit: '台', project: { kind: 'case', id: 'A-002' } as Project, reason: '部品不足', shortage: { item: 'Q', unit: '個', value: 1 }, affected: null };
+    const stop = { process: 'R組立', item: 'R', unit: '台', project: { kind: 'case', id: 'A-002' } as Project, reason: '部品不足', shortage: { item: 'Q', unit: '個', value: 1 }, affected: null };
     expect(() => recordStop(l, meta('s1', '09:00'), { ...stop, item: 'P', unit: '個' })).toThrow('利用停止');
     expect(() => recordStop(l, meta('s2', '09:00'), { ...stop, shortage: { item: 'P', unit: '個', value: 1 } })).toThrow('利用停止');
     expect(() => recordStop(l, meta('s3', '09:00'), { ...stop, project: { kind: 'case', id: 'A-001' } })).toThrow('利用停止');

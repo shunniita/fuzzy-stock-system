@@ -39,25 +39,22 @@ async function intake(page: Page) {
   await formOf(page).getByRole('button', { name: '記録する', exact: true }).click();
   await expect(status(page)).toContainText('記録した');
 }
-async function begin(page: Page, childId: string, process: string, criterion: string, value = '2') {
-  await record(page, 'returnRework', { lot: 'returned', childId, process, criterion, basis: 'counted', value, reason: '新しい物理作業' }, '14:00');
+async function begin(page: Page, childId: string, process: string, value = '2') {
+  await record(page, 'returnRework', { lot: 'returned', childId, process, basis: 'counted', value, reason: '新しい物理作業' }, '14:00');
   await expect(status(page)).toContainText('物理的なやり直し・修理');
   await formOf(page).locator('[name=confirmedPhysical]').check();
   await formOf(page).getByRole('button', { name: '記録する', exact: true }).click();
   await expect(status(page)).toContainText('記録した');
 }
 
-test('MFG-02/FH-RRS-01: 既存工程の完了基準を返ってきた物のやり直し・修理で変えず、作業終了後は確認待ちにする', async ({ page }) => {
+test('MFG-02/FH-RRS-01: 返ってきた物のやり直し・修理は登録済みの工程から選び、完了基準は登録に従って作業終了後は確認待ちにする', async ({ page }) => {
   await startEmpty(page);
   await recorded(page, 'start', { newId: 'normal', item: 'R', project: 'A-001', location: 'T', process: 'R組立', basis: 'label', value: '3' }, '10:00');
   await intake(page);
-  const before = await storageBytes(page);
-  await record(page, 'returnRework', { lot: 'returned', childId: 'repair', process: ' R組立 ', criterion: 'workEnd', basis: 'counted', value: '2', reason: '架空の物理作業' }, '14:00');
-  await formOf(page).locator('[name=confirmedPhysical]').check();
-  await formOf(page).getByRole('button', { name: '記録する', exact: true }).click();
-  await expect(status(page)).toContainText('完了基準');
-  expect(await storageBytes(page)).toEqual(before);
-  await begin(page, 'repair', ' R組立 ', 'inspection');
+  await selectOperation(formOf(page).locator('[name=op]'), 'returnRework');
+  await expect(formOf(page).locator('[name=criterion]')).toHaveCount(0);
+  await expect(formOf(page).locator('[name=process] option')).toHaveText(['選ぶ', '工程R組立（完了基準：作業終了後の確認の完了）']);
+  await begin(page, 'repair', 'R組立');
   await recorded(page, 'finish', { lot: 'repair', childId: 'inspection', basis: 'counted', value: '2' }, '15:00');
   const after = await snapshotOf(page);
   expect(after.ledger.lots['normal']?.stage).toMatchObject({ kind: 'working', process: { id: 'R組立', criterion: 'inspection' } });
@@ -69,14 +66,14 @@ test('MFG-06/FH-RRS-01: 次工程Nの返ってきた物は保存せず移動を�
   await startEmpty(page); await intake(page);
   await recorded(page, 'move', { lot: 'returned', location: 'N' }, '13:30');
   const before = await storageBytes(page);
-  await record(page, 'returnRework', { lot: 'returned', childId: 'repair', process: 'R組立', criterion: 'inspection', basis: 'counted', value: '2', reason: '架空の物理作業' }, '14:00');
+  await record(page, 'returnRework', { lot: 'returned', childId: 'repair', process: 'R組立', basis: 'counted', value: '2', reason: '架空の物理作業' }, '14:00');
   await formOf(page).locator('[name=confirmedPhysical]').check();
   await formOf(page).getByRole('button', { name: '記録する', exact: true }).click();
   await expect(status(page)).toContainText('次工程N');
   await expect(status(page)).toContainText('移動してから');
   expect(await storageBytes(page)).toEqual(before);
   await recorded(page, 'move', { lot: 'returned', location: 'T' }, '14:30');
-  await record(page, 'returnRework', { lot: 'returned', childId: 'repair', process: 'R組立', criterion: 'inspection', basis: 'counted', value: '2', reason: '架空の物理作業' }, '15:00');
+  await record(page, 'returnRework', { lot: 'returned', childId: 'repair', process: 'R組立', basis: 'counted', value: '2', reason: '架空の物理作業' }, '15:00');
   await formOf(page).locator('[name=confirmedPhysical]').check();
   await formOf(page).getByRole('button', { name: '記録する', exact: true }).click();
   await expect(status(page)).toContainText('記録した');
@@ -85,14 +82,14 @@ test('MFG-06/FH-RRS-01: 次工程Nの返ってきた物は保存せず移動を�
 
 test('ADR-041/FH-RRS-05: 返ってきた物のやり直し・修理をTabとキーボードだけで選択・確認・保存する', async ({ page }) => {
   await startEmpty(page); await intake(page);
+  await recorded(page, 'masterProcess', { name: 'キーボード工程', criterion: 'inspection' }, '13:30');
   const before = await snapshotOf(page);
   const form = formOf(page);
   // 受付済みのfixtureから先は、クリック・focus・selectOption・fillを使わない。
   await keyboardChoose(page, page.getByLabel('作業の種類', { exact: true }), 'rework');
   await keyboardChoose(page, form.locator('[name=op]'), 'returnRework');
   await keyboardChoose(page, form.locator('[name=lot]'), 'returned');
-  await keyboardText(page, form.locator('[name=process]'), 'キーボード工程');
-  await keyboardChoose(page, form.locator('[name=criterion]'), 'inspection');
+  await keyboardChoose(page, form.locator('[name=process]'), 'キーボード工程');
   await keyboardText(page, form.locator('[name=childId]'), 'repair-keyboard');
   await keyboardChoose(page, form.locator('[name=basis]'), 'counted');
   await keyboardText(page, form.locator('[name=value]'), '2');
@@ -127,8 +124,9 @@ test('FH-RRS-02/03/04: 出庫後の戻り2台を検査再完了し、20台・元
   await recorded(page, 'inspect', { lot: 'inspection', childId: 'finished', basis: 'counted', value: '20' }, '11:00');
   await recorded(page, 'handover', { lot: 'finished', basis: 'counted', value: '2', counterpart: '外' }, '11:30');
   await intake(page);
+  await recorded(page, 'masterProcess', { name: '戻り工程', criterion: 'inspection' }, '13:30');
   const before = await snapshotOf(page), oldUses = before.ledger.history.filter(e => e.kind === 'use');
-  await begin(page, 'repair', '戻り工程', 'inspection');
+  await begin(page, 'repair', '戻り工程');
   await expect(cell(page, 'finished', '記録上の数と根拠')).toContainText('18台');
   await expect(cell(page, 'repair', '作業の状態')).toContainText('作業中');
   await expect(cell(page, 'repair', '取り分けた理由')).toContainText('使用可否確認待ち');
@@ -154,8 +152,10 @@ test('FH-RRS-02/03/04: 出庫後の戻り2台を検査再完了し、20台・元
 
 test('FH-RRS-01/03: 未確認・確認失効・過量・取消は保存せず、二工程の部分開始を分離する', async ({ page }) => {
   await startEmpty(page); await intake(page);
+  await recorded(page, 'masterProcess', { name: '作業終了工程', criterion: 'workEnd' }, '13:30');
+  await recorded(page, 'masterProcess', { name: '別検査工程', criterion: 'inspection' }, '13:30');
   const before = await storageBytes(page);
-  await record(page, 'returnRework', { lot: 'returned', childId: 'repair', process: '作業終了工程', criterion: 'workEnd', basis: 'counted', value: '1', reason: '物理作業' }, '14:00');
+  await record(page, 'returnRework', { lot: 'returned', childId: 'repair', process: '作業終了工程', basis: 'counted', value: '1', reason: '物理作業' }, '14:00');
   await expect(status(page)).toContainText('物理的なやり直し・修理');
   expect(await storageBytes(page)).toEqual(before);
   await formOf(page).locator('[name=confirmedPhysical]').check();
@@ -163,13 +163,13 @@ test('FH-RRS-01/03: 未確認・確認失効・過量・取消は保存せず、
   await expect(formOf(page).locator('[name=confirmedPhysical]')).not.toBeChecked();
   await selectOperation(formOf(page).locator('[name=op]'), 'returnRecord');
   expect(await storageBytes(page)).toEqual(before);
-  await record(page, 'returnRework', { lot: 'returned', childId: 'bad', process: '作業終了工程', criterion: 'workEnd', basis: 'counted', value: '3', reason: '過量' }, '14:00');
+  await record(page, 'returnRework', { lot: 'returned', childId: 'bad', process: '作業終了工程', basis: 'counted', value: '3', reason: '過量' }, '14:00');
   await formOf(page).locator('[name=confirmedPhysical]').check();
   await formOf(page).getByRole('button', { name: '記録する', exact: true }).click();
   await expect(status(page)).toContainText('負になる');
   expect(await storageBytes(page)).toEqual(before);
-  await begin(page, 'repair', '作業終了工程', 'workEnd', '1');
-  await begin(page, 'second', '別検査工程', 'inspection', '1');
+  await begin(page, 'repair', '作業終了工程', '1');
+  await begin(page, 'second', '別検査工程', '1');
   await recorded(page, 'finish', { lot: 'repair', childId: 'ready', basis: 'counted', value: '1' }, '15:00');
   await expect(cell(page, 'ready', '作業の状態')).toContainText('完成（渡す前）');
   await goTo(page, 'stock');

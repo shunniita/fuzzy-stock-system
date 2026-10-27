@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { beginReturnedRework, beginRework, changeStage, correctOccurredAt, practiceLedger, merge, move, recordProvisional, recordReworkPart, register, type Ledger, type Meta, type Process } from '../../src/domain/ledger.ts';
+import { beginReturnedRework, beginRework, changeStage, correctOccurredAt, practiceLedger as practiceBase, merge, move, recordProvisional, recordReworkPart, register, type Ledger, type Meta, type Process } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '架空修理', criterion: 'inspection' }, { id: '架空仕上げ', criterion: 'workEnd' });
 import { assignReturnedProvisional } from '../../src/domain/return-intake.ts';
 import { emptySupply, receiveLot, reviseReceipt, type Supply } from '../../src/domain/supply.ts';
 import { backupTextOf, readBackup } from '../../src/ui/backup.ts';
@@ -17,7 +19,7 @@ function found(location = 'T'): Ledger {
 function returned(location = 'T'): Ledger {
   return assignReturnedProvisional(found(location), meta('assign', 13), { kind: 'notIncluded', issueId: 'found', lot: { ...product, location }, reason: '現在数量に未包含', confirmed: true });
 }
-const pendingOf = (snapshot: Snapshot) => ({ format: 'fuzzy-stock-pending', version: 11, pending: {
+const pendingOf = (snapshot: Snapshot) => ({ format: 'fuzzy-stock-pending', version: 12, pending: {
   progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op1', opLabel: '架空操作', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at,
   units: [{ ledger: snapshot.ledger, supply: snapshot.supply, targets: [], conflictReviews: [] }],
 } });
@@ -38,12 +40,13 @@ describe('MFG-02/FH-RRS-01: 工程IDと完了基準', () => {
     expect(next.lots['repair']?.stage).toEqual({ kind: 'working', process });
     expect(next.history.at(-1)).toMatchObject({ returnSource: { process } });
   });
-  test('同じ工程IDでも完了基準の異なる既存の物はどちら向きにも統合しない', () => {
+  test('完了基準の異なる工程の物はどちら向きにも統合せず、同じ工程IDに別の完了基準を写さない', () => {
     let l = register(practiceLedger, meta('inspection', 10), { ...product, id: 'inspection', stage: { kind: 'working', process } }, 'label', 3);
-    l = register(l, meta('work-end', 11), { ...product, id: 'work-end', stage: { kind: 'working', process: { ...process, criterion: 'workEnd' } } }, 'label', 2);
+    expect(() => register(l, meta('same-id', 11), { ...product, id: 'same-id', stage: { kind: 'working', process: { ...process, criterion: 'workEnd' } } }, 'label', 2)).toThrow('完了基準が登録と異なる');
+    l = register(l, meta('work-end', 11), { ...product, id: 'work-end', stage: { kind: 'working', process: { id: '架空仕上げ', criterion: 'workEnd' } } }, 'label', 2);
     const before = serialize(initial(l, emptySupply));
-    expect(() => merge(l, meta('merge'), 'inspection', 'work-end')).toThrow(/完了基準/);
-    expect(() => merge(l, meta('merge'), 'work-end', 'inspection')).toThrow(/完了基準/);
+    expect(() => merge(l, meta('merge'), 'inspection', 'work-end')).toThrow('作業の状態が違う');
+    expect(() => merge(l, meta('merge'), 'work-end', 'inspection')).toThrow('作業の状態が違う');
     expect(serialize(initial(l, emptySupply))).toBe(before);
   });
   test('MFG-06: 次工程Nの返ってきた物は移動してからやり直し・修理を始める', () => {

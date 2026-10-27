@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { beginRework, changeStage, correctOccurredAt, practiceLedger, handOver, merge, recordReworkPart, recount, register, split, type Ledger, type Meta } from '../../src/domain/ledger.ts';
+import { beginRework, changeStage, correctOccurredAt, practiceLedger as practiceBase, handOver, merge, recordReworkPart, recount, register, split, type Ledger, type Meta } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '架空組立', criterion: 'workEnd' });
 import { emptySupply } from '../../src/domain/supply.ts';
 import { backupTextOf, readBackup } from '../../src/ui/backup.ts';
 import { initial, parse, serialize, serializePending, type Pending } from '../../src/ui/storage.ts';

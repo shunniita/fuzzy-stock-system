@@ -6,7 +6,7 @@ import { observe, quantityOf } from '../../src/domain/quantity.ts';
 import { jst, quantityText, totalsOf, totalsText } from '../../src/ui/format.ts';
 import { needQuantityText, replyText } from '../../src/ui/supply-format.ts';
 import { seedLedger, seedScn02 } from '../../src/ui/seed.ts';
-import { processes } from '../../src/domain/ledger.ts';
+const processes = [{ id: 'R組立', criterion: 'inspection' }] as const;
 import type { Sheet } from '../../src/ui/xlsx.ts';
 import { viewSheetsOf } from '../../src/ui/viewsheets.ts';
 import { meta } from './record-fixture.ts';

@@ -1,7 +1,9 @@
 import { legacyEventLabels } from '../fixtures/history-labels.ts';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { add, observe, quantityOf, subtract } from '../../src/domain/quantity.ts';
-import { correctOccurredAt, declareDiscrepancy, deepFreeze, practiceLedger, move, recount, recordProvisional, recordStop, resolveIssue, resumeWork, start, updateStop, use, voidRecord, type EventDetail, type Ledger, type Lot, type Meta, type Stop } from '../../src/domain/ledger.ts';
+import { correctOccurredAt, declareDiscrepancy, deepFreeze, practiceLedger as practiceBase, move, recount, recordProvisional, recordStop, resolveIssue, resumeWork, start, updateStop, use, voidRecord, type EventDetail, type Ledger, type Lot, type Meta, type Stop } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '工程', criterion: 'inspection' }, { id: '仕上げ工程', criterion: 'workEnd' });
 import { fixedMasters } from '../../src/domain/masters.ts';
 import { allocateArrival, cancelRequest, confirmOrder, emptySupply, receiveLot, recordReply, recordRequest, reviseArrival, type Declaration, type Supply, type SupplyDetail } from '../../src/domain/supply.ts';
 import { differenceText, eventText, quantityText } from '../../src/ui/format.ts';
@@ -147,13 +149,13 @@ function populated(): { ledger: Ledger; supply: ReturnType<typeof seedScn02>['su
 }
 
 function snapshot(): Snapshot {
-  return deepFreeze({ format: 'fuzzy-stock-f0', version: 11, conflictReviews: [], revision: 4, lastWriter: 'op9', opFloor: 30,
+  return deepFreeze({ format: 'fuzzy-stock-f0', version: 12, conflictReviews: [], revision: 4, lastWriter: 'op9', opFloor: 30,
     ...populated(), ops: { op9: { fingerprint: '入力', units: [['received'], ['arrival']] } },
     saveChecks: [{ opId: 'op8', opLabel: '受入', savedTargets: ['まとまり0012'], unsavedTargets: ['依頼op7'], attempt: '登録操作', openedAt: at, resolution: { outcome: 'remainderAbandoned', actor: '架空担当B', at: later } }],
   });
 }
 
-const pendingText = (value: unknown): string => JSON.stringify({ format: 'fuzzy-stock-pending', version: 11, pending: value });
+const pendingText = (value: unknown): string => JSON.stringify({ format: 'fuzzy-stock-pending', version: 12, pending: value });
 
 function pending(): Pending {
   return { progress: 'saving', unknownSince: null, savingSince: later, baseRevision: 3,
@@ -207,7 +209,7 @@ const details: EventDetail[] = [
   { kind: 'use', lotId: 'P-001', basis: 'approximate', value: 1, usedFor: '架空作業', applied: false, inclusion: 'included' },
   { kind: 'handover', lotId: 'P-001', basis: 'label', value: 1, counterpart: 'OUT', applied: true, inclusion: 'notIncluded' },
   { kind: 'split', lotId: 'P-001', basis: 'counted', value: 1, childId: 'child', applied: true, inclusion: null },
-  { kind: 'stage', lotId: 'P-001', basis: 'unknown', value: null, childId: 'child', to: { kind: 'awaitingHandover', process: { id: '工程', criterion: 'workEnd' } }, correction: true, applied: false, inclusion: null },
+  { kind: 'stage', lotId: 'P-001', basis: 'unknown', value: null, childId: 'child', to: { kind: 'awaitingHandover', process: { id: '仕上げ工程', criterion: 'workEnd' } }, correction: true, applied: false, inclusion: null },
 ];
 const seed = seedScn02();
 const need = Object.values(seed.supply.needs)[0];
@@ -368,7 +370,7 @@ describe('Task 2.1 保存形式とローカル読み込み (AT-38/FH-B05の保�
   });
 
   test.each([
-    ['format', ['format'], '別形式'], ['version', ['version'], 12], ['revision', ['revision'], -1], ['opFloor', ['opFloor'], 0], ['lastWriter', ['lastWriter'], undefined],
+    ['format', ['format'], '別形式'], ['version', ['version'], 13], ['revision', ['revision'], -1], ['opFloor', ['opFloor'], 0], ['lastWriter', ['lastWriter'], undefined],
     ['ledger', ['ledger'], []], ['lots', ['ledger', 'lots'], []], ['stage', ['ledger', 'lots', 'P-B01', 'stage', 'kind'], 'invalid'],
     ['project', ['ledger', 'lots', 'P-B01', 'project', 'id'], undefined], ['holds', ['ledger', 'lots', 'P-B01', 'holds'], ['invalid']],
     ['quantity', ['ledger', 'lots', 'P-B01', 'quantity', 'kind'], 'invalid'], ['numeric', ['ledger', 'lots', 'P-B01', 'quantity', 'numeric', 'value'], 1.5],
@@ -1270,7 +1272,7 @@ describe('B3 task2.2 保存の確定境界（AT-23・AT-24・AT-38・AT-39の単
     const current = initial(seedLedger(), emptySupply); const store = storeOf(current); const op = operation();
     let ledger = use(current.ledger, meta('op20-use1'), 'P-001', 'counted', 2, '架空作業の開始');
     ledger = use(ledger, meta('op20-use2'), 'P-001', 'counted', 3, '架空作業の開始');
-    ledger = start(ledger, meta('op20-start'), { id: '仕掛品', item: 'R', unit: '台', project: { kind: 'case', id: 'B-001' }, location: 'T' }, { id: 'R組立', criterion: 'workEnd' }, 'counted', 1, ['op20-use1', 'op20-use2']);
+    ledger = start(ledger, meta('op20-start'), { id: '仕掛品', item: 'R', unit: '台', project: { kind: 'case', id: 'B-001' }, location: 'T' }, { id: 'R組立', criterion: 'inspection' }, 'counted', 1, ['op20-use1', 'op20-use2']);
     faults.failMidwayAt = fail;
     const result = commit(store, current, op, [{ conflictReviews: [], ledger, supply: emptySupply, targets: ['まとまりP-001', 'まとまり仕掛品'] }]);
     expect(result.kind).toBe(fail === null ? 'saved' : 'failed');

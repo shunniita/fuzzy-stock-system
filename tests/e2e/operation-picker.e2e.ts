@@ -7,7 +7,7 @@ test('作業別操作: 全操作へ種類から到達でき、一つの候補列
   const group = page.getByLabel('作業の種類', { exact: true });
   await expect(group).toBeVisible();
   const groups = await group.locator('option').evaluateAll(nodes => nodes.map(node => ({ value: node.getAttribute('value')!, label: node.textContent! })));
-  expect(groups.map(g => g.label)).toEqual(['現物の登録・使用・移動', '製造・工程', 'やり直し・修理', '必要な数・依頼・発注', '受け取り・割り当て・返却', '数え直し・訂正・照合', '仮の記録・所属の整理', '登録情報の登録・変更']);
+  expect(groups.map(g => g.label)).toEqual(['現物の登録・使用・移動', '製造・工程', '工程の登録・設定', 'やり直し・修理', '必要な数・依頼・発注', '受け取り・割り当て・返却', '数え直し・訂正・照合', '仮の記録・所属の整理', '登録情報の登録・変更']);
   const found: string[] = [];
   const categoryOf = new Map<string, string>();
   for (const { value } of groups) {

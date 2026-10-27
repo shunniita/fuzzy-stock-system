@@ -1,10 +1,10 @@
-import { InclusionRequired, noStage, processes, register, type Ledger, type Lot, type Meta, type Project, type Stage } from '../domain/ledger.ts';
+import { InclusionRequired, noStage, processUsed, register, type Ledger, type Lot, type Meta, type Process, type Project, type Stage } from '../domain/ledger.ts';
 import type { Basis } from '../domain/quantity.ts';
 import { choiceField, h, textField, type Values } from './dom.ts';
-import { inScopeAt, own, quantityStepOf, unassignedCode, type Masters } from '../domain/masters.ts';
+import { inScopeAt, own, processOf, processRef, quantityStepOf, unassignedCode, type Masters } from '../domain/masters.ts';
 import { parseSignedScalar, scalarLimitText, StepMismatch, type Step } from '../domain/scalar.ts';
 import type { Supply } from '../domain/supply.ts';
-import { basisLabel, itemRef, locationRef, projectText, stageText } from './format.ts';
+import { basisLabel, criterionText, itemRef, locationRef, projectText, stageText } from './format.ts';
 
 // 台帳の画面と供給の画面で共有する、状態を持たない入力欄の部品。
 
@@ -31,13 +31,23 @@ export function lotOptions(ledger: Ledger, where: (lot: Lot) => boolean = () => 
   const m = ledger.masters;
   return Object.values(ledger.lots)
     .filter((l) => l.mergedInto === null && where(l))
-    .map((l) => [l.id, `${l.id}（品目${itemRef(m, l.item)}・${locationRef(m, l.location)}・${projectText(m, l.project)}${l.stage.kind === 'none' ? '' : `・${stageText(l.stage)}`}）`]);
+    .map((l) => [l.id, `${l.id}（品目${itemRef(m, l.item)}・${locationRef(m, l.location)}・${projectText(m, l.project)}${l.stage.kind === 'none' ? '' : `・${stageText(l.stage, id => processRef(m, id))}`}）`]);
 }
 
 // 新しい置き場所は、利用中で記録の対象だったことのある場所を出す。どの時点で範囲内かは、入力中の実際の日時で決まる（要件3.1・7.3・7.4）ので、
 // 画面が選択肢を絞る（restrictPlaces）。
 export const placeOptions = (masters: Masters): [string, string][] =>
   Object.values(masters.locations).filter((l) => l.active && l.scope.some((s) => s.inScope)).map((l) => [l.id, `${l.name}（${l.code}）`]);
+
+// 新しく工程に載せる入力の選択肢。利用停止中の工程は出さない（MST-03）。
+export const processOptions = (masters: Masters): [string, string][] =>
+  Object.values(masters.processes).filter((p) => p.active).map((p) => [p.id, `工程${p.name}（完了基準：${criterionText(p.criterion)}）`]);
+
+// 中断は過去の日時でも記録できる（MFG-08a）ので、利用停止中の工程でも記録に使われていれば選べる。
+export function stopProcessOptions(ledger: Ledger): [string, string][] {
+  return Object.values(ledger.masters.processes).filter((p) => p.active || processUsed(ledger, p.id))
+    .map((p) => [p.id, `工程${processRef(ledger.masters, p.id)}（完了基準：${criterionText(p.criterion)}）`]);
+}
 
 // 場所の選択肢のうち、その時点で記録の対象外のものを選べなくする（要件7.3・7.4）。選ぶ欄は、選んでいたものが外れたら選び直させる。
 // 不明を選べる欄（仮の記録）は、選んでいた場所を黙って不明にしないよう、選んだままにして台帳に断らせる。
@@ -203,7 +213,7 @@ export function registerFromValues(ledger: Ledger, meta: Meta, v: Values): Ledge
     case 'working':
     case 'inspecting':
     case 'awaitingHandover': {
-      const process = processes.find((p) => p.id === v.text('process'));
+      const process = processOf(ledger.masters, v.text('process'));
       if (!process) throw new Error('工程を選ぶ');
       stage = { kind, process };
       break;

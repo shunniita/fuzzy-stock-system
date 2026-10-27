@@ -1,4 +1,4 @@
-# fuzzy-stock-system v1.2.0
+# fuzzy-stock-system v1.3.0
 
 手元の物の数と、その数を確かめた根拠を記録するソフトです。Windows、Windows PowerShell、JavaScriptが有効なブラウザーを使います。動作を確認しているブラウザーはMicrosoft Edgeです。Node.jsや開発用パッケージの導入は不要です。
 

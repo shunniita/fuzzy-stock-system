@@ -1,4 +1,4 @@
-import { InclusionRequired, start, use, type Inclusion, type Ledger, type Meta, type Process } from './ledger.ts';
+import { InclusionRequired, processNameAt, start, use, type Inclusion, type Ledger, type Meta, type Process } from './ledger.ts';
 import { own, quantityStepOf, type Masters } from './masters.ts';
 import type { Basis } from './quantity.ts';
 import { checkAssemblyRecipe } from './assembly-recipes.ts';
@@ -40,14 +40,15 @@ export const estimateEventId = (startEventId: string): string => `${startEventId
 // 作業の開始の材料の使用先。推計の使用は明細の番号を付ける。保存境界では、作業の開始のIDと工程から組み立てた文と完全一致で照らし、
 // 手入力や旧版の作業の開始の使用先（番号なし）と取り違えない。
 const estimateMarker = '・レシピ推計の明細';
-const startUsedFor = (lotId: string, processId: string): string => `${lotId}の着手（工程${processId}）`;
+// 工程は記録したときの名前で書く。旧版の工程はIDが名前と同じなので、旧版の文とも一致する。
+const startUsedFor = (lotId: string, processName: string): string => `${lotId}の着手（工程${processName}）`;
 const estimateNote = (usedFor: string, row: number): string => `${usedFor}${estimateMarker}${row + 1}`;
-function usedForOf(begin: StartEvent): string {
+function usedForOf(ledger: Ledger, begin: StartEvent): string {
   const stage = begin.changes.find((c) => c.before === null && c.after.id === begin.lotId)?.after.stage;
-  return startUsedFor(begin.lotId, stage?.kind === 'working' ? stage.process.id : '');
+  return startUsedFor(begin.lotId, stage?.kind === 'working' ? processNameAt(ledger, begin.eventId, stage.process.id) : '');
 }
-function isEstimateNote(begin: StartEvent, usedFor: string): boolean {
-  const head = `${usedForOf(begin)}${estimateMarker}`;
+function isEstimateNote(ledger: Ledger, begin: StartEvent, usedFor: string): boolean {
+  const head = `${usedForOf(ledger, begin)}${estimateMarker}`;
   return usedFor.startsWith(head) && /^[1-9][0-9]*$/.test(usedFor.slice(head.length));
 }
 
@@ -126,7 +127,7 @@ export function startWithEstimate(state: { ledger: Ledger; supply: Supply }, met
   if (template === undefined) throw new Error('セットを選ぶ');
   const candidates = template === null ? [] : estimateCandidates(state.ledger.masters, template, input.lot, input.basis === 'unknown' ? null : input.value);
   checkInputs(state.ledger, candidates, input);
-  const usedFor = startUsedFor(input.lot.id, input.process.id);
+  const usedFor = startUsedFor(input.lot.id, processNameAt(state.ledger, meta.eventId, input.process.id));
   let ledger = state.ledger, n = 0;
   const materials: string[] = [];
   const record = (lotId: string, basis: Basis, value: number | null, note: string, inclusion: Inclusion | undefined, target: EstimateInclusionRequired['target']): string => {
@@ -176,7 +177,7 @@ function checkEstimateRow(ledger: Ledger, begin: StartEvent, candidate: Candidat
   const values = row.uses.map((id) => {
     if (seen.has(id) || !begin.materials.includes(id)) fail(`使用${id}が作業の開始の材料にない`);
     seen.add(id);
-    return recordedUse(ledger, id, candidate, estimateNote(usedForOf(begin), index), fail);
+    return recordedUse(ledger, id, candidate, estimateNote(usedForOf(ledger, begin), index), fail);
   });
   // 使用記録は作業の開始の材料なので取り消されず、数え直しでも変わらない。合計は記録時のまま一致する。
   if (row.confirmed !== (row.decision === 'use' ? sumScalars(values, step) : null)) fail('確定数量');
@@ -196,7 +197,7 @@ function checkEstimate(ledger: Ledger, e: EstimateEvent, fail: Fail): void {
   for (const id of begin.materials) {
     const u = seen.has(id) ? undefined : ledger.history.find((x) => x.eventId === id);
     const lot = u?.kind === 'use' ? own(ledger.lots, u.lotId) : undefined;
-    if (u?.kind === 'use' && isEstimateNote(begin, u.usedFor)) fail(`推計の使用${id}が推計の明細にない`);
+    if (u?.kind === 'use' && isEstimateNote(ledger, begin, u.usedFor)) fail(`推計の使用${id}が推計の明細にない`);
     if (lot && overlappingRow(candidates, e.rows, lot) >= 0) fail(`手入力の材料${id}が推計の明細と重なる`);
   }
 }
@@ -220,7 +221,7 @@ export function validateUsageEstimates(ledger: Ledger, supply: Supply): void {
   // 推計の記録が欠けた作業の開始に、推計の使用だけが残っていないか。
   for (const begin of ledger.history) {
     if (begin.kind !== 'start' || starts.has(begin.eventId)) continue;
-    const orphan = begin.materials.find((id) => ledger.history.some((x) => x.eventId === id && x.kind === 'use' && isEstimateNote(begin, x.usedFor)));
+    const orphan = begin.materials.find((id) => ledger.history.some((x) => x.eventId === id && x.kind === 'use' && isEstimateNote(ledger, begin, x.usedFor)));
     if (orphan) throw new Error(`作業の開始 ${begin.eventId} の推計の使用${orphan}に、セット推計の記録がない`);
   }
 }

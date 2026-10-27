@@ -110,7 +110,7 @@ describe('競合保持: バックアップと復元で照合記録を引き継�
     const text = backupTextOf(first, later);
     const envelope = JSON.parse(text) as { version: number; snapshot: string };
     expect(envelope.version).toBe(1);
-    expect(JSON.parse(envelope.snapshot)).toMatchObject({ version: 11 });
+    expect(JSON.parse(envelope.snapshot)).toMatchObject({ version: 12 });
     const read = readBackup(bytes(text));
     expect(read.kind).toBe('ok');
     if (read.kind !== 'ok') return;

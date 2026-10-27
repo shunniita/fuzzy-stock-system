@@ -1,4 +1,4 @@
-import type { Ledger, MasterChange, Project } from './ledger.ts';
+import type { Ledger, MasterChange, Process, Project } from './ledger.ts';
 import { validateScalar, type Step } from './scalar.ts';
 
 // 元の資料（全社の品目一覧など）の情報。手元の名称とは別に持つ（MST-06）。
@@ -19,13 +19,16 @@ export type ItemMaster = {
   units: readonly string[]; unitSteps: Readonly<Record<string, Step>>; trial: boolean; active: boolean; packaging: Packaging | null;
   consumable: ConsumableSetting | null;
 };
-export type LocationMaster = { type: 'location'; id: string; code: string; name: string; trial: boolean; active: boolean; scope: readonly ScopeEntry[] };
+// nextProcessは次工程への引渡しの渡し先。台帳全体で一件まで（MFG-06）。
+export type LocationMaster = { type: 'location'; id: string; code: string; name: string; trial: boolean; active: boolean; scope: readonly ScopeEntry[]; nextProcess: boolean };
 export type CaseMaster = { type: 'case'; id: string; code: string | null; name: string | null; source: Source | null; active: boolean };
 // 担当者は名前で識別する（TBD-13の決定まで）。idが名前。
 export type ActorMaster = { type: 'actor'; id: string; active: boolean };
-export type Master = ItemMaster | LocationMaster | CaseMaster | ActorMaster;
+// 記録には工程の値{ id, criterion }を写すので、名前を変えてもidは変えない。
+export type ProcessMaster = { type: 'process'; id: string; name: string; criterion: Process['criterion']; active: boolean };
+export type Master = ItemMaster | LocationMaster | CaseMaster | ActorMaster | ProcessMaster;
 
-export const masterTypeLabel: Record<Master['type'], string> = { item: '品目', location: '場所', case: '案件', actor: '担当者' };
+export const masterTypeLabel: Record<Master['type'], string> = { item: '品目', location: '場所', case: '案件', actor: '担当者', process: '工程' };
 
 // masterTypeLabelは保存済み対象名にも使うため、表示だけを別にする。
 export const masterTypeDisplayLabel: Record<Master['type'], string> = { ...masterTypeLabel, case: '案件・用途' };
@@ -35,6 +38,7 @@ export type Masters = {
   locations: Readonly<Record<string, LocationMaster>>;
   cases: Readonly<Record<string, CaseMaster>>;
   actors: Readonly<Record<string, ActorMaster>>;
+  processes: Readonly<Record<string, ProcessMaster>>;
 };
 
 // 現在値と履歴は同じオブジェクトを共有するため、凍結しないと現在値の書換えで過去の記録まで変わる。
@@ -50,8 +54,8 @@ export function deepFreeze<T>(value: T): T {
 
 const item = (id: string, name: string, units: string[], trial = true, packaging: Packaging | null = null): ItemMaster =>
   ({ type: 'item', id, code: id, name, source: null, units, unitSteps: integerUnitSteps(units), trial, active: true, packaging, consumable: null });
-const location = (id: string, name: string, trial = true): LocationMaster =>
-  ({ type: 'location', id, code: id, name, trial, active: true, scope: [{ from: null, inScope: true }] });
+const location = (id: string, name: string, trial = true, nextProcess = false): LocationMaster =>
+  ({ type: 'location', id, code: id, name, trial, active: true, scope: [{ from: null, inScope: true }], nextProcess });
 const byId = <T extends { id: string }>(list: T[]): Record<string, T> => Object.fromEntries(list.map((m) => [m.id, m]));
 
 // F0_SCOPE.mdの固定の架空登録情報。実品目・実案件・用途ではない（NFR-10）。練習用の台帳と、以前の形式の記録の読み込みに使う。
@@ -66,9 +70,11 @@ export const fixedMasters: Masters = deepFreeze({
     item('V', '架空共通ワッシャV', ['本']),
     item('X', '架空対象外部品X', ['個'], false),
   ]),
-  locations: byId([location('S1', '棚S1'), location('S2', '棚S2'), location('T', '作業台T'), location('N', '次工程N'), location('O', '対象外の棚O', false)]),
+  locations: byId([location('S1', '棚S1'), location('S2', '棚S2'), location('T', '作業台T'), location('N', '次工程N', true, true), location('O', '対象外の棚O', false)]),
   cases: byId(['A-001', 'A-002', 'B-001'].map((id): CaseMaster => ({ type: 'case', id, code: id, name: null, source: null, active: true }))),
   actors: byId(['架空担当A', '架空担当B'].map((id): ActorMaster => ({ type: 'actor', id, active: true }))),
+  // 旧版の工程は記録から補うので、記録に現れない工程をここで足さない。
+  processes: {},
 });
 
 function entryAt<T extends { from: string | null }>(entries: readonly T[], at: string): T {
@@ -189,8 +195,32 @@ export function requireItemSettingsTransition(before: Masters, after: Masters, c
   })) throw new Error('保存する品目設定が変更履歴に対応していない');
 }
 
+// 保存する単位では、元の工程と次工程の指定に新しいmaster履歴だけを適用した結果と現在値を照合する。
+// recordedは記録から補える工程。版12より前の保存途中の単位は、記録に初めて現れた工程を履歴なしで補うので、それとの一致は認める。
+// 版は見ない。版12の単位でこの形の工程を足しても、旧版の読込で補う工程と同じ値にしかならない。
+export function requireProcessTransition(before: Masters, after: Masters, changes: readonly MasterChange[], recorded: Readonly<Record<string, ProcessMaster>> = {}): void {
+  const processes = new Map(Object.values(before.processes).map(p => [p.id, p]));
+  for (const p of Object.values(after.processes)) {
+    const legacy = own(recorded, p.id);
+    if (!processes.has(p.id) && legacy !== undefined && !changes.some(c => c.after.type === 'process' && c.after.id === p.id)) processes.set(p.id, legacy);
+  }
+  const flags = new Map(Object.values(before.locations).map(l => [l.id, l.nextProcess]));
+  for (const { before: from, after: to } of changes) {
+    if (to.type === 'process') {
+      if (JSON.stringify(processes.get(to.id) ?? null) !== JSON.stringify(from)) throw new Error('保存する工程の変更前が元の設定と一致しない');
+      processes.set(to.id, to);
+    } else if (to.type === 'location') flags.set(to.id, to.nextProcess);
+  }
+  if (processes.size !== Object.keys(after.processes).length || [...processes].some(([id, p]) => JSON.stringify(own(after.processes, id)) !== JSON.stringify(p))) {
+    throw new Error('保存する工程の設定が変更履歴に対応していない');
+  }
+  if (Object.values(after.locations).some(l => (flags.get(l.id) ?? false) !== l.nextProcess)) throw new Error('保存する次工程の指定が変更履歴に対応していない');
+}
+
 // 練習開始時だけの架空設定。旧版補完に使うfixedMastersへは混ぜない。
-export const practiceMasters: Masters = deepFreeze({ ...fixedMasters, items: { ...fixedMasters.items,
+export const practiceMasters: Masters = deepFreeze({ ...fixedMasters,
+  processes: { R組立: { type: 'process', id: 'R組立', name: 'R組立', criterion: 'inspection', active: true } },
+  items: { ...fixedMasters.items,
   S: { ...fixedMasters.items.S!, consumable: { pieceUnit: '本', rule: { threshold: 3000, standardOrder: { value: 1, unit: '箱' } } } },
   V: { ...fixedMasters.items.V!, consumable: { pieceUnit: '本', rule: null } },
 } });
@@ -229,9 +259,24 @@ export function requireConsistentItemPrecisions(states: readonly Masters[]): voi
   }
 }
 
+// 現在の一覧・入力で見せる工程の名前。利用停止中は状態を付ける。知らないIDはそのまま見せる。
+export function processRef(masters: Masters, id: string): string {
+  const m = own(masters.processes, id);
+  return m === undefined ? id : m.active ? m.name : `${m.name}（利用停止）`;
+}
+
+export function processOf(masters: Masters, id: string): Process | undefined {
+  const m = own(masters.processes, id);
+  return m === undefined ? undefined : { id: m.id, criterion: m.criterion };
+}
+
+export function nextProcessOf(masters: Masters): LocationMaster | null {
+  return Object.values(masters.locations).find(location => location.nextProcess) ?? null;
+}
+
 export function codeOwner(masters: Masters, type: 'item' | 'location' | 'case', code: string): Master | undefined {
   const group: Readonly<Record<string, Master>> = type === 'item' ? masters.items : type === 'location' ? masters.locations : masters.cases;
-  return Object.values(group).find((m) => m.type !== 'actor' && m.code === code);
+  return Object.values(group).find((m) => m.type !== 'actor' && m.type !== 'process' && m.code === code);
 }
 
 // 新しい記録に利用停止中の登録情報を使わせない（MST-03）。知らないIDは画面が出さないので、ここでは止めない（ADR-024）。

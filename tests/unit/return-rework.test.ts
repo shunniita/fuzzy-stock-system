@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { adoptProvisional, beginReturnedRework, beginRework, changeStage, correctOccurredAt, declareDiscrepancy, practiceLedger, handOver, hold, InclusionRequired, merge, productionOf, recount, recordProvisional, recordReworkPart, register, reworksOf, split, totalOf, type Ledger, type Meta, type Process } from '../../src/domain/ledger.ts';
+import { adoptProvisional, beginReturnedRework, beginRework, changeStage, correctOccurredAt, declareDiscrepancy, practiceLedger as practiceBase, handOver, hold, InclusionRequired, merge, productionOf, recount, recordProvisional, recordReworkPart, register, reworksOf, split, totalOf, type Ledger, type Meta, type Process } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '戻り検査', criterion: 'inspection' }, { id: '別工程', criterion: 'workEnd' });
 import { assignReturnedProvisional } from '../../src/domain/return-intake.ts';
 import type { Basis } from '../../src/domain/quantity.ts';
 import { emptySupply } from '../../src/domain/supply.ts';
@@ -30,12 +32,12 @@ describe('FH-RRS-01/02 返ってきた物からのやり直し・修理開始', 
     expect(JSON.stringify(l)).toBe(before);
   });
   test.each(['workEnd', 'inspection'] as const)('再完了%sで同じ現物を増やさず旧材料を消費しない', criterion => {
-    const p = { ...process, criterion };
+    const p = criterion === 'inspection' ? process : { id: '別工程', criterion };
     let l = beginReturnedRework(returned('label', 2, p), meta('repair-start'), { ...request(), process: p });
     l = changeStage(l, meta('finish', 15), 'repair', 'done', 'label', 2, { kind: criterion === 'inspection' ? 'inspecting' : 'awaitingHandover', process: p });
     if (criterion === 'inspection') l = changeStage(l, meta('inspect', 16), 'done', 'ready', 'label', 2, { kind: 'awaitingHandover', process: p });
     expect(totalOf(l, 'R')).toMatchObject({ numeric: { value: 20 } });
-    expect(productionOf(l, process.id, 'R', '台', project)).toMatchObject({ completed: { numeric: { value: 2 } }, reworkStarted: { numeric: { value: 2 } } });
+    expect(productionOf(l, p.id, 'R', '台', project)).toMatchObject({ completed: { numeric: { value: 2 } }, reworkStarted: { numeric: { value: 2 } } });
     expect(l.history.filter(e => e.kind === 'use' || e.kind === 'start')).toHaveLength(0);
     expect(Object.values(l.lots).filter(lot => lot.id !== 'original').every(lot => lot.holds.includes('usabilityCheck'))).toBe(true);
   });

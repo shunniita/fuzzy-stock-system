@@ -1,7 +1,9 @@
 import { positivePartMinus, sumScalars, sumScalarsFinal } from '../../src/domain/scalar.ts';
 import { describe, expect, test } from 'vitest';
 import { add, observe, quantityOf, subtract, type Basis, type Quantity } from '../../src/domain/quantity.ts';
-import { adoptProvisional, beginRework, changeMasters, changeStage, practiceLedger, handOver, hold, merge, productionOf, recount, recordProvisional, recordReworkPart, recordStop, register, resolveIssue, split, start, stopExcessOf, totalOf, transferProject, updateStop, use, validateReworkLinks, voidRecord, type Ledger, type Lot, type Meta } from '../../src/domain/ledger.ts';
+import { adoptProvisional, beginRework, changeMasters, changeStage, practiceLedger as practiceBase, handOver, hold, merge, productionOf, recount, recordProvisional, recordReworkPart, recordStop, register, resolveIssue, split, start, stopExcessOf, totalOf, transferProject, updateStop, use, validateReworkLinks, voidRecord, type Ledger, type Lot, type Meta } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '架空工程', criterion: 'workEnd' }, { id: '架空検査工程', criterion: 'inspection' });
 import { allocateArrival, allocatedToReceipt, cancelRequest, declareShortage, linkDeclaration, emptySupply, receiveLot, receivedFromRemaining, recordRequest, registerNeed, requestProgressOf, reviseArrival, reviseNeed, reviseReceipt, type Supply } from '../../src/domain/supply.ts';
 import { dateStatusOf, requestSummaryOf, requireQuantityTotals, shortageOf } from '../../src/domain/shortage.ts';
 import { applyNeedImport, openNeedImports, previewNeedImport, previewNeedImportResolution, resolveNeedImport, validateNeedImports } from '../../src/domain/need-import.ts';

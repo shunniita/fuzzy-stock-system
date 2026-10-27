@@ -1,3 +1,4 @@
+import { processRef } from '../domain/masters.ts';
 import { openIssuesOf, type Ledger, type Lot } from '../domain/ledger.ts';
 import { groupsOf, requestSummaryOf, shortageOf, stopGroupsOf, stopsOf, type GroupKey } from '../domain/shortage.ts';
 import { requestProgressOf, sameProject, type Supply } from '../domain/supply.ts';
@@ -27,7 +28,7 @@ function caseLotsOf(ledger: Ledger, projectId: string): Lot[] {
 function lotText(ledger: Ledger, lot: Lot): string {
   const issues = openIssuesOf(ledger, lot.id);
   return [
-    `保管単位${lot.id}`, `所在${locationRef(ledger.masters, lot.location)}`, quantityText(lot.quantity, lot.unit), stageText(lot.stage),
+    `保管単位${lot.id}`, `所在${locationRef(ledger.masters, lot.location)}`, quantityText(lot.quantity, lot.unit), stageText(lot.stage, id => processRef(ledger.masters, id)),
     lot.holds.length > 0 ? `取り分けた理由：${lot.holds.map((r) => holdLabel[r]).join('・')}` : null,
     issues.length > 0 ? `確認が必要：${issues.map((i) => `${i.id}（${issueLabel[i.reason]}）`).join('・')}` : null,
   ].filter((line) => line !== null).join('・');

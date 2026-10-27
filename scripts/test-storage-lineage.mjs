@@ -12,7 +12,7 @@ const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
   import {backupTextOf,readBackup} from './src/ui/backup.ts';
   const at='2026-10-22T00:00:00+09:00';
   const meta=(eventId,hour)=>({eventId,actor:'架空担当A',occurredAt:'2026-10-21T'+hour+':00:00+09:00',recordedAt:at});
-  const p={id:'架空工程',criterion:'inspection'};
+  const p={id:'R組立',criterion:'inspection'};
   let l=register(practiceLedger,meta('done',10),{id:'done',item:'R',unit:'台',project:{kind:'common'},location:'T',stage:{kind:'awaitingHandover',process:p}},'counted',20);
   l=beginRework(l,meta('rework',11),'done','repair','counted',20,'架空の手直し');
   l=split(l,meta('Y',12),'repair','Y','counted',10);

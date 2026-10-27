@@ -21,9 +21,9 @@ const storeOf = () => {
 afterEach(() => { faults.loseResponseAt = null; faults.failMidwayAt = null; });
 
 describe('FH-C04 読取証拠の保存', () => {
-  it('現行版11に書き、台帳/供給/バックアップを原文のまま往復する', () => {
+  it('現行版12に書き、台帳/供給/バックアップを原文のまま往復する', () => {
     const original = snapshot();
-    expect(original.version).toBe(11);
+    expect(original.version).toBe(12);
     const decoded = parse(serialize(original));
     expect(decoded.ledger.history[0]?.scan).toEqual(scan);
     expect(decoded.supply.log[0]?.scan).toEqual(scan);
@@ -33,8 +33,8 @@ describe('FH-C04 読取証拠の保存', () => {
   });
   it.each([1, 2, 3])('scanなし版%dを読み数量・履歴を変えない', version => {
     const old = { ...initial(practiceLedger, emptySupply), version };
-    const decoded = parse(JSON.stringify(old, (key, value: unknown) => key === 'consumable' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value));
-    expect(decoded.version).toBe(11);
+    const decoded = parse(JSON.stringify(old, (key, value: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value));
+    expect(decoded.version).toBe(12);
     expect(decoded.ledger).toEqual({ ...practiceLedger, masters: fixedMasters });
     expect(decoded.supply).toEqual(emptySupply);
   });
@@ -63,11 +63,11 @@ describe('FH-C04 読取証拠の保存', () => {
     if (result.kind !== 'unknown') throw Error('不明保存が必要');
     store.setItem = write;
     const wire: unknown = JSON.parse(store.getItem('fuzzy-stock/pending') ?? 'null');
-    expect(wire).toMatchObject({ format: 'fuzzy-stock-pending', version: 11 });
+    expect(wire).toMatchObject({ format: 'fuzzy-stock-pending', version: 12 });
     expect(wire).not.toHaveProperty('progress');
     const restored = decodePending(wire);
     expect(restored.units[0]?.ledger.history[0]?.scan).toEqual(scan);
-    expect(decodePending({ format: 'fuzzy-stock-pending', version: 11, pending: result.pending })).toEqual(restored);
+    expect(decodePending({ format: 'fuzzy-stock-pending', version: 12, pending: result.pending })).toEqual(restored);
     const checked = inquire(store, restored);
     expect(checked.savedUnits).toBe(saved);
     faults.loseResponseAt = null;
