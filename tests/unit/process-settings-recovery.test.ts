@@ -66,6 +66,10 @@ describe('工程の設定 2.3・6.2・6.4・6.5: 保存途中と復元', () => {
     expect(parse(JSON.stringify(deactivated))?.ledger.masters.processes['R組立']?.active).toBe(false);
     deactivated.ledger.history[0].masters[0].before.name = '改変';
     expect(() => parse(JSON.stringify(deactivated))).toThrow('工程 R組立 の最初の変更前');
+    // 練習用の工程の完了基準を変えてから使っても、変更前は練習用の値のまま照合する。
+    let practiced = changed(practiceLedger, 'crit', { action: 'criterion', id: 'R組立', criterion: 'workEnd', reason: '確認を省く' });
+    practiced = start(practiced, meta('s9'), { id: 'W9', item: 'R', unit: '台', project: { kind: 'case', id: 'A-001' }, location: 'T' }, { id: 'R組立', criterion: 'workEnd' }, 'counted', 1, []);
+    expect(parse(serialize(initial(practiced, emptySupply)))?.ledger.masters.processes['R組立']?.criterion).toBe('workEnd');
     const inactive = wire(); inactive.ledger.history[0].masters[0].after.active = false;
     for (const later of inactive.ledger.history.slice(1)) for (const pair of later.masters) if (pair.after.id === '塗装') { if (pair.before) pair.before.active = false; pair.after.active = false; }
     inactive.ledger.masters.processes['塗装'].active = false;

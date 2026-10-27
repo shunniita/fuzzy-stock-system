@@ -102,34 +102,35 @@ export function requireConsistentProcesses(ledger: Ledger): void {
   for (const stop of Object.values(ledger.stops)) if (own(processes, stop.process) === undefined) throw new Error(`停止 ${stop.id} の工程 ${stop.process} が登録されていない`);
   for (const p of embeddedProcesses(ledger)) if (own(processes, p.id) === undefined) throw new Error(`記録に使われた工程 ${p.id} が登録されていない`);
   const masterEvents = ledger.history.filter((event): event is LedgerEvent & { kind: 'master' } => event.kind === 'master');
-  requireProcessHistory(masterEvents, processes, filledProcesses(ledger));
+  requireProcessHistory(ledger, processes);
   requireNextProcessHistory(masterEvents, locations);
 }
 
 // 工程の変更前は直前の変更後と同じで、各欄は対応する操作でだけ変わり、最後の変更後が現在値になる。
 // 登録の操作を経ない工程は、旧版の記録から補ったものか練習の初期値で、IDを名前とした利用中の工程になる。最初の変更前（変更がなければ現在値）を、
-// 記録に使われていれば最初に現れた完了基準と、練習の工程なら練習の値と照合する。
+// それより前の記録に使われていれば最初に現れた完了基準と、練習の工程なら練習の値と照合する。変更の後の記録は変更後の完了基準を写すので見ない。
 // shortcut: 記録に使われず練習にもない工程を現在値だけに足す改変は見分けない。登録操作を経ない工程の試験用の台帳をやめたら、補った値か練習の値に限る。
-function requireProcessHistory(events: readonly (LedgerEvent & { kind: 'master' })[], processes: Masters['processes'], filled: Masters['processes']): void {
-  const fromOrigin = (p: ProcessMaster) => {
+function requireProcessHistory(ledger: Ledger, processes: Masters['processes']): void {
+  const fromOrigin = (p: ProcessMaster, filled: Masters['processes']) => {
     const criterion = own(filled, p.id)?.criterion ?? own(practiceMasters.processes, p.id)?.criterion ?? p.criterion;
     return p.name === p.id && p.active && p.criterion === criterion;
   };
   const last = new Map<string, ProcessMaster>();
-  for (const event of events) for (const { before, after } of event.masters) {
+  for (const [index, event] of ledger.history.entries()) if (event.kind === 'master') for (const { before, after } of event.masters) {
     if (after.type !== 'process') continue;
     if (before !== null && (before.type !== 'process' || before.id !== after.id)) throw new Error('工程の変更前と変更後が同じ工程を指さない');
     if (before === null && !after.active) throw new Error(`工程 ${after.id} は利用停止のまま登録できない`);
     const previous = last.get(after.id);
     if (previous !== undefined && JSON.stringify(previous) !== JSON.stringify(before)) throw new Error(`工程 ${after.id} の変更前が直前の変更後と一致しない`);
-    if (previous === undefined && before?.type === 'process' && !fromOrigin(before)) throw new Error(`工程 ${after.id} の最初の変更前が、記録から補った値とも練習の初期値とも一致しない`);
+    if (previous === undefined && before?.type === 'process' && !fromOrigin(before, filledProcesses({ history: ledger.history.slice(0, index), lots: {}, stops: {} }))) throw new Error(`工程 ${after.id} の最初の変更前が、記録から補った値とも練習の初期値とも一致しない`);
     const changed = before === null ? [] : (Object.keys(processFieldActions) as (keyof typeof processFieldActions)[]).filter(key => before[key] !== after[key]);
     const illegal = changed.find(key => !processFieldActions[key].includes(event.action));
     if (illegal !== undefined) throw new Error(`工程 ${after.id} の${illegal}を${event.action}で変えられない`);
     last.set(after.id, after);
   }
   for (const [id, historical] of last) if (JSON.stringify(own(processes, id)) !== JSON.stringify(historical)) throw new Error(`現在の工程 ${id} が最後の変更履歴と一致しない`);
-  for (const p of Object.values(processes)) if (!last.has(p.id) && !fromOrigin(p)) throw new Error(`工程 ${p.id} は変更履歴がなく、記録から補った値とも練習の初期値とも一致しない`);
+  const filled = filledProcesses(ledger);
+  for (const p of Object.values(processes)) if (!last.has(p.id) && !fromOrigin(p, filled)) throw new Error(`工程 ${p.id} は変更履歴がなく、記録から補った値とも練習の初期値とも一致しない`);
 }
 
 // 場所の次工程の指定は、指定の操作でだけ変わり、どの時点でも一か所までで、最後の変更後が現在値になる。
