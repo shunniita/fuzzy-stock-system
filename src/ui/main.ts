@@ -568,7 +568,11 @@ const ops = {
   },
 } satisfies Record<string, Op>;
 
-const ctx: Ctx = { ledger: () => ledger, supply: () => supply, asOfChanged: () => renderFollowup() };
+const ctx: Ctx = { ledger: () => ledger, supply: () => supply, asOfChanged: () => renderFollowup(), openConsumableSettings: () => {
+  currentOp = Object.keys(ledger.masters.items).length === 0 ? 'masterItem' : 'masterConsumable';
+  message = null; renderInput();
+  document.querySelector<HTMLSelectElement>('#input [name=op]')?.focus();
+} };
 
 // 既存の台帳の操作は、台帳だけを更新する操作として包む。供給の操作は supply-ui が持つ。
 const allOps: Record<string, UiOp> = {

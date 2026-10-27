@@ -106,9 +106,11 @@ test('P1-PRACTICE: 練習用の台帳は架空の登録情報だけを持ち、�
   await expect(page.locator('#actor')).toHaveValue('架空担当A');
 });
 
-test('P1-CONSUMABLES: 共通消耗品の欄は、品目ごとの登録ができるまで空の台帳でも練習用でも表示しない', async ({ page }) => {
+test('P1-CONSUMABLES: 空台帳は設定入口を示し、未登録の固定品目を表示しない', async ({ page }) => {
   await page.goto('/'); await waitForApp(page);
   await goTo(page, 'supply');
-  await expect(page.locator('#consumables')).toBeHidden();
-  await expect(page.getByRole('heading', { name: /共通消耗品/ })).toHaveCount(0);
+  await expect(page.locator('#consumables')).toBeVisible();
+  await expect(page.locator('#consumables article')).toHaveCount(0);
+  await page.getByRole('button', { name: '共通消耗品を設定する' }).click();
+  await expect(page.locator('#input [name=op]')).toHaveValue('masterItem');
 });

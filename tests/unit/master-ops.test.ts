@@ -24,7 +24,7 @@ describe('F1-B 3.1・要件1 登録情報の登録', () => {
   test('1.1・1.9・1.10: 品目を登録すると、品番・コードを文字列のまま持ち、履歴に前後と担当者が残る。保管単位は変わらない', () => {
     const before = register(practiceLedger, meta('r1', '08:00'), lotOf('P-1'), 'counted', 5);
     const l = change(before, 'm1', { action: 'register', master: { type: 'item', code: '0012', name: '架空部品0012', units: ['個'], unitSteps: { '個': 1 }, trial: true, source: null } });
-    expect(l.masters.items['0012']).toEqual({ type: 'item', id: '0012', code: '0012', name: '架空部品0012', source: null, units: ['個'], unitSteps: { '個': 1 }, trial: true, active: true, packaging: null });
+    expect(l.masters.items['0012']).toEqual({ type: 'item', id: '0012', code: '0012', name: '架空部品0012', source: null, units: ['個'], unitSteps: { '個': 1 }, trial: true, active: true, packaging: null, consumable: null });
     expect(last(l)).toMatchObject({ kind: 'master', action: 'register', eventId: 'm1', actor: '架空担当A', confirmed: false, reason: null, changes: [], masters: [{ before: null, after: { id: '0012' } }] });
     expect(l.lots).toEqual(before.lots);
   });

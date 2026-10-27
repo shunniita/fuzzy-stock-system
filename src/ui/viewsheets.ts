@@ -9,6 +9,7 @@ import type { Sheet } from './xlsx.ts';
 import { cumulativeText, reworkTextOf } from './format.ts';
 import { scanCells } from './code-format.ts';
 import { createHistoryTargetCollector } from '../domain/history-targets.ts';
+import { consumableSettingText, packagingSettingText } from './format.ts';
 import type { HistoryTargetCollector } from './history-item-format.ts';
 
 type State = Pick<Snapshot, 'ledger' | 'supply'>;
@@ -355,6 +356,17 @@ const notation: [string, string][] = [
   ['長い値', 'Excelの1セルの上限（32,767文字、特殊な文字列の保護で増える分も含む）を超えた値は、元のセルに先頭と案内を書き、全文を「長い値」シートの断片に持つ'],
 ];
 
+function itemSettingsSpec(state: State): Spec {
+  return {
+    name: '品目の設定', purpose: '現在の品目の単位・包装・共通消耗品の設定。変更前後は台帳の履歴を参照する',
+    columns: [column('品番・コード', 24, '現在の品番・コード。未付与の品目は仮と表示'), column('名称', 30, '現在の品目名と利用停止の状態'),
+      column('単位と最小単位', 30, '登録後は変更しない管理単位と最小単位'), column('包装・入り数', 80, '適用時点ごとの入り数。不明は0ではなく換算できない'),
+      column('共通消耗品・補充基準', 60, '現在の対象指定・集計単位・補充基準・標準依頼数量。自動では依頼を作らない')],
+    rows: Object.values(state.ledger.masters.items).map(item => [itemRef(state.ledger.masters, item.id), itemNameText(state.ledger.masters, item.id),
+      item.units.map(unit => `${unit}：${item.unitSteps[unit]}`).join('、'), packagingSettingText(item.packaging), consumableSettingText(item.consumable)]),
+  };
+}
+
 function explanation(specs: Spec[], createdAt: string): Spec {
   const rows: string[][] = [
     ['この出力', '閲覧用の出力（復元には使えない）。記録を戻すときは、復元用バックアップ（.json）を使う。この出力は取り込めない'],
@@ -371,6 +383,6 @@ function explanation(specs: Spec[], createdAt: string): Spec {
 // 閲覧用の出力のシート。説明を最初に置き、各シートの各列の意味を説明のシートから引けるようにする（要件4.12・5.3）。
 export function viewSheetsOf(state: State, createdAt: string): Sheet[] {
   const targets = createHistoryTargetCollector(state);
-  const specs = [totalsSpec(state), lotsSpec(state, targets), termsSpec(state), ledgerHistorySpec(state, targets), supplyHistorySpec(state, targets), requestsSpec(state), productionSpec(state)];
+  const specs = [totalsSpec(state), lotsSpec(state, targets), termsSpec(state), ledgerHistorySpec(state, targets), supplyHistorySpec(state, targets), requestsSpec(state), productionSpec(state), itemSettingsSpec(state)];
   return [explanation(specs, createdAt), ...specs].map(({ name, columns, rows }): Sheet => ({ name, columns: columns.map(({ header, width }) => ({ header, width })), rows }));
 }

@@ -3,7 +3,7 @@ import type { Ledger } from '../domain/ledger.ts';
 import type { Numeric, Quantity, Term, UnknownQuantity } from '../domain/quantity.ts';
 import type { Supply } from '../domain/supply.ts';
 import { deepFreeze } from '../domain/ledger.ts';
-import { masterTypeLabel, requireSameItemPrecisions } from '../domain/masters.ts';
+import { masterTypeLabel, requireConsistentItemSettings, requireItemSettingsTransition, requireSameItemPrecisions } from '../domain/masters.ts';
 import { requireQuantityTotals } from '../domain/shortage.ts';
 import { decodePending, decodeSnapshot } from './storageparse.ts';
 import { isReviewOperation, type ConflictReview } from './conflictrecord.ts';
@@ -22,7 +22,7 @@ export type SaveCheck = {
   resolution: { outcome: SaveOutcome; actor: string; at: string };
 };
 export type Snapshot = {
-  format: 'fuzzy-stock-f0'; version: 10; revision: number; lastWriter: string; opFloor: number;
+  format: 'fuzzy-stock-f0'; version: 11; revision: number; lastWriter: string; opFloor: number;
   ledger: Ledger; supply: Supply; ops: Readonly<Record<string, OpEntry>>; saveChecks: readonly SaveCheck[];
   conflictReviews: readonly ConflictReview[];
 };
@@ -495,6 +495,8 @@ function appendedIds(before: Pick<UnitState, 'ledger' | 'supply' | 'conflictRevi
   const supplyPrefix = after.supply.log.slice(0, before.supply.log.length);
   if (!sameValue(ledgerPrefix, before.ledger.history) || !sameValue(supplyPrefix, before.supply.log)) throw new Error('確定する単位の履歴が現在の状態に続いていない');
   const events = after.ledger.history.slice(before.ledger.history.length);
+  requireConsistentItemSettings(after.ledger);
+  requireItemSettingsTransition(before.ledger.masters, after.ledger.masters, events.flatMap(event => event.kind === 'master' ? event.masters : []));
   const log = after.supply.log.slice(before.supply.log.length);
   const ids = [...events, ...log, ...reviews].map(event => event.eventId);
   const used = new Set([...before.ledger.history, ...before.supply.log].map(event => event.eventId));
@@ -547,7 +549,7 @@ function checkedSnapshot(value: Snapshot): Snapshot {
 }
 
 export function serializePending(pending: Pending): string {
-  return encodeWithQuantities({ format: 'fuzzy-stock-pending', version: 10, pending });
+  return encodeWithQuantities({ format: 'fuzzy-stock-pending', version: 11, pending });
 }
 
 export function serialize(snapshot: Snapshot): string {
@@ -704,7 +706,7 @@ function encodeQuantities(value: unknown, sortKeys: boolean): { body: string; ta
 }
 
 export function initial(ledger: Ledger, supply: Supply): Snapshot {
-  return deepFreeze({ format: 'fuzzy-stock-f0', version: 10, revision: 0, lastWriter: 'init', opFloor: 1, ledger, supply, ops: {}, saveChecks: [], conflictReviews: [] });
+  return deepFreeze({ format: 'fuzzy-stock-f0', version: 11, revision: 0, lastWriter: 'init', opFloor: 1, ledger, supply, ops: {}, saveChecks: [], conflictReviews: [] });
 }
 
 export function load(store: StoreLike): LoadResult {

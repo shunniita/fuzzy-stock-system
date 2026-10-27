@@ -33,9 +33,8 @@ import { checkField, choiceField, h, section, selectField, textField, type Value
 import { amount, amountFields, countOrUnknown, quantityValue, codeTarget, itemFields, placeOptions, projectField, projectOf } from './fields.ts';
 import { caseRef, itemNameText, itemRef, jst, locationRef, projectText, quantityText, tokyoText } from './format.ts';
 import type { Masters } from '../domain/masters.ts';
-import { stockItems } from './seed.ts';
-import { requireActive } from '../domain/masters.ts';
-import { replenishmentOf, stockOf } from '../domain/packaging.ts';
+import { own, requireActive } from '../domain/masters.ts';
+import { consumablesOf, replenishmentOf, stockOf } from '../domain/packaging.ts';
 import { dateStatusOf, groupsOf, requestSummaryOf, shortageOf, stopsOf, type GroupKey } from '../domain/shortage.ts';
 import { consumableLinesText, needQuantityText, receivedText, requestDateText, remainderText, replyText, requestStateText, shortageLinesText, stateTriadText, stopLineText, supplyEventText, supplyOccurredText } from './supply-format.ts';
 import { createHistoryTargetCollector } from '../domain/history-targets.ts';
@@ -51,7 +50,7 @@ export type UiOp = {
 };
 
 // 画面の部品が、現在の状態を引くための口。入力欄は描画のたびに作り直すので、値でなく取り出す関数を渡す。
-export type Ctx = { ledger: () => Ledger; supply: () => Supply; asOfChanged?: () => void };
+export type Ctx = { ledger: () => Ledger; supply: () => Supply; asOfChanged?: () => void; openConsumableSettings?: () => void };
 
 // 一回の入力に付ける基本ID。供給だけを変える入力では台帳の件数が増えないので、両方の履歴の件数の和から付ける。
 // 入力は一件以上の記録を作るので、件数の和は入力ごとに必ず増え、基本IDは重ならない。
@@ -321,7 +320,11 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
     remainder: {
       label: '開けた物の残り具合（数が不明な開封分。数量へは換算しない）',
       fields: () => [
-        lotChoice(ctx, 'lot', '開封済みの保管単位（数が不明）', (l) => l.quantity.kind === 'unknown' && l.unit === '本'),
+        lotChoice(ctx, 'lot', '開封済みの保管単位（数が不明）', (l) => {
+          const item = own(ctx.ledger().masters.items, l.item);
+          const pieceUnit = item?.consumable?.pieceUnit ?? item?.packaging?.pieceUnit;
+          return l.quantity.kind === 'unknown' && (pieceUnit === undefined || l.unit === pieceUnit);
+        }),
         choiceField('level', '残量区分', remainderLevels.map((r): [string, string] => [r, remainderText[r]])),
       ],
       run: (s, m, v) => withSupply(s, recordRemainder(s.ledger, s.supply, m, v.text('lot'), v.text('level') as RemainderLevel)),
@@ -564,7 +567,13 @@ export function renderConsumables(ctx: Ctx): void {
   const root = section('consumables');
   const ledger = ctx.ledger();
   const supply = ctx.supply();
-  for (const cfg of stockItems) {
+  const configured = consumablesOf(ledger.masters);
+  if (configured.length === 0) {
+    const open = h('button', { type: 'button' }, '共通消耗品を設定する');
+    open.addEventListener('click', () => ctx.openConsumableSettings?.());
+    root.append(h('p', {}, '共通消耗品は未設定です。'), open);
+  }
+  for (const cfg of configured) {
     // 共通在庫だけ。案件・用途に属する同じ品目のまとまり・依頼を、共通の合計や補充確認に混ぜない（MOD-02）。
     const common = (l: Lot) => l.project.kind === 'common';
     const stock = stockOf(ledger, supply, cfg.item, cfg.pieceUnit, common);
@@ -578,7 +587,7 @@ export function renderConsumables(ctx: Ctx): void {
         'article',
         { class: 'group', 'data-stock': cfg.item },
         h('h3', {}, `品目${ref}（${name}）`),
-        h('ul', { 'aria-label': `品目${ref}の箱・バラ数量・補充確認` }, ...lines.map((text) => h('li', text.startsWith('補充確認：') ? { class: 'warn' } : {}, text))),
+        h('ul', { 'aria-label': `品目${ref}の包装・バラ数量・補充確認` }, ...lines.map((text) => h('li', text.startsWith('補充確認：') ? { class: 'warn' } : {}, text))),
       ),
     );
   }

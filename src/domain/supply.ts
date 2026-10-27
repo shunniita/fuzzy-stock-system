@@ -526,7 +526,7 @@ export function currentLevelOf(ledger: Ledger, supply: Supply, lot: Lot): Remain
 }
 
 // 開封済みで数量が不明なまとまりの残量区分。数えた・だいたいの数量があるまとまりは、その数量を使うので記録しない。
-// 区分を本数へ換算しない（SUP-03）。どの単位のまとまりが開封済みかは、換算の固定データを持つ側（packaging・画面）が絞る。
+// 区分を数量へ換算しない（SUP-03）。設定のある品目は画面で中身の単位へ絞り、開封済みかを利用者が選ぶ。
 export function recordRemainder(ledger: Ledger, supply: Supply, meta: Meta, lotId: string, level: RemainderLevel): Supply {
   const masters = ledger.masters;
   if (!remainderLevels.includes(level)) throw new Error(`残量区分「${String(level)}」は定義にない区分`);

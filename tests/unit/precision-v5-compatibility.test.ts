@@ -28,7 +28,7 @@ for (const c of precisionV5Cases) {
     const input: unknown = JSON.parse(c.wire), before = JSON.stringify(input);
     if (c.kind === 'snapshot') {
       const snapshot = decodeSnapshot(input);
-      expect(snapshot.version).toBe(10);
+      expect(snapshot.version).toBe(11);
       checkLedger(snapshot.ledger, 2);
       const data = new Map([['fuzzy-stock/head', 'A'], ['fuzzy-stock/slot-A', c.wire]]);
       const bytes = [...data];

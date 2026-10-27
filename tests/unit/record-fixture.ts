@@ -14,7 +14,7 @@ export function snapshot(): Snapshot {
   ledger = recordStop(ledger, meta('stop'), { process: 'R組立', item: 'R', unit: '台', project: { kind: 'case', id: 'B-001' }, reason: '部品不足', shortage: { item: 'P', unit: '個', value: 2 }, affected: null });
   ({ ledger, supply } = receiveLot(ledger, supply, meta('received'), { id: '交換品', item: 'S', unit: '箱', project: { kind: 'common' }, location: 'S1' }, 'label', 1, '0012-AB'));
   supply = allocateArrival(ledger, supply, meta('arrival'), 'sc-q1', { receiptLotId: '交換品', arrived: 1, good: 1 });
-  return deepFreeze({ format: 'fuzzy-stock-f0', version: 10, conflictReviews: [], revision: 4, lastWriter: 'op9', opFloor: 30, ledger, supply,
+  return deepFreeze({ format: 'fuzzy-stock-f0', version: 11, conflictReviews: [], revision: 4, lastWriter: 'op9', opFloor: 30, ledger, supply,
     ops: { op9: { fingerprint: '入力', units: [['received'], ['arrival']] } },
     saveChecks: [{ opId: 'op8', opLabel: '受入', savedTargets: ['まとまり0012'], unsavedTargets: ['依頼op7'], attempt: '登録操作', openedAt: at, resolution: { outcome: 'remainderAbandoned', actor: '架空担当B', at: later } }],
   });

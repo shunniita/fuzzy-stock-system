@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { changeMasters, practiceLedger, register, use, type Ledger, type Lot, type Meta, type Project } from '../../src/domain/ledger.ts';
 import { fixedMasters } from '../../src/domain/masters.ts';
-import { replenishmentOf, stockOf } from '../../src/domain/packaging.ts';
+import { consumablesOf, replenishmentOf, stockOf } from '../../src/domain/packaging.ts';
 import { emptySupply, recordReply, recordRemainder, recordRequest, type Supply } from '../../src/domain/supply.ts';
 import { consumableLinesText } from '../../src/ui/supply-format.ts';
-import { stockItems } from '../../src/ui/seed.ts';
+import { viewSheetsOf } from '../../src/ui/viewsheets.ts';
 
 const common: Project = { kind: 'common' };
 
@@ -16,6 +16,7 @@ function meta(eventId: string, hour = 9): Meta {
 const reg = (l: Ledger, id: string, item: string, unit: string, basis: 'counted' | 'label' | 'approximate' | 'unknown', value: number | null): Ledger =>
   register(l, meta(id, 8), { id, item, unit, project: common, location: 'S1' }, basis, value);
 
+const stockItems = consumablesOf(practiceLedger.masters);
 const screws = stockItems.find((s) => s.item === 'S')!;
 const washers = stockItems.find((s) => s.item === 'V')!;
 
@@ -30,6 +31,37 @@ const askBox = (s: Supply): Supply =>
   recordRequest(s, fixedMasters, meta('q1', 8), { project: common, item: 'S', unit: '箱', quantity: 1, vendor: '架空の仕入先X', requestedOn: '2026-10-01', reply: { kind: 'none' } });
 
 describe('ネジの欄の文言', () => {
+  test('任意の袋入り品目の設定・設定前の未換算・基準解除を一覧とExcelへ反映する', () => {
+    let l = changeMasters(practiceLedger, meta('item'), { action: 'register', master: { type: 'item', code: 'D', name: '架空袋D', units: ['個', '袋'], unitSteps: { 個: 0.1, 袋: 1 }, trial: true, source: null } });
+    expect(consumablesOf(l.masters).map(c => c.item)).not.toContain('D');
+    l = reg(l, 'OLD', 'D', '袋', 'counted', 1);
+    l = changeMasters(l, meta('pack', 10), { action: 'packaging', id: 'D', boxUnit: '袋', pieceUnit: '個', value: 10, reason: '架空の包装' });
+    l = changeMasters(l, meta('setting'), { action: 'consumable', id: 'D', setting: { pieceUnit: '個', rule: { threshold: 0.3, standardOrder: { value: 1, unit: '袋' } } }, reason: '架空の基準' });
+    l = reg(l, 'LOOSE', 'D', '個', 'counted', 0.3);
+    const cfg = consumablesOf(l.masters).find(c => c.item === 'D')!;
+    const text = linesOf(cfg, l, emptySupply);
+    expect(text).toContain('未開封の袋：OLD 1袋');
+    expect(text).toContain('設定前の入り数は不明');
+    expect(text).toContain('数量の数値部分の小計（個） 0.3個');
+    expect(text).toContain('標準依頼数量1袋');
+    expect(text).not.toContain('null');
+    const sheet = viewSheetsOf({ ledger: l, supply: emptySupply }, meta('export').recordedAt).find(s => s.name === '品目の設定')!;
+    const row = sheet.rows.find(r => r[0] === 'D')!;
+    expect(row[3]).toContain('不明');
+    expect(row[3]).toContain('10個');
+    expect(row[4]).toContain('0.3個');
+    expect(row[4]).toContain('1袋');
+    l = changeMasters(l, meta('no-rule'), { action: 'consumable', id: 'D', setting: { pieceUnit: '個', rule: null }, reason: '数量だけを見る' });
+    const noRule = consumablesOf(l.masters).find(c => c.item === 'D')!;
+    expect(linesOf(noRule, l, emptySupply)).not.toContain('補充確認');
+    l = changeMasters(l, meta('off'), { action: 'deactivate', type: 'item', id: 'D', reason: '利用停止' });
+    expect(consumablesOf(l.masters).find(c => c.item === 'D')).toEqual(noRule);
+    const stopped = viewSheetsOf({ ledger: l, supply: emptySupply }, meta('export').recordedAt).find(s => s.name === '品目の設定')!;
+    expect(stopped.rows.find(r => r[0]?.startsWith('D（'))?.join(' ')).toContain('利用停止');
+    l = changeMasters(l, meta('clear'), { action: 'consumable', id: 'D', setting: null, reason: '対象を解除' });
+    expect(consumablesOf(l.masters).map(c => c.item)).not.toContain('D');
+    expect(l.lots.OLD).toBeDefined();
+  });
   test('個で管理する消耗品の数量見出しは本に固定しない', () => {
     const text = linesOf({ ...washers, pieceUnit: '個' }, reg(practiceLedger, 'V-OPEN', 'V', '個', 'counted', 7), emptySupply);
     expect(text).toContain('開封済み・バラの数量（個）：V-OPEN 7個');

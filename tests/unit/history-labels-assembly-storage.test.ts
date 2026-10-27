@@ -29,7 +29,7 @@ function snapshotBackup(value: Snapshot): Uint8Array {
 }
 function rejectsAtThreeBoundaries(value: Snapshot, reason: string): void {
   expect(() => decodeSnapshot(value)).toThrow(reason);
-  expect(() => decodePending({ format: 'fuzzy-stock-pending', version: 9, pending: pending(value) })).toThrow(reason);
+  expect(() => decodePending({ format: 'fuzzy-stock-pending', version: 11, pending: pending(value) })).toThrow(reason);
   const backup = readBackup(snapshotBackup(value));
   expect(backup).toMatchObject({ kind: 'unreadable', reason: expect.stringContaining('記録の検査を通らない') });
   if (backup.kind === 'unreadable') expect(backup.reason).toContain(reason);
@@ -78,7 +78,7 @@ describe('履歴表示 task3 版9の組立構成と受け取り経路', () => {
     const supply = saveReceiptTemplate(ledger, emptySupply, meta('flat-save'), flat);
     const state = receiveTemplate({ ledger, supply }, meta('flat-receive'), child.id, { kind: 'case', id: 'A-001' }, 10, [20, 30].map(quantity => ({ quantity, shortfall: 0 })), null);
     const s = initial(state.ledger, state.supply);
-    const value = JSON.parse(JSON.stringify({ ...s, version: 8 }, (key, entry: unknown) => key === 'itemLabels' ? undefined : entry));
+    const value = JSON.parse(JSON.stringify({ ...s, version: 8 }, (key, entry: unknown) => key === 'consumable' || key === 'itemLabels' ? undefined : entry));
     expect(() => decodeSnapshot(value)).not.toThrow();
     if (field === 'productUnit') value.supply.receiptTemplates.child.productUnit = '台';
     if (field === 'assembly') value.supply.receiptTemplates.child.rows[0].assembly = child;

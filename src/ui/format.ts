@@ -20,7 +20,7 @@ import {
   type Stage,
   type Stop,
 } from '../domain/ledger.ts';
-import { masterTypeDisplayLabel, own, refOf, unassignedCode, type Master, type Masters } from '../domain/masters.ts';
+import { masterTypeDisplayLabel, own, refOf, unassignedCode, type ConsumableSetting, type Packaging, type Master, type Masters } from '../domain/masters.ts';
 import type { Basis, Quantity, Term } from '../domain/quantity.ts';
 import { createHistoryTargetCollector } from '../domain/history-targets.ts';
 import { historyItems, type HistoryTargetCollector, type ItemFormatter } from './history-item-format.ts';
@@ -379,6 +379,18 @@ function masterRefText(m: Master): string {
   return `${masterTypeDisplayLabel[m.type]}${m.code ?? unassignedCode}${name}`;
 }
 
+export function consumableSettingText(setting: ConsumableSetting | null): string {
+  if (setting === null) return '対象外';
+  const rule = setting.rule;
+  return rule === null ? `対象（集計単位${setting.pieceUnit}、補充基準なし）`
+    : `対象（補充基準${rule.threshold}${setting.pieceUnit}、標準依頼数量${rule.standardOrder.value}${rule.standardOrder.unit}）`;
+}
+
+export function packagingSettingText(packaging: Packaging | null): string {
+  if (packaging === null) return '未設定';
+  return `1${packaging.boxUnit}あたりの数：${packaging.perBox.map(entry => `${entry.from === null ? '最初から' : `${jst(entry.from)}から`}${entry.value === null ? '不明' : `${entry.value}${packaging.pieceUnit}`}`).join('、')}`;
+}
+
 // 登録情報の変更の前後を一つの文にする（要件10.2）。仮の既存IDは「既存IDなし（仮）」と書く（要件4.7）。
 function masterChangeText(action: MasterRequest['action'], { before, after }: MasterChange): string {
   const ref = masterRefText(after);
@@ -403,10 +415,16 @@ function masterChangeText(action: MasterRequest['action'], { before, after }: Ma
       const source = (m: Master | null) => (m === null || (m.type !== 'item' && m.type !== 'case') || m.source === null ? 'なし' : `「${m.source.name}」（版${m.source.revision}）`);
       return `${ref}の元の資料 ${source(before)} → ${source(after)}`;
     }
+    case 'consumable': {
+      const setting = (master: Master | null) => master?.type === 'item' ? consumableSettingText(master.consumable) : '対象外';
+      return `${ref}の共通消耗品設定 ${setting(before)} → ${setting(after)}`;
+    }
+    case 'packaging':
     case 'perBox': {
       const latest = after.type === 'item' ? after.packaging?.perBox.at(-1) : undefined;
       const unit = after.type === 'item' ? after.packaging?.pieceUnit ?? '' : '';
-      return `${ref}の1箱あたりの数を${jst(latest?.from ?? null)}から${latest?.value ?? ''}${unit}にする`;
+      const box = after.type === 'item' ? after.packaging?.boxUnit ?? '' : '';
+      return `${ref}の1${box}あたりの数を${jst(latest?.from ?? null)}から${latest?.value ?? ''}${unit}にする${action === 'packaging' ? '（それ以前の入り数は不明）' : ''}`;
     }
     case 'scope': {
       const latest = after.type === 'location' ? after.scope.at(-1) : undefined;
@@ -429,7 +447,7 @@ export type Totals = {
 // 絞り込んだ範囲の集計。単位の違う数量は合計しない（AT-10）ので、品目と単位の組ごとに行を分ける。
 export function totalsOf(ledger: Ledger, lots: readonly Lot[]): Totals[] {
   const groups = new Map<string, { item: string; unit: string }>();
-  for (const l of lots) groups.set(`${l.item} ${l.unit}`, { item: l.item, unit: l.unit });
+  for (const l of lots) groups.set(`${l.item}\0${l.unit}`, { item: l.item, unit: l.unit });
   const ids = new Set(lots.map((l) => l.id));
   return [...groups.values()].map(({ item, unit }) => {
     const inGroup = (l: Lot) => ids.has(l.id) && l.unit === unit;

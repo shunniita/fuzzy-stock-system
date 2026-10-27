@@ -4,5 +4,5 @@ import type { EventItemLabels } from '../../src/domain/history-labels.ts';
 export const legacyEventLabels = { itemLabels: { kind: 'legacy-unavailable' } } satisfies { itemLabels: EventItemLabels };
 
 export function legacyJson(value: unknown): string {
-  return JSON.stringify(value, (key, entry: unknown) => key === 'itemLabels' ? undefined : entry);
+  return JSON.stringify(value, (key, entry: unknown) => key === 'consumable' || key === 'itemLabels' ? undefined : entry);
 }

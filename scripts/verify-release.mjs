@@ -118,6 +118,18 @@ try {
   assert.deepEqual(created.returnSource.process, { id: '架空ZIP戻り工程', criterion: 'inspection' });
   const returnProof = { parentBefore: 2, parentAfter: 0, childAfter: 2, stage: 'working', supplyUnchanged: true, oldHistoryPrefixRetained: true, historyAdded: 1, holdsInherited: true, confirmedPhysical: true };
 
+  await recorded(page, 'masterItem', { code: 'ZIP-D', name: '架空ZIP消耗品', units: '個、袋', 'unitStep-個': '0.1' });
+  await recorded(page, 'masterPerBox', { target: 'item:ZIP-D', boxUnit: '袋', pieceUnit: '個', perBox: '10', reason: '架空ZIPの包装確認' }, '10:00');
+  await recorded(page, 'masterConsumable', { target: 'item:ZIP-D', consumableEnabled: true, pieceUnit: '個', replenishmentEnabled: true, threshold: '20', standardOrderValue: '2', standardOrderUnit: '袋', reason: '架空ZIPの補充基準' });
+  await recorded(page, 'register', { newId: 'ZIP-BAG', item: 'ZIP-D', unit: '袋', project: 'common', location: 'S1', basis: 'counted', value: '1' });
+  await recorded(page, 'register', { newId: 'ZIP-LOOSE', item: 'ZIP-D', unit: '個', project: 'common', location: 'S1', basis: 'counted', value: '0.3' });
+  await page.locator('#nav-supply').click();
+  const consumableText = await page.locator('#consumables [data-stock="ZIP-D"]').innerText();
+  assert.match(consumableText, /10.3個/);
+  assert.match(consumableText, /標準依頼数量2袋/);
+  assert.match(consumableText, /中身未確認/);
+  const consumableProof = { item: 'ZIP-D', packaging: '袋', total: '10.3個', standardOrder: '2袋', basisPreserved: true };
+  await page.locator('#nav-stock').click();
   const stock = await page.locator('#list').innerText();
   assert.ok(stock.includes('品目'), '在庫一覧が使える');
   const storage = await page.evaluate(() => JSON.stringify(Object.entries(localStorage).sort()));
@@ -171,9 +183,11 @@ try {
   const reopened = await openApp(origin);
   assert.equal(await reopened.locator('#list').innerText(), stock, 'ブラウザーと配信を再起動しても在庫を保持する');
   assert.equal(await reopened.evaluate(() => JSON.stringify(Object.entries(localStorage).sort())), restoredStorage, '同じ専用プロファイルの保存記録を保持する');
+  await reopened.locator('#nav-supply').click();
+  assert.equal(await reopened.locator('#consumables [data-stock="ZIP-D"]').innerText(), consumableText, '消耗品の設定と数量を復元・再起動後も保持する');
   assert.deepEqual(external, []);
   assert.deepEqual(errors, []);
-  report = { archive, revision: manifest.revision, files: manifest.files.length + 1, publicProof, returnProof, checks: ['all file hashes', 'Japanese extraction path', 'start-local.cmd', 'usable boot', 'empty ledger registration, use, move, recount, history and backup restore', 'bundled browser help', 'returned physical intake, assignment and rework with preserved history and supply', 'save and reload', 'backup download and restore after reset', 'Excel lazy import and download', 'configured port from local-settings.txt without Port override', 'browser and server restart with same profile and origin', 'no external app requests', 'no page errors'], backupBytes: backup.length, excelBytes: excel.length };
+  report = { archive, revision: manifest.revision, files: manifest.files.length + 1, publicProof, returnProof, consumableProof, checks: ['all file hashes', 'Japanese extraction path', 'start-local.cmd', 'usable boot', 'empty ledger registration, use, move, recount, history and backup restore', 'bundled browser help', 'returned physical intake, assignment and rework with preserved history and supply', 'configured consumable with decimal quantity, backup restore and restart', 'save and reload', 'backup download and restore after reset', 'Excel lazy import and download', 'configured port from local-settings.txt without Port override', 'browser and server restart with same profile and origin', 'no external app requests', 'no page errors'], backupBytes: backup.length, excelBytes: excel.length };
 } catch (error) { failures.push(error); }
 finally {
   try { if (browser) await browser.close(); }

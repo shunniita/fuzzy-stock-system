@@ -1,4 +1,3 @@
-import type { Replenishment } from '../domain/packaging.ts';
 import { emptySupply, recordRequest, registerNeed, type Supply } from '../domain/supply.ts';
 import { practiceLedger, hold, recordProvisional, register, split, use, type Ledger, type Meta, type Project } from '../domain/ledger.ts';
 
@@ -36,15 +35,6 @@ export function seedLedger(): Ledger {
     note: '品目不明の箱（架空の読取文字列 0012-AB）',
   });
 }
-
-// 箱と本数で持つ共通品目の固定データ（B2）。補充基準・標準依頼数量は試験データで、現場の設定ではない（ADR-005、TBD-05）。
-// 包装の入り数は台帳のマスタにある（ADR-024）。ワッシャVは包装も基準も持たず、開封分の残量区分だけを登録する（AT-42）。
-export type StockItem = { item: string; pieceUnit: string; rule: Replenishment | null };
-
-export const stockItems: readonly StockItem[] = [
-  { item: 'S', pieceUnit: '本', rule: { item: 'S', pieceUnit: '本', threshold: 3000, standardOrder: { value: 1, unit: '箱' } } },
-  { item: 'V', pieceUnit: '本', rule: null },
-];
 
 // SCN-02（中身の不足・交換・ネジ補充）の初期状態（FH-B02）。案件B-001の品目Pの必要数100、ラベル100個の現物、
 // 共通ネジの既存の補充依頼1箱。実数98への訂正、不良の隔離、追加依頼、交換品の受入などは、利用者が画面から記録する。

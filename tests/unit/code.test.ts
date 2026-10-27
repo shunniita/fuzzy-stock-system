@@ -8,8 +8,8 @@ const masters: Masters = {
   ...fixedMasters,
   items: {
     ...fixedMasters.items,
-    item007: { type: 'item', id: 'item007', code: '007', name: '架空007', source: null, units: ['個'], unitSteps: { '個': 1 }, trial: true, active: true, packaging: null },
-    item7: { type: 'item', id: 'item7', code: '7', name: '架空7', source: null, units: ['個'], unitSteps: { '個': 1 }, trial: true, active: false, packaging: null },
+    item007: { type: 'item', id: 'item007', code: '007', name: '架空007', source: null, units: ['個'], unitSteps: { '個': 1 }, trial: true, active: true, packaging: null, consumable: null },
+    item7: { type: 'item', id: 'item7', code: '7', name: '架空7', source: null, units: ['個'], unitSteps: { '個': 1 }, trial: true, active: false, packaging: null, consumable: null },
   },
 };
 
@@ -39,7 +39,7 @@ describe('AT-30/46 架空コードの解釈', () => {
     expect(scan.interpreted).toHaveProperty('reason');
   });
   it('登録情報変更後も当時の解決を保持し登録情報自身を凍結しない', () => {
-    const item = { type: 'item', id: 'mutable', code: '007', name: '変更前', source: null, units: ['個'], unitSteps: { '個': 1 }, trial: true, active: true, packaging: null } satisfies Masters['items'][string];
+    const item = { type: 'item', id: 'mutable', code: '007', name: '変更前', source: null, units: ['個'], unitSteps: { '個': 1 }, trial: true, active: true, packaging: null, consumable: null } satisfies Masters['items'][string];
     const scan = readCode('007', { ...masters, items: { mutable: item } });
     item.name = '変更後'; item.code = '008';
     expect(scan.interpreted).toMatchObject({ item: { code: '007', name: '変更前' } });

@@ -1,0 +1,122 @@
+import { expect, test, type Page } from '@playwright/test';
+import * as XLSX from 'xlsx';
+import { backupButton, downloadVia, exportButton, goTo, pickFile, record, recorded, selectOperation, storageBytes, waitForApp, waitForPersistence } from './helpers.ts';
+import { snapshotOf } from './conflict-helpers.ts';
+
+async function blankItem(page: Page): Promise<void> {
+  await page.goto('/'); await waitForApp(page);
+  await recorded(page, 'masterActor', { name: '架空担当' });
+  await recorded(page, 'masterLocation', { code: 'L', name: '架空棚', inScope: 'true' });
+  await recorded(page, 'masterItem', { code: 'D', name: '架空の袋入り消耗品', units: '個、袋', 'unitStep-個': '0.1' });
+}
+
+test('共通消耗品1.1–1.6: 包装設定・原文拒否・現在値の読戻し・必要欄の切替', async ({ page }) => {
+  await blankItem(page);
+  await recorded(page, 'masterPerBox', { target: 'item:D', boxUnit: '袋', pieceUnit: '個', perBox: '10', reason: '架空の包装確認' }, '10:00');
+  const initial = await snapshotOf(page), bytes = await storageBytes(page);
+  for (const field of ['threshold', 'standardOrderValue']) {
+    const entries = { target: 'item:D', consumableEnabled: true, pieceUnit: '個', replenishmentEnabled: true, threshold: '0.3', standardOrderValue: '0.1', standardOrderUnit: '個', reason: '基準設定', [field]: '0.10000000000000001' };
+    await expect(await record(page, 'masterConsumable', entries)).toContainText('最小単位');
+    await expect(page.locator(`#input [name=${field}]`)).toHaveValue('0.10000000000000001');
+    expect((await snapshotOf(page)).ledger).toEqual(initial.ledger);
+    expect(await storageBytes(page)).toEqual(bytes);
+  }
+  await recorded(page, 'masterConsumable', { target: 'item:D', consumableEnabled: true, pieceUnit: '個', replenishmentEnabled: true, threshold: '0.3', standardOrderValue: '1', standardOrderUnit: '袋', reason: '基準設定' });
+  await selectOperation(page.locator('#input [name=op]'), 'masterConsumable');
+  const form = page.getByRole('form', { name: '操作の入力' });
+  await form.locator('[name=target]').selectOption('item:D');
+  await expect(form.locator('[name=consumableEnabled]')).toBeChecked();
+  await expect(form.locator('[name=threshold]')).toHaveValue('0.3');
+  await expect(form.locator('[name=standardOrderUnit]')).toHaveValue('袋');
+  await form.locator('[name=replenishmentEnabled]').uncheck();
+  await expect(form.locator('[name=threshold]')).toHaveCount(0);
+  await expect(form.locator('[name=standardOrderUnit]')).toHaveCount(0);
+  await form.locator('[name=reason]').fill('基準を解除');
+  await form.getByRole('button', { name: '記録する', exact: true }).click();
+  await expect(page.locator('#input')).toContainText('記録した');
+  expect((await snapshotOf(page)).ledger.masters.items.D?.consumable).toEqual({ pieceUnit: '個', rule: null });
+  await recorded(page, 'masterConsumable', { target: 'item:D', consumableEnabled: false, reason: '指定解除' });
+  expect((await snapshotOf(page)).ledger.masters.items.D?.consumable).toBeNull();
+});
+
+test('共通消耗品通し操作: 袋・小数・共通所属・依頼と受け取り・設定解除・Excel・JSON復元', async ({ page }) => {
+  await blankItem(page);
+  await recorded(page, 'masterCase', { code: 'CASE', name: '架空用途' });
+  const item = { item: 'D', unit: '袋', project: 'common', location: 'L', basis: 'counted' };
+  await recorded(page, 'register', { ...item, newId: 'OLD', value: '1' }, '08:00');
+  await recorded(page, 'masterPerBox', { target: 'item:D', boxUnit: '袋', pieceUnit: '個', perBox: '10', reason: '包装確認' }, '10:00');
+  await recorded(page, 'masterConsumable', { target: 'item:D', consumableEnabled: true, pieceUnit: '個', replenishmentEnabled: true, threshold: '20', standardOrderValue: '2', standardOrderUnit: '袋', reason: '補充基準' });
+  for (const [newId, value] of [['A', '0.1'], ['B', '0.2']]) await recorded(page, 'register', { ...item, newId: newId!, unit: '個', value: value! });
+  await recorded(page, 'register', { ...item, newId: 'CASE-LOT', project: 'CASE', value: '8' });
+  await recorded(page, 'register', { ...item, newId: 'OPEN', unit: '個', basis: 'unknown', value: '' });
+  await recorded(page, 'remainder', { lot: 'OPEN', level: 'few' });
+  const request = { project: 'common', item: 'D', unit: '袋', quantity: '2', vendor: '架空仕入先', requestedOn: '2026-09-29', replyKind: 'none' };
+  await recorded(page, 'requestRecord', request, '11:00');
+  const requestId = Object.keys((await snapshotOf(page)).supply.requests)[0]!;
+  await recorded(page, 'requestRecord', { ...request, project: 'CASE', vendor: '案件専用仕入先' }, '11:00');
+  await recorded(page, 'receive', { ...item, newId: 'NEW', value: '1', r1request: requestId, r1arrived: '1', r1good: '1' });
+  await goTo(page, 'supply');
+  const common = page.locator('#consumables [data-stock=D]');
+  await expect(common).toContainText('数量の数値部分の小計（個）');
+  await expect(common).toContainText('10.3個');
+  await expect(common).toContainText('設定前の入り数は不明');
+  await expect(common).toContainText('OLD 1袋');
+  await expect(common).toContainText('OPEN 少ない');
+  await expect(common).toContainText('標準依頼数量2袋');
+  await expect(common).toContainText('到着1袋・未着1袋');
+  await expect(common).not.toContainText('CASE-LOT');
+  await expect(common).not.toContainText('案件専用仕入先');
+  await expect(common).not.toContainText('0.30000000000000004');
+  const original = await snapshotOf(page);
+  const book = XLSX.read((await downloadVia(page, exportButton)).bytes, { type: 'array' });
+  expect(book.SheetNames).toContain('品目の設定');
+  const settings = XLSX.utils.sheet_to_json(book.Sheets['品目の設定']!, { header: 1 });
+  expect(JSON.stringify(settings)).toContain('補充基準20個');
+  expect(JSON.stringify(settings)).toContain('標準依頼数量2袋');
+  expect(JSON.stringify(settings)).toContain('不明');
+  const backup = await downloadVia(page, backupButton);
+  await goTo(page, 'stock');
+  await recorded(page, 'masterConsumable', { target: 'item:D', threshold: '5', standardOrderValue: '1', reason: '基準変更' });
+  await recorded(page, 'masterConsumable', { target: 'item:D', replenishmentEnabled: false, reason: '数量だけを見る' });
+  await goTo(page, 'supply');
+  await expect(common).not.toContainText('補充確認：');
+  await expect(common).toContainText('到着1袋・未着1袋');
+  await recorded(page, 'masterConsumable', { target: 'item:D', consumableEnabled: false, reason: '指定解除' });
+  await goTo(page, 'supply');
+  await expect(common).toHaveCount(0);
+  const cleared = await snapshotOf(page);
+  expect(cleared.ledger.lots).toEqual(original.ledger.lots);
+  expect(cleared.supply).toEqual(original.supply);
+  await pickFile(page, backup.path);
+  await page.getByRole('region', { name: '復元の確認' }).getByRole('button', { name: '復元する', exact: true }).click();
+  await waitForPersistence(page);
+  await page.reload(); await waitForApp(page);
+  const restored = await snapshotOf(page);
+  expect(restored.ledger).toEqual(original.ledger);
+  expect(restored.supply).toEqual(original.supply);
+  await goTo(page, 'supply');
+  await expect(common).toContainText('補充基準20個');
+  await recorded(page, 'masterDeactivate', { target: 'item:D', reason: '利用停止' });
+  await goTo(page, 'supply');
+  await expect(common).toContainText('利用停止');
+  await expect(common).toContainText('到着1袋・未着1袋');
+});
+
+test('共通消耗品4.4: 保存結果不明から再読込・照会・再試行して設定履歴を一度だけ残す', async ({ page }) => {
+  await blankItem(page);
+  await page.goto('/?test'); await waitForApp(page);
+  await page.evaluate(() => window.fuzzyStockTest!.loseResponseAt(1));
+  await record(page, 'masterConsumable', { target: 'item:D', consumableEnabled: true, pieceUnit: '個', replenishmentEnabled: true, threshold: '0.3', standardOrderValue: '1', standardOrderUnit: '袋', reason: '復旧試験' });
+  await expect(page.locator('#save')).toContainText('保存結果不明');
+  await page.reload(); await waitForApp(page);
+  await page.getByRole('button', { name: '照会する', exact: true }).click();
+  await page.getByRole('button', { name: '再試行する', exact: true }).click();
+  await waitForPersistence(page);
+  const saved = await snapshotOf(page);
+  expect(saved.ledger.history.filter(e => e.kind === 'master' && e.action === 'consumable')).toHaveLength(1);
+  expect(saved.ledger.masters.items.D?.consumable).toEqual({ pieceUnit: '個', rule: { threshold: 0.3, standardOrder: { value: 1, unit: '袋' } } });
+  expect(saved.supply.requests).toEqual({});
+  expect(await page.evaluate(() => localStorage.getItem('fuzzy-stock/pending'))).toBeNull();
+  await goTo(page, 'supply');
+  await expect(page.locator('#consumables [data-stock=D]')).toContainText('標準依頼数量1袋');
+});

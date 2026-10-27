@@ -147,13 +147,13 @@ function populated(): { ledger: Ledger; supply: ReturnType<typeof seedScn02>['su
 }
 
 function snapshot(): Snapshot {
-  return deepFreeze({ format: 'fuzzy-stock-f0', version: 10, conflictReviews: [], revision: 4, lastWriter: 'op9', opFloor: 30,
+  return deepFreeze({ format: 'fuzzy-stock-f0', version: 11, conflictReviews: [], revision: 4, lastWriter: 'op9', opFloor: 30,
     ...populated(), ops: { op9: { fingerprint: '入力', units: [['received'], ['arrival']] } },
     saveChecks: [{ opId: 'op8', opLabel: '受入', savedTargets: ['まとまり0012'], unsavedTargets: ['依頼op7'], attempt: '登録操作', openedAt: at, resolution: { outcome: 'remainderAbandoned', actor: '架空担当B', at: later } }],
   });
 }
 
-const pendingText = (value: unknown): string => JSON.stringify({ format: 'fuzzy-stock-pending', version: 9, pending: value });
+const pendingText = (value: unknown): string => JSON.stringify({ format: 'fuzzy-stock-pending', version: 11, pending: value });
 
 function pending(): Pending {
   return { progress: 'saving', unknownSince: null, savingSince: later, baseRevision: 3,
@@ -368,7 +368,7 @@ describe('Task 2.1 保存形式とローカル読み込み (AT-38/FH-B05の保�
   });
 
   test.each([
-    ['format', ['format'], '別形式'], ['version', ['version'], 11], ['revision', ['revision'], -1], ['opFloor', ['opFloor'], 0], ['lastWriter', ['lastWriter'], undefined],
+    ['format', ['format'], '別形式'], ['version', ['version'], 12], ['revision', ['revision'], -1], ['opFloor', ['opFloor'], 0], ['lastWriter', ['lastWriter'], undefined],
     ['ledger', ['ledger'], []], ['lots', ['ledger', 'lots'], []], ['stage', ['ledger', 'lots', 'P-B01', 'stage', 'kind'], 'invalid'],
     ['project', ['ledger', 'lots', 'P-B01', 'project', 'id'], undefined], ['holds', ['ledger', 'lots', 'P-B01', 'holds'], ['invalid']],
     ['quantity', ['ledger', 'lots', 'P-B01', 'quantity', 'kind'], 'invalid'], ['numeric', ['ledger', 'lots', 'P-B01', 'quantity', 'numeric', 'value'], 1.5],

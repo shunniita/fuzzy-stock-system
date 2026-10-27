@@ -248,13 +248,15 @@ test('AT-44・3.1〜3.4・4.1・4.3・4.5・4.10・5.1〜5.4: 閲覧用の出力
   await expect(notice(page)).toContainText('閲覧用の出力を書き出した');
 
   const book = XLSX.read(view.bytes, { type: 'array' });
-  expect(book.SheetNames).toEqual(['説明', '集計', '保管単位', '元の記録', '台帳の履歴', '供給の履歴', '依頼', '工程集計']);
+  expect(book.SheetNames).toEqual(['説明', '集計', '保管単位', '元の記録', '台帳の履歴', '供給の履歴', '依頼', '工程集計', '品目の設定']);
   const rows = (name: string): string[][] => {
     const sheet = book.Sheets[name];
     if (!sheet) throw new Error(`シートがない：${name}`);
     return XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: true });
   };
   expect(rows('説明')[1]?.[1]).toMatch(/^閲覧用の出力（復元には使えない）/);
+  expect(rows('品目の設定')[0]).toContain('共通消耗品・補充基準');
+  expect(rows('品目の設定').find(r => r[0] === 'S')?.join(' ')).toContain('標準依頼数量1箱');
   const lots = rows('保管単位');
   expect(lots.find(r => r[0] === 'P-004')).toContain('不明');
   expect(lots.find(r => r[0] === '0012')?.[0]).toBe('0012');

@@ -8,13 +8,13 @@ import {
   type MasterRequest,
   type NewMaster,
 } from '../domain/ledger.ts';
-import { masterTypeDisplayLabel, unassignedCode, type Master, type Masters, type Source } from '../domain/masters.ts';
+import { masterTypeDisplayLabel, own, unassignedCode, type ItemMaster, type Master, type Masters, type Source } from '../domain/masters.ts';
 import type { Supply } from '../domain/supply.ts';
 import { requestProgressOf } from '../domain/supply.ts';
 import { checkField, choiceField, h, selectField, textField, type Values } from './dom.ts';
 import { codeTarget, itemFields, lotOptions, placeOptions, projectField, projectKey, projectOf, projectsOf } from './fields.ts';
-import type { Step } from '../domain/scalar.ts';
-import { caseRef, eventText, itemRef, jst, locationRef, projectText, quantityText } from './format.ts';
+import { parseScalar, type Step } from '../domain/scalar.ts';
+import { caseRef, consumableSettingText, packagingSettingText, eventText, itemRef, jst, locationRef, projectText, quantityText } from './format.ts';
 import type { Ctx, UiOp } from './supply-ui.ts';
 
 // 確認が要る操作は、画面の「確認した」の欄を読む。
@@ -54,10 +54,10 @@ function sourceOf(v: Values): Source | null {
   return name === '' && revision === '' ? null : { name, revision };
 }
 
-const masterOp = (label: string, fields: (masters: Masters) => HTMLElement[], request: (v: Values) => MasterRequest, ctx: Ctx): UiOp => ({
+const masterOp = (label: string, fields: (masters: Masters) => HTMLElement[], request: (v: Values, masters: Masters) => MasterRequest, ctx: Ctx): UiOp => ({
   label: `登録情報：${label}`,
   fields: () => fields(ctx.ledger().masters),
-  run: (s, m, v) => ({ state: { ...s, ledger: changeMasters(s.ledger, m, request(v), v.checked('confirmed')) } }),
+  run: (s, m, v) => ({ state: { ...s, ledger: changeMasters(s.ledger, m, request(v, s.ledger.masters), v.checked('confirmed')) } }),
 });
 
 // Number()は0x10・0b11・1e1も整数にしてしまうので、十進の数字だけを1箱あたりの数として読む。
@@ -65,6 +65,68 @@ function perBoxOf(raw: string): number {
   const text = raw.trim();
   if (!/^\d+$/.test(text)) throw new Error('1箱あたりの数は1以上の整数にする');
   return Number(text);
+}
+
+function selectedItem(masters: Masters, v: Values): ItemMaster {
+  const item = own(masters.items, targetOf(v, ['item']).id);
+  if (item === undefined) throw new Error('対象の品目を選ぶ');
+  return item;
+}
+
+function itemSettingFields(masters: Masters, fields: (item: ItemMaster) => HTMLElement[]): HTMLElement[] {
+  const target = choiceField('target', '品目', Object.values(masters.items).map(item => [`item:${item.id}`, masterLabel(masters, item)]));
+  const details = h('div', {});
+  target.addEventListener('change', () => {
+    const item = own(masters.items, target.querySelector('select')!.value.slice(5));
+    details.replaceChildren(...(item === undefined ? [] : fields(item)));
+  });
+  return [target, details, reasonField()];
+}
+
+function unitChoice(item: ItemMaster, name: string, label: string, current = ''): HTMLLabelElement {
+  const field = choiceField(name, label, item.units.map(unit => [unit, unit]));
+  field.querySelector('select')!.value = current;
+  return field;
+}
+
+function packagingFields(item: ItemMaster): HTMLElement[] {
+  const count = textField('perBox', item.packaging === null ? '入り数（1包装あたりの数）' : `新しい1${item.packaging.boxUnit}あたりの数`, 'integer');
+  if (item.packaging !== null) {
+    count.querySelector('input')!.value = String(item.packaging.perBox.at(-1)!.value);
+    return [h('p', {}, `包装：${item.packaging.boxUnit} → ${item.packaging.pieceUnit}`), count];
+  }
+  return [unitChoice(item, 'boxUnit', '包装の単位'), unitChoice(item, 'pieceUnit', '中身の単位', item.consumable?.pieceUnit ?? ''), count];
+}
+
+function consumableFields(item: ItemMaster): HTMLElement[] {
+  const setting = item.consumable;
+  const enabled = checkField('consumableEnabled', '共通消耗品として表示する', setting !== null);
+  const piece = unitChoice(item, 'pieceUnit', '集計する単位', setting?.pieceUnit ?? item.packaging?.pieceUnit ?? '');
+  const useRule = checkField('replenishmentEnabled', '補充基準を設定する', setting?.rule != null);
+  const threshold = textField('threshold', '補充基準', 'number');
+  const order = textField('standardOrderValue', '標準依頼数量', 'number');
+  const orderUnit = unitChoice(item, 'standardOrderUnit', '標準依頼の単位', setting?.rule?.standardOrder.unit ?? '');
+  threshold.querySelector('input')!.value = setting?.rule ? String(setting.rule.threshold) : '';
+  order.querySelector('input')!.value = setting?.rule ? String(setting.rule.standardOrder.value) : '';
+  const ruleFields = h('div', {}), detail = h('div', {});
+  const showRule = () => ruleFields.replaceChildren(...(useRule.querySelector('input')!.checked ? [threshold, order, orderUnit] : []));
+  const showSetting = () => detail.replaceChildren(...(enabled.querySelector('input')!.checked ? [piece, useRule, ruleFields] : []));
+  enabled.addEventListener('change', showSetting);
+  useRule.addEventListener('change', showRule);
+  showRule(); showSetting();
+  return [enabled, detail];
+}
+
+function consumableRequest(v: Values, masters: Masters): MasterRequest {
+  const item = selectedItem(masters, v);
+  const base = { action: 'consumable', id: item.id, reason: v.text('reason') } as const;
+  if (!v.checked('consumableEnabled')) return { ...base, setting: null };
+  const pieceUnit = v.text('pieceUnit'), pieceStep = own(item.unitSteps, pieceUnit);
+  if (pieceStep === undefined) throw new Error('集計する単位を選ぶ');
+  if (!v.checked('replenishmentEnabled')) return { ...base, setting: { pieceUnit, rule: null } };
+  const unit = v.text('standardOrderUnit'), orderStep = own(item.unitSteps, unit);
+  if (orderStep === undefined) throw new Error('標準依頼の単位を選ぶ');
+  return { ...base, setting: { pieceUnit, rule: { threshold: parseScalar(v.text('threshold'), pieceStep), standardOrder: { value: parseScalar(v.text('standardOrderValue'), orderStep), unit } } } };
 }
 
 const unitsOf = (text: string): string[] => text.split(/[、,]/).map((u) => u.trim());
@@ -130,8 +192,12 @@ export function masterOps(ctx: Ctx): Record<string, UiOp> {
       (v) => ({ action: 'code', ...targetOf(v, coded), code: v.text('code'), reason: v.text('reason') }), ctx),
     masterSource: masterOp('元の資料の更新（呼び名は変えない）', () => [choiceField('type', '種類', [['item', '品目'], ['case', '案件・用途']]), textField('code', '品番・コード'), textField('sourceName', '元の資料の名称'), textField('sourceRevision', '元の資料の版')],
       (v) => ({ action: 'source', type: v.text('type') === 'case' ? 'case' : 'item', code: v.text('code'), source: { name: v.text('sourceName'), revision: v.text('sourceRevision') } }), ctx),
-    masterPerBox: masterOp('1箱あたりの数の変更（実際の日時を適用時点にする）', (ms) => [choiceField('target', '品目', Object.values(ms.items).filter((i) => i.packaging !== null).map((i) => [`item:${i.id}`, masterLabel(ms, i)])), textField('perBox', '新しい1箱あたりの数', 'integer'), reasonField()],
-      (v) => ({ action: 'perBox', id: targetOf(v, ['item']).id, value: perBoxOf(v.text('perBox')), reason: v.text('reason') }), ctx),
+    masterPerBox: masterOp('包装・入り数の設定（実際の日時を適用時点にする）', ms => itemSettingFields(ms, packagingFields),
+      (v, ms) => {
+        const item = selectedItem(ms, v), common = { id: item.id, value: perBoxOf(v.text('perBox')), reason: v.text('reason') };
+        return item.packaging === null ? { action: 'packaging', ...common, boxUnit: v.text('boxUnit'), pieceUnit: v.text('pieceUnit') } : { action: 'perBox', ...common };
+      }, ctx),
+    masterConsumable: masterOp('共通消耗品・補充基準の設定', ms => itemSettingFields(ms, consumableFields), consumableRequest, ctx),
     masterScope: masterOp('記録の対象の変更（実際の日時を適用時点にする）', (ms) => [targetField(ms, ['location']), choiceField('inScope', '変更後', [['false', '記録の対象外'], ['true', '記録の対象']]), reasonField()],
       (v) => ({ action: 'scope', id: targetOf(v, ['location']).id, inScope: v.text('inScope') === 'true', reason: v.text('reason') }), ctx),
     identify: {
@@ -174,8 +240,8 @@ export function mastersPanel(ledger: Ledger, selected: string, onSelect: (key: s
   const ms = ledger.masters;
   const items = Object.values(ms.items).map((i) => [
     i.code ?? unassignedCode, i.code === null ? '仮' : '', i.name, stateText(i),
-    `${i.units.join('・')}${i.packaging ? `（1${i.packaging.boxUnit}の1箱あたりの数：${i.packaging.perBox.map((p) => `${sinceText(p.from)}${p.value}${i.packaging!.pieceUnit}`).join('、')}）` : ''}`,
-    i.units.map((u) => `${u}：${i.unitSteps[u]}`).join('、'), i.source ? `${i.source.name}（版${i.source.revision}）` : 'なし',
+    i.units.join('・'), i.units.map((u) => `${u}：${i.unitSteps[u]}`).join('、'), packagingSettingText(i.packaging), consumableSettingText(i.consumable),
+    i.source ? `${i.source.name}（版${i.source.revision}）` : 'なし',
   ]);
   const locations = Object.values(ms.locations).map((l) => [
     l.code, l.name, stateText(l), l.scope.map((s) => `${sinceText(s.from)}${s.inScope ? '記録の対象' : '記録の対象外'}`).join('、'),
@@ -192,7 +258,7 @@ export function mastersPanel(ledger: Ledger, selected: string, onSelect: (key: s
   const events = current ? ledger.history.filter((e) => e.kind === 'master' && e.masters.some((c) => c.after.type === current.type && c.after.id === current.id)) : [];
   return [
     h('p', {}, '品目・場所・案件・用途・担当者を登録・変更するときは、入力で作業の種類「登録情報の登録・変更」を選ぶ。権限による制限はなく、画面を使える人は誰でも変えられる。変更は履歴に残り、過去の記録は消さない。'),
-    h('h3', {}, '品目'), table('品目の登録情報', ['品番・コード', '仮', '名称', '状態', '単位と1箱あたりの数', '単位ごとの最小単位（登録後は変えない）', '元の資料'], items),
+    h('h3', {}, '品目'), table('品目の登録情報', ['品番・コード', '仮', '名称', '状態', '単位', '単位ごとの最小単位（登録後は変えない）', '包装・入り数', '共通消耗品・補充基準', '元の資料'], items),
     h('h3', {}, '場所'), table('場所の登録情報', ['品番・コード', '名称', '状態', '記録の対象'], locations),
     h('h3', {}, '案件・用途'), table('案件・用途の登録情報', ['品番・コード', '仮', '名称', '状態', '元の資料'], cases),
     h('h3', {}, '担当者'), table('担当者の登録情報', ['名前', '状態'], actors),
