@@ -20,14 +20,13 @@ import {
   isUsable,
   merge,
   move,
-  nextProcessLocation,
   nextStage,
+  processNameAt,
   noStage,
   occurredAtOf,
   openIssues,
   openIssuesOf,
   originOf,
-  processes,
   productionOf,
   productionGroupsOf,
   productionIssuesOf,
@@ -89,10 +88,10 @@ import {
 import { checkField, choiceField, field, h, section, selectField, textField, type Child, type Values } from './dom.ts';
 import { alternativeFields, alternativeOperationOf, alternativeSourceOf } from './alternative-input.ts';
 import type { AlternativeOperation } from '../domain/alternative-record.ts';
-import { own } from '../domain/masters.ts';
+import { nextProcessOf, own, processOf, processRef, type Masters } from '../domain/masters.ts';
 import { emptySupply } from '../domain/supply.ts';
 import { requireQuantityTotals } from '../domain/shortage.ts';
-import { amount, amountFields, countOrUnknown, MaterialInclusionRequired, formValue, precisionHints, quantityStepFor, quantityTargetOf, quantityValue, basisOptions, codeTarget, itemFields, itemOptions, lotOptions as lotChoices, placeOptions as placeChoices, projectField, projectKey, projectOf, registerFromValues, restrictPlaces } from './fields.ts';
+import { processOptions, stopProcessOptions, amount, amountFields, countOrUnknown, MaterialInclusionRequired, formValue, precisionHints, quantityStepFor, quantityTargetOf, quantityValue, basisOptions, codeTarget, itemFields, itemOptions, lotOptions as lotChoices, placeOptions as placeChoices, projectField, projectKey, projectOf, registerFromValues, restrictPlaces } from './fields.ts';
 import { codeInput, type CodeHolds, type CodeInput } from './code-input.ts';
 import { recountWithReceiptChoice, renderConsumables, renderSupply, supplyAsOf, supplyOps, type Ctx, type UiOp } from './supply-ui.ts';
 import { seedLedger, seedScn02 } from './seed.ts';
@@ -200,12 +199,29 @@ function partCount(v: Values): number {
 // 空欄を黙って不明にも0にもしない。不明はチェックで選ぶ（unknownPairs）。
 
 
-const processField = (label = '工程') =>
-  choiceField(
-    'process',
-    label,
-    processes.map((p) => [p.id, `工程${p.id}（完了基準：${p.criterion === 'inspection' ? '作業終了後の確認の完了' : '作業終了'}）`]),
-  );
+// 工程が一つもなければ選べる物がないので、登録する場所を示す（要件4.2）。
+const processFields = (options = processOptions(ledger.masters)): HTMLElement[] => {
+  return [
+    ...(options.length === 0 ? [h('p', { class: 'warn' }, '利用中の工程がありません。作業の種類「工程の登録・設定」で工程を登録してください。')] : []),
+    choiceField('process', '工程', options),
+  ];
+};
+
+const noNextProcess = '次工程の場所が指定されていません。作業の種類「工程の登録・設定」で次工程の場所を指定してください。';
+
+// 旧版から引き継いだ指定は、利用停止・記録の対象外の場所のこともあり、そのときは選べる渡し先がない。
+function nextProcessProblem(masters: Masters): string | null {
+  const next = nextProcessOf(masters);
+  if (next === null) return noNextProcess;
+  return placeChoices(masters).some(([id]) => id === next.id) ? null : `次工程の場所 ${next.name}（${next.code}）は利用停止中か記録の対象外です。場所の利用を再開するか、作業の種類「工程の登録・設定」で次工程の場所を指定し直してください。`;
+}
+
+function nextProcessFields(): HTMLElement[] {
+  const problem = nextProcessProblem(ledger.masters);
+  if (problem !== null) return [h('p', { class: 'warn' }, problem)];
+  const next = nextProcessOf(ledger.masters)!;
+  return [codeTarget(selectField('location', '渡した先（手元の次工程）', placeOptions().filter(([id]) => id === next.id)), 'location', { hold: 'location' })];
+}
 
 // 作業の開始と材料の使用を一つの入力で記録する。材料の行は使うものだけ選ぶ。
 const materialRows = [1, 2, 3] as const;
@@ -232,13 +248,16 @@ function stageStep(label: string, from: Stage['kind'], toNextProcess = false): O
       lotField('lot', `対象の保管単位（${stageLabel[from]}）`, (l) => l.stage.kind === from),
       textField('childId', '移した分の新しいID'),
       ...amountFields(),
-      ...(toNextProcess ? [codeTarget(choiceField('location', '渡した先（手元の次工程）', placeOptions().filter(([id]) => id === nextProcessLocation)), 'location', { hold: 'location' })] : []),
+      ...(toNextProcess ? nextProcessFields() : []),
     ],
     run: (l, m, v, inc) => {
+      const problem = toNextProcess ? nextProcessProblem(l.masters) : null;
+      if (problem !== null) throw new Error(problem);
       const lot = l.lots[v.text('lot')]!;
       const { basis, value } = amount(v);
       const changed = changeStage(l, m, lot.id, v.text('childId'), basis, value, nextStage(lot.stage)!, inc);
-      return toNextProcess ? move(changed, { ...m, eventId: `${m.eventId}-m` }, v.text('childId'), v.text('location')) : changed;
+      // 渡し先の欄は指定の場所を示すだけなので、指定から渡し先を取り、記録の時点で対象外かの判断は台帳に任せる。
+      return toNextProcess ? move(changed, { ...m, eventId: `${m.eventId}-m` }, v.text('childId'), nextProcessOf(l.masters)!.id) : changed;
     },
   };
 }
@@ -292,7 +311,7 @@ const ops = {
       projectField(ledger.masters),
       locationField(),
       selectField('stage', '作業の状態', [['none', stageLabel.none], ['working', stageLabel.working], ['inspecting', stageLabel.inspecting], ['awaitingHandover', stageLabel.awaitingHandover]]),
-      selectField('process', '工程（作業なしでは不要）', [['', 'なし'], ...processes.map((p) => [p.id, `工程${p.id}（完了基準：${p.criterion === 'inspection' ? '作業終了後の確認の完了' : '作業終了'}）`] as const)]),
+      selectField('process', '工程（作業なしでは不要）', [['', 'なし'], ...processOptions(ledger.masters)]),
       ...amountFields(),
     ],
     run: (l, m, v) => registerFromValues(l, m, v),
@@ -300,17 +319,18 @@ const ops = {
   start: {
     label: '作業の開始（材料の使用とまとめて記録）',
     fields: () => [
-      processField(),
+      ...processFields(),
       textField('newId', '作業中の保管単位の新しいID'),
       ...itemFields(ledger.masters),
       projectField(ledger.masters),
-      codeTarget(choiceField('location', '作業の場所', placeOptions().filter(([id]) => id !== nextProcessLocation)), 'location', { hold: 'location' }),
+      codeTarget(choiceField('location', '作業の場所', placeOptions().filter(([id]) => id !== nextProcessOf(ledger.masters)?.id)), 'location', { hold: 'location' }),
       ...amountFields(),
       ...materialFields(),
     ],
     // 材料の使用と作業の開始は一つの入力なので、どれかで失敗したら全部を台帳に残さない（DAT-04・AT-39）。
     run: (l, m, v) => {
-      const process = processes.find((p) => p.id === v.text('process'))!;
+      const process = processOf(l.masters, v.text('process'));
+      if (!process) throw new Error('工程を選ぶ');
       const id = v.text('newId');
       const materials: string[] = [];
       let next = l;
@@ -327,7 +347,7 @@ const ops = {
         // 包含の回答は材料のまとまりごとの最後に数えた数に対するので、材料ごとに答えさせる。
         const answer = v.text(`m${i}inclusion`) as Inclusion | '';
         try {
-          next = use(next, { ...m, eventId }, lot, basis, value, `${id}の着手（工程${process.id}）`, answer === '' ? undefined : answer);
+          next = use(next, { ...m, eventId }, lot, basis, value, `${id}の着手（工程${processNameAt(l, m.eventId, process.id)}）`, answer === '' ? undefined : answer);
         } catch (err) {
           if (err instanceof InclusionRequired) throw new MaterialInclusionRequired(`材料${i}：${err.message}`, `m${i}inclusion`);
           throw err;
@@ -375,12 +395,12 @@ const ops = {
       textField('childId', '位置を変える分の新しいID'),
       ...amountFields(),
       choiceField('to', '正しい位置', (Object.keys(stageLabel) as Stage['kind'][]).map((k) => [k, stageLabel[k]])),
-      selectField('process', '工程（作業なしから変えるときだけ）', [['', '今の工程のまま'], ...processes.map((p) => [p.id, `工程${p.id}`] as const)]),
+      selectField('process', '工程（作業なしから変えるときだけ）', [['', '今の工程のまま'], ...processOptions(ledger.masters)]),
     ],
     run: (l, m, v, inc) => {
       const lot = l.lots[v.text('lot')]!;
       const kind = v.text('to') as Stage['kind'];
-      const process = processes.find((p) => p.id === v.text('process')) ?? (lot.stage.kind === 'none' ? undefined : lot.stage.process);
+      const process = processOf(l.masters, v.text('process')) ?? (lot.stage.kind === 'none' ? undefined : lot.stage.process);
       if (kind !== 'none' && !process) throw new Error('作業なしから変えるときは工程を選ぶ');
       const to: Stage = kind === 'none' || !process ? noStage : { kind, process };
       const { basis, value } = amount(v);
@@ -390,7 +410,7 @@ const ops = {
   stop: {
     label: '作業の中断',
     fields: () => [
-      processField(),
+      ...processFields(stopProcessOptions(ledger)),
       ...itemFields(ledger.masters),
       projectField(ledger.masters),
       textField('reason', '中断した理由'),
@@ -906,7 +926,7 @@ function renderList(): void {
         h('td', {}, locationRef(ledger.masters, lot.location)),
         h('td', {}, quantityText(lot.quantity, lot.unit)),
         h('td', {}, holdsText(lot)),
-        h('td', {}, stageText(lot.stage)),
+        h('td', {}, stageText(lot.stage, id => processRef(ledger.masters, id))),
         h('td', {}, lastCountText(ledger, lot)),
         h('td', {}, jst(lastUpdatedOf(ledger, lot.id))),
         h('td', issues.length ? { class: 'warn' } : {}, issues.length ? `確認が必要 ${issues.length}件` : 'なし'),
@@ -957,7 +977,7 @@ function renderDetail(): void {
       ...row('現在の記録上の数', quantityText(lot.quantity, lot.unit)),
       ...row('最後に数えた数', lastCountText(ledger, lot)),
       ...row('取り分けた理由', holdsText(lot)),
-      ...row('作業の状態', stageText(lot.stage)),
+      ...row('作業の状態', stageText(lot.stage, id => processRef(ledger.masters, id))),
       ...row('最終記録更新', jst(lastUpdatedOf(ledger, lot.id))),
       ...row('分割元', lot.splitFrom ? lotButton(lot.splitFrom) : 'なし'),
       ...row('分けた先', ...(children.length ? children.map((c) => lotButton(c.id)) : ['なし'])),
@@ -1067,7 +1087,7 @@ function renderProduction(): void {
       h(
         'li',
         issueCount ? { class: 'warn' } : {},
-        `工程${g.process}・品目${itemRef(ledger.masters, g.item)}（${g.unit}）・${projectText(ledger.masters, g.project)}：工程内 ${quantityText(p.inProcess, g.unit)}` +
+        `工程${processRef(ledger.masters, g.process)}・品目${itemRef(ledger.masters, g.item)}（${g.unit}）・${projectText(ledger.masters, g.project)}：工程内 ${quantityText(p.inProcess, g.unit)}` +
           `（作業中 ${quantityText(p.working, g.unit)}、確認待ち ${quantityText(p.inspecting, g.unit)}）` +
           `${stopped.length ? `、うち ${stopped.join('、')}` : ''}` +
           `／完成（渡す前） ${quantityText(p.awaitingHandover, g.unit)}／工程完了累計 ${cumulativeText(p.completed, g.unit)}／やり直し・修理開始累計 ${cumulativeText(p.reworkStarted, g.unit)}（現在の現物数には足さない）／引渡済み累計 ${cumulativeText(p.handedOver, g.unit)}${returned}${issueCount ? `。確認が必要 ${issueCount}件：この数を確定した製造の数として断定しない` : ''}`,

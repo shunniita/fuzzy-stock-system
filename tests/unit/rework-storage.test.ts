@@ -1,6 +1,8 @@
 import { legacyEventLabels } from '../fixtures/history-labels.ts';
 import { describe, expect, test } from 'vitest';
-import { beginRework, declareDiscrepancy, practiceLedger, recordReworkPart, register, use, type Ledger, type Meta } from '../../src/domain/ledger.ts';
+import { beginRework, declareDiscrepancy, practiceLedger as practiceBase, recordReworkPart, register, use, type Ledger, type Meta } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '組立', criterion: 'workEnd' });
 import { readCode } from '../../src/domain/code.ts';
 import { emptySupply } from '../../src/domain/supply.ts';
 import { backupTextOf, readBackup } from '../../src/ui/backup.ts';

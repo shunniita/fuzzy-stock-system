@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { beginRework, changeStage, correctOccurredAt, practiceLedger, handOver, merge, recordReworkPart, recount, register, split, start, use, type Ledger, type Meta, type Process, type Project, type ReworkPartRequest } from '../../src/domain/ledger.ts';
+import { beginRework, changeStage, correctOccurredAt, practiceLedger as practiceBase, handOver, merge, recordReworkPart, recount, register, split, start, use, type Ledger, type Meta, type Process, type Project, type ReworkPartRequest } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '架空組立', criterion: 'workEnd' });
 
 const project = { kind: 'case', id: 'A-001' } satisfies Project;
 const process = { id: '架空組立', criterion: 'workEnd' } satisfies Process;

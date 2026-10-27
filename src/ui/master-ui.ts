@@ -2,19 +2,21 @@ import {
   adoptProvisional,
   assignProject,
   changeMasters,
+  processUsed,
   identifyProvisional,
   openIssues,
   type Ledger,
   type MasterRequest,
   type NewMaster,
+  type Process,
 } from '../domain/ledger.ts';
-import { masterTypeDisplayLabel, own, unassignedCode, type ItemMaster, type Master, type Masters, type Source } from '../domain/masters.ts';
+import { masterTypeDisplayLabel, nextProcessOf, own, unassignedCode, type ItemMaster, type Master, type Masters, type Source } from '../domain/masters.ts';
 import type { Supply } from '../domain/supply.ts';
 import { requestProgressOf } from '../domain/supply.ts';
 import { checkField, choiceField, h, selectField, textField, type Values } from './dom.ts';
 import { codeTarget, itemFields, lotOptions, placeOptions, projectField, projectKey, projectOf, projectsOf } from './fields.ts';
 import { parseScalar, type Step } from '../domain/scalar.ts';
-import { caseRef, consumableSettingText, packagingSettingText, eventText, itemRef, jst, locationRef, projectText, quantityText } from './format.ts';
+import { caseRef, consumableSettingText, criterionText, packagingSettingText, eventText, itemRef, jst, locationRef, projectText, quantityText } from './format.ts';
 import type { Ctx, UiOp } from './supply-ui.ts';
 
 // 確認が要る操作は、画面の「確認した」の欄を読む。
@@ -25,12 +27,13 @@ function masterLabel(masters: Masters, m: Master): string {
     case 'location': return `場所${locationRef(masters, m.id)}「${m.name}」`;
     case 'case': return `案件・用途${caseRef(masters, m.id)}${m.name === null ? '' : `「${m.name}」`}`;
     case 'actor': return `担当者「${m.id}」${m.active ? '' : '（利用停止）'}`;
+    case 'process': return `工程「${m.name}」${m.active ? '' : '（利用停止）'}`;
   }
 }
 
 // 登録情報の操作の対象は、利用停止と仮も含めて全部出す（要件3.5）。値は「種類:内部の識別」。
 function targetField(masters: Masters, types: readonly Master['type'][]): HTMLLabelElement {
-  const groups = { item: masters.items, location: masters.locations, case: masters.cases, actor: masters.actors };
+  const groups = { item: masters.items, location: masters.locations, case: masters.cases, actor: masters.actors, process: masters.processes };
   const options = types.flatMap((type) => Object.values(groups[type] as Readonly<Record<string, Master>>).map((m): [string, string] => [`${type}:${m.id}`, masterLabel(masters, m)]));
   return choiceField('target', '対象の登録情報', options);
 }
@@ -167,10 +170,35 @@ function fixedPlaceTime(node: HTMLLabelElement): HTMLLabelElement {
   return node;
 }
 
+// 完了基準の意味は選択肢の文言で示す（要件1.4）。
+const criterionField = () => choiceField('criterion', '完了基準', [
+  ['workEnd', '作業終了（作業終了の後は完成（渡す前））'],
+  ['inspection', '作業終了後の確認の完了（作業終了の後は確認待ち、確認の完了の後は完成（渡す前））'],
+]);
+
+function criterionOf(v: Values): Process['criterion'] {
+  const criterion = v.text('criterion');
+  if (criterion !== 'workEnd' && criterion !== 'inspection') throw new Error('工程の完了基準を選ぶ');
+  return criterion;
+}
+
 export function masterOps(ctx: Ctx): Record<string, UiOp> {
-  const all = ['item', 'location', 'case', 'actor'] as const;
+  const all = ['item', 'location', 'case', 'actor', 'process'] as const;
   const coded = ['item', 'location', 'case'] as const;
+  const named = ['item', 'location', 'case', 'process'] as const;
   return {
+    masterProcess: masterOp('工程の登録', () => [textField('name', '工程の名前'), criterionField()],
+      register((v) => ({ type: 'process', name: v.text('name'), criterion: criterionOf(v) })), ctx),
+    masterProcessCriterion: masterOp('工程の完了基準の変更（作業や中断を記録していない工程だけ）',
+      (ms) => {
+        const unused = Object.values(ms.processes).filter((p) => !processUsed(ctx.ledger(), p.id)).map((p): [string, string] => [p.id, masterLabel(ms, p)]);
+        return [...(unused.length === 0 ? [h('p', { class: 'warn' }, '完了基準を変えられる工程がありません。作業や中断を記録した工程の完了基準は変えられません。別の工程を登録してください。')] : []),
+          choiceField('target', '工程', unused), criterionField(), reasonField()];
+      },
+      (v) => ({ action: 'criterion', id: v.text('target'), criterion: criterionOf(v), reason: v.text('reason') }), ctx),
+    masterNextProcess: masterOp('次工程の場所の指定・解除',
+      (ms) => [selectField('location', '次工程の場所', [['', '指定しない（解除する）'], ...Object.values(ms.locations).filter((l) => l.active).map((l): [string, string] => [l.id, `${l.name}（${l.code}）`])], nextProcessOf(ms)?.id ?? ''), reasonField()],
+      (v) => ({ action: 'nextProcess', id: v.text('location') === '' ? null : v.text('location'), reason: v.text('reason') }), ctx),
     masterItem: masterOp('品目の登録', () => [...codeFields('品番・コード（文字列のまま保存）'), textField('name', '呼び名'), ...unitStepFields(), ...sourceFields()],
       register((v) => {
         const units = unitsOf(v.text('units'));
@@ -182,8 +210,8 @@ export function masterOps(ctx: Ctx): Record<string, UiOp> {
     masterCase: masterOp('案件・用途の登録', () => [...codeFields('品番・コード（文字列のまま保存）'), textField('name', '呼び名（品番・コードがあれば空欄でもよい）'), ...sourceFields()],
       register((v) => ({ type: 'case', code: codeOf(v), name: v.text('name') === '' ? null : v.text('name'), source: sourceOf(v) })), ctx),
     masterActor: masterOp('担当者の登録', () => [textField('name', '担当者の名前')], register((v) => ({ type: 'actor', name: v.text('name') })), ctx),
-    masterRename: masterOp('名称の変更', (ms) => [targetField(ms, coded), textField('name', '新しい名称'), reasonField()],
-      (v) => ({ action: 'rename', ...targetOf(v, coded), name: v.text('name'), reason: v.text('reason') }), ctx),
+    masterRename: masterOp('名称の変更', (ms) => [targetField(ms, named), textField('name', '新しい名称'), reasonField()],
+      (v) => ({ action: 'rename', ...targetOf(v, named), name: v.text('name'), reason: v.text('reason') }), ctx),
     masterDeactivate: masterOp('利用停止（過去の記録は消さない）', (ms) => [targetField(ms, all), reasonField()],
       (v) => ({ action: 'deactivate', ...targetOf(v, all), reason: v.text('reason') }), ctx),
     masterReactivate: masterOp('利用の再開', (ms) => [targetField(ms, all), reasonField()],
@@ -250,18 +278,22 @@ export function mastersPanel(ledger: Ledger, selected: string, onSelect: (key: s
     c.code ?? unassignedCode, c.code === null ? '仮' : '', c.name ?? 'なし', stateText(c), c.source ? `${c.source.name}（版${c.source.revision}）` : 'なし',
   ]);
   const actors = Object.values(ms.actors).map((a) => [a.id, stateText(a)]);
-  const all: Master[] = [...Object.values(ms.items), ...Object.values(ms.locations), ...Object.values(ms.cases), ...Object.values(ms.actors)];
+  const processes = Object.values(ms.processes).map((p) => [p.name, p.id, criterionText(p.criterion), stateText(p)]);
+  const next = nextProcessOf(ms);
+  const all: Master[] = [...Object.values(ms.items), ...Object.values(ms.locations), ...Object.values(ms.cases), ...Object.values(ms.actors), ...Object.values(ms.processes)];
   const key = (m: Master) => `${m.type}:${m.id}`;
   const current = all.find((m) => key(m) === selected) ?? all[0];
   const choice = selectField('master-history', '変更の履歴を見る登録情報', all.map((m) => [key(m), masterLabel(ms, m)]), current ? key(current) : '');
   choice.addEventListener('change', (event) => { if (event.target instanceof HTMLSelectElement) onSelect(event.target.value); });
   const events = current ? ledger.history.filter((e) => e.kind === 'master' && e.masters.some((c) => c.after.type === current.type && c.after.id === current.id)) : [];
   return [
-    h('p', {}, '品目・場所・案件・用途・担当者を登録・変更するときは、入力で作業の種類「登録情報の登録・変更」を選ぶ。権限による制限はなく、画面を使える人は誰でも変えられる。変更は履歴に残り、過去の記録は消さない。'),
+    h('p', {}, '品目・場所・案件・用途・担当者を登録・変更するときは、入力で作業の種類「登録情報の登録・変更」を選ぶ。工程と次工程の場所は「工程の登録・設定」で登録する。権限による制限はなく、画面を使える人は誰でも変えられる。変更は履歴に残り、過去の記録は消さない。'),
     h('h3', {}, '品目'), table('品目の登録情報', ['品番・コード', '仮', '名称', '状態', '単位', '単位ごとの最小単位（登録後は変えない）', '包装・入り数', '共通消耗品・補充基準', '元の資料'], items),
     h('h3', {}, '場所'), table('場所の登録情報', ['品番・コード', '名称', '状態', '記録の対象'], locations),
     h('h3', {}, '案件・用途'), table('案件・用途の登録情報', ['品番・コード', '仮', '名称', '状態', '元の資料'], cases),
     h('h3', {}, '担当者'), table('担当者の登録情報', ['名前', '状態'], actors),
+    h('h3', {}, '工程'), table('工程の登録情報', ['名前', 'ID', '完了基準', '状態'], processes),
+    h('p', {}, `次工程の場所：${next === null ? '指定なし' : `${next.name}（${next.code}）${next.active ? '' : '（利用停止）'}`}`),
     h('h3', {}, '変更の履歴'), choice,
     events.length === 0
       ? h('p', {}, 'この登録情報の変更の記録はない（最初からの値のまま）')

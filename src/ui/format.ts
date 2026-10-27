@@ -4,6 +4,7 @@ import {
   holdReasons,
   isUsable,
   nextStage,
+  processNameAt,
   occurredAtOf,
   openIssuesOf,
   totalOf,
@@ -13,6 +14,7 @@ import {
   type IssueReason,
   type Ledger,
   type LedgerEvent,
+  type Process,
   type Lot,
   type MasterChange,
   type MasterRequest,
@@ -20,7 +22,7 @@ import {
   type Stage,
   type Stop,
 } from '../domain/ledger.ts';
-import { masterTypeDisplayLabel, own, refOf, unassignedCode, type ConsumableSetting, type Packaging, type Master, type Masters } from '../domain/masters.ts';
+import { masterTypeDisplayLabel, own, processRef, refOf, unassignedCode, type ConsumableSetting, type Packaging, type Master, type Masters } from '../domain/masters.ts';
 import type { Basis, Quantity, Term } from '../domain/quantity.ts';
 import { createHistoryTargetCollector } from '../domain/history-targets.ts';
 import { historyItems, type HistoryTargetCollector, type ItemFormatter } from './history-item-format.ts';
@@ -92,8 +94,9 @@ export const stageLabel: Record<Stage['kind'], string> = {
   awaitingHandover: '完成（渡す前）',
 };
 
-export function stageText(s: Stage): string {
-  return s.kind === 'none' ? stageLabel.none : `工程${s.process.id}・${stageLabel[s.kind]}`;
+// nameは工程IDから見せる名前を引く。現在の表示は今の名前、履歴は記録したときの名前を渡す。
+export function stageText(s: Stage, name: (id: string) => string = id => id): string {
+  return s.kind === 'none' ? stageLabel.none : `工程${name(s.process.id)}・${stageLabel[s.kind]}`;
 }
 
 // 位置の変更に業務上の名前を付ける。完了基準どおりの次の位置への変更だけが業務上の手順で、
@@ -235,9 +238,9 @@ export function affectedText(affected: number | null, unit: string): string {
 }
 
 // 影響台数は中断の単位、不足数は不足品目の記録した単位で読む（MFG-08b）。
-export function stopText(masters: Masters, s: Stop, ref: ItemFormatter = id => itemRef(masters, id)): string {
+export function stopText(masters: Masters, s: Stop, ref: ItemFormatter = id => itemRef(masters, id), name: (id: string) => string = id => processRef(masters, id)): string {
   const shortage = s.shortage ? `、不足 品目${ref(s.shortage.item)} ${s.shortage.value === null ? `数が不明（${s.shortage.unit}）` : `${s.shortage.value}${s.shortage.unit}`}` : '';
-  return `工程${s.process}・品目${ref(s.item)}（${s.unit}）・${projectText(masters, s.project)}、理由「${s.reason}」${shortage}、${affectedText(s.affected, s.unit)}`;
+  return `工程${name(s.process)}・品目${ref(s.item)}（${s.unit}）・${projectText(masters, s.project)}、理由「${s.reason}」${shortage}、${affectedText(s.affected, s.unit)}`;
 }
 
 // 分割元とまとめ直しの元をたどり、作業の開始で作ったまとまりの材料の使用記録を返す（MFG-03a・06）。作業の開始に由来しなければnull。
@@ -284,9 +287,10 @@ function eventDetails(ledger: Ledger, e: LedgerEvent, ref: ItemFormatter, target
   const lotUnit = (lotId: string): string => ledger.lots[lotId]?.unit ?? '';
   const label = kindLabel[e.kind];
   const m = ledger.masters;
+  const pname = (id: string): string => processNameAt(ledger, e.eventId, id);
   switch (e.kind) {
     case 'rework':
-      return `${label}：${e.lotId}から${e.childId}へ${valueText(e.basis, e.value, lotUnit(e.lotId))}、理由「${e.reason}」${e.returnSource === undefined ? '' : `／返ってきた物の新規割当の記録${e.returnSource.adoptEventId}／工程${e.returnSource.process.id}・${e.returnSource.process.criterion === 'workEnd' ? '作業終了' : '確認の完了'}基準／物理的なやり直し・修理を確認`}`;
+      return `${label}：${e.lotId}から${e.childId}へ${valueText(e.basis, e.value, lotUnit(e.lotId))}、理由「${e.reason}」${e.returnSource === undefined ? '' : `／返ってきた物の新規割当の記録${e.returnSource.adoptEventId}／工程${pname(e.returnSource.process.id)}・${e.returnSource.process.criterion === 'workEnd' ? '作業終了' : '確認の完了'}基準／物理的なやり直し・修理を確認`}`;
     case 'reworkPart': {
       const detail = e.action === 'discard' ? `廃棄 品目${ref(e.item)} ${e.value}${e.unit}（組付け済み部品。未使用在庫の増減なし）` : (() => {
         const id = e.action === 'replace' ? e.useEventId : e.registerEventId;
@@ -314,7 +318,7 @@ function eventDetails(ledger: Ledger, e: LedgerEvent, ref: ItemFormatter, target
             ? `相手先または処置 ${e.counterpart}`
             : e.kind === 'split'
               ? `取り出し先 ${e.childId}`
-              : `${e.childId}へ（${parent ? stageText(parent.stage) : ''} → ${stageText(e.to)}）`;
+              : `${e.childId}へ（${parent ? stageText(parent.stage, pname) : ''} → ${stageText(e.to, pname)}）`;
       const applied = e.applied ? '' : '・親から減らしていない（未適用）';
       const inclusion = e.inclusion === null ? '' : `・${inclusionLabel[e.inclusion]}`;
       const voidEvent = voidOf(ledger, e.eventId);
@@ -324,14 +328,14 @@ function eventDetails(ledger: Ledger, e: LedgerEvent, ref: ItemFormatter, target
     case 'start': {
       const lot = e.changes[0]?.after;
       const materials = e.materials.length ? `材料の使用記録 ${e.materials.join('・')}` : '材料の使用記録の対応付けなし';
-      return lot ? `${label}：${lot.id}（品目${ref(lot.item)}、${projectText(m, lot.project)}、${locationRef(m, lot.location)}、${stageText(lot.stage)}）${quantityText(lot.quantity, lot.unit)}、${materials}${scopeNote(m, lot.location)}` : label;
+      return lot ? `${label}：${lot.id}（品目${ref(lot.item)}、${projectText(m, lot.project)}、${locationRef(m, lot.location)}、${stageText(lot.stage, pname)}）${quantityText(lot.quantity, lot.unit)}、${materials}${scopeNote(m, lot.location)}` : label;
     }
     case 'void': {
       const result = e.applied ? '数量を戻した' : '今の数量に反映されていないため数量は変えていない';
       return `${label}：操作${e.targetEventId}（${e.lotId}）を起きなかったものとして取消、理由「${e.reason}」、${result}`;
     }
     case 'stop':
-      return `${label}：${e.stop.id} ${stopText(m, e.stop, ref)}`;
+      return `${label}：${e.stop.id} ${stopText(m, e.stop, ref, pname)}`;
     case 'stopUpdate':
       return `${label}：中断${e.stopId}を${affectedText(e.previous, ledger.stops[e.stopId]?.unit ?? '')} → ${affectedText(e.affected, ledger.stops[e.stopId]?.unit ?? '')}`;
     case 'resume':
@@ -373,8 +377,11 @@ function eventDetails(ledger: Ledger, e: LedgerEvent, ref: ItemFormatter, target
   }
 }
 
+export const criterionText = (criterion: Process['criterion']): string => criterion === 'inspection' ? '作業終了後の確認の完了' : '作業終了';
+
 function masterRefText(m: Master): string {
   if (m.type === 'actor') return `担当者「${m.id}」`;
+  if (m.type === 'process') return `工程「${m.name}」`;
   const name = m.name === null ? '' : `「${m.name}」`;
   return `${masterTypeDisplayLabel[m.type]}${m.code ?? unassignedCode}${name}`;
 }
@@ -400,15 +407,21 @@ function masterChangeText(action: MasterRequest['action'], { before, after }: Ma
       return `${ref}の試行対象 ${trial(before)} → ${trial(after)}`;
     }
     case 'register':
-      return `${ref}を登録${after.type === 'location' ? `（記録の対象${after.scope[0]?.inScope ? '' : '外'}）` : ''}`;
+      return `${ref}を登録${after.type === 'location' ? `（記録の対象${after.scope[0]?.inScope ? '' : '外'}）` : after.type === 'process' ? `（完了基準：${criterionText(after.criterion)}）` : ''}`;
+    case 'criterion': {
+      const criterion = (m: Master | null) => m?.type === 'process' ? criterionText(m.criterion) : '';
+      return `${ref}の完了基準 ${criterion(before)} → ${criterion(after)}`;
+    }
+    case 'nextProcess':
+      return after.type === 'location' && after.nextProcess ? `${ref}を次工程の場所に指定` : `${ref}の次工程の場所の指定を解除`;
     case 'rename':
-      return `${masterTypeDisplayLabel[after.type]}${after.type === 'actor' ? after.id : after.code ?? unassignedCode}の名称「${before && before.type !== 'actor' ? before.name ?? 'なし' : ''}」→「${after.type !== 'actor' ? after.name ?? 'なし' : ''}」`;
+      return `${masterTypeDisplayLabel[after.type]}${after.type === 'actor' ? after.id : after.type === 'process' ? '' : after.code ?? unassignedCode}の名称「${before && before.type !== 'actor' ? before.name ?? 'なし' : ''}」→「${after.type !== 'actor' ? after.name ?? 'なし' : ''}」`;
     case 'deactivate':
       return `${ref}を利用停止`;
     case 'reactivate':
       return `${ref}の利用を再開`;
     case 'code': {
-      const code = (m: Master | null) => (m === null || m.type === 'actor' ? '' : m.code ?? unassignedCode);
+      const code = (m: Master | null) => (m === null || m.type === 'actor' || m.type === 'process' ? '' : m.code ?? unassignedCode);
       return `${masterTypeDisplayLabel[after.type]}「${after.type === 'actor' ? after.id : after.name ?? code(after)}」の品番・コード ${code(before)} → ${code(after)}`;
     }
     case 'source': {

@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { fixedMasters } from '../../src/domain/masters.ts';
-import { changeStage, correctOccurredAt, recordStop, voidRecord, declareDiscrepancy, practiceLedger, merge, recount, register, resolveIssue, split, start, totalOf, use, type Meta, type Process, type Stage } from '../../src/domain/ledger.ts';
+import { changeStage, correctOccurredAt, recordStop, voidRecord, declareDiscrepancy, practiceLedger as practiceBase, merge, recount, register, resolveIssue, split, start, totalOf, use, type Meta, type Process, type Stage } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: 'R仮組', criterion: 'workEnd' });
 import { add, observe, quantityOf, subtract, type Basis } from '../../src/domain/quantity.ts';
 import { cumulativeText, differenceText, materialsOf, stageChangeLabel, stopText, eventsOf, eventText, jst, lastCountText, lastUpdatedOf, quantityText, targetLabel, trialText } from '../../src/ui/format.ts';
 
@@ -159,7 +161,7 @@ describe('作業の状態の変更の呼び名', () => {
 });
 
 describe('作業の開始の材料の使用記録のたどり方（MFG-03a・06）', () => {
-  const process: Process = { id: 'R組立', criterion: 'workEnd' };
+  const process: Process = { id: 'R仮組', criterion: 'workEnd' };
   const part = (id: string) => ({ id, item: 'P', unit: '個', project: { kind: 'case', id: 'A-001' } as const, location: 'T' });
   const product = (id: string) => ({ id, item: 'R', unit: '台', project: { kind: 'case', id: 'A-001' } as const, location: 'T' });
 

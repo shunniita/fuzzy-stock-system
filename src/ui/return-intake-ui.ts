@@ -1,7 +1,8 @@
 import { beginReturnedRework, openIssues, recordProvisional } from '../domain/ledger.ts';
 import { assignReturnedProvisional, type ReturnAssignment } from '../domain/return-intake.ts';
 import { checkField, choiceField, h, selectField, textField } from './dom.ts';
-import { amount, amountFields, codeTarget, itemFields, itemOptions, lotOptions, placeOptions, projectField, projectOf } from './fields.ts';
+import { amount, amountFields, codeTarget, itemFields, itemOptions, lotOptions, placeOptions, processOptions, projectField, projectOf } from './fields.ts';
+import { processOf } from '../domain/masters.ts';
 import { eventText, holdLabel, itemRef, quantityText } from './format.ts';
 import type { Ctx, UiOp } from './supply-ui.ts';
 
@@ -49,18 +50,19 @@ export function returnIntakeOps(ctx: Ctx): Record<string, UiOp> {
         const physical = checkField('confirmedPhysical', 'この返ってきた物の新しい物理的なやり直し・修理を開始する');
         physical.querySelector('input')!.dataset['receiptConfirm'] = '';
         return [codeTarget(choiceField('lot', '返ってきた物と新規割当の記録', candidates), 'lot'),
-          textField('process', 'やり直し・修理の工程ID'), choiceField('criterion', '工程の完了基準', [['workEnd', '作業終了'], ['inspection', '確認の完了']]),
+          ...(processOptions(l.masters).length === 0 ? [h('p', { class: 'warn' }, '利用中の工程がありません。作業の種類「工程の登録・設定」で工程を登録してください。')] : []),
+          choiceField('process', 'やり直し・修理の工程', processOptions(l.masters)),
           textField('childId', 'やり直し・修理分の新しいID'), ...amountFields(), textField('reason', 'やり直し・修理の理由'), physical,
-          h('p', {}, '直接新規割当した作業をしていない現物だけを対象とする。工程・完了基準を選び、今回の物理作業を確認する。使用可否確認待ちは引き継ぎ、元の製造個体の自動特定や修理権限の認定はしない。')];
+          h('p', {}, '直接新規割当した作業をしていない現物だけを対象とする。工程を選び、今回の物理作業を確認する。完了基準は工程の登録に従う。使用可否確認待ちは引き継ぎ、元の製造個体の自動特定や修理権限の認定はしない。')];
       },
       run: (s, m, v, inc) => {
         const adopted = s.ledger.history.find(e => e.kind === 'adopt' && e.lotId === v.text('lot'));
         if (!adopted) throw new Error('返ってきた物と新規割当の記録を選ぶ');
-        const criterion = v.text('criterion');
-        if (criterion !== 'workEnd' && criterion !== 'inspection') throw new Error('工程の完了基準を選ぶ');
+        const process = processOf(s.ledger.masters, v.text('process'));
+        if (!process) throw new Error('やり直し・修理の工程を選ぶ');
         const { basis, value } = amount(v);
         return { state: { ...s, ledger: beginReturnedRework(s.ledger, m, { lotId: v.text('lot'), adoptEventId: adopted.eventId,
-          childId: v.text('childId'), process: { id: v.text('process'), criterion }, basis, value, reason: v.text('reason'), confirmedPhysical: v.checked('confirmedPhysical') }, inc) } };
+          childId: v.text('childId'), process, basis, value, reason: v.text('reason'), confirmedPhysical: v.checked('confirmedPhysical') }, inc) } };
       },
     },
     returnRecord: {

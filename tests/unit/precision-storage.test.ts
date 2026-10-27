@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { beginRework, changeMasters, changeStage, practiceLedger, recordProvisional, recordReworkPart, recordStop, recount, register, start, updateStop, use, type Ledger, type Meta, type NewMaster } from '../../src/domain/ledger.ts';
+import { beginRework, changeMasters, changeStage, practiceLedger as practiceBase, recordProvisional, recordReworkPart, recordStop, recount, register, start, updateStop, use, type Ledger, type Meta, type NewMaster } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '架空工程', criterion: 'workEnd' });
 import * as masters from '../../src/domain/masters.ts';
 import { applyNeedImport, previewNeedImport } from '../../src/domain/need-import.ts';
 import type { Quantity } from '../../src/domain/quantity.ts';
@@ -83,9 +85,9 @@ describe('Task2: 登録情報精度の不変契約と版5', () => {
   });
   test('版5往復・backup外版1を保ち、小数数量も保存へ通す', () => {
     const s = initial(registered(), emptySupply);
-    expect(JSON.parse(serialize(s)).version).toBe(11); expect(parse(serialize(s))).toEqual(s);
+    expect(JSON.parse(serialize(s)).version).toBe(12); expect(parse(serialize(s))).toEqual(s);
     const text = backupTextOf(s, at), outer = JSON.parse(text);
-    expect(outer.version).toBe(1); expect(JSON.parse(outer.snapshot).version).toBe(11);
+    expect(outer.version).toBe(1); expect(JSON.parse(outer.snapshot).version).toBe(12);
     const read = readBackup(new TextEncoder().encode(text)); expect(read.kind).toBe('ok');
     if (read.kind === 'ok') expect(read.snapshot).toEqual(s);
     const decimal = initial(register(s.ledger, meta('op2'), { id: 'fraction', item: 'D', unit: 'kg', location: 'S1', project: { kind: 'common' } }, 'counted', 0.1), emptySupply);
@@ -107,7 +109,7 @@ describe('Task2: 登録情報精度の不変契約と版5', () => {
   test('精度の丸め原文をsnapshotとCRC正しいbackupでも拒否', () => {
     reject(wire().replaceAll('"kg":0.1', '"kg":0.10000000000000001'));
     reject(wire().replaceAll('"個":1', '"個":1.0000000000000001'));
-    reject(wire().replace('"version":11', '"version":11.000000000000001'));
+    reject(wire().replace('"version":12', '"version":12.000000000000001'));
   });
 });
 
@@ -128,12 +130,12 @@ describe('Task2: 旧原文と全pending単位', () => {
   test('版5pendingの二単位と整数数量・原入力を再読込/照会/再送で一回だけ保存', () => {
     const { store, result } = partial();
     const input = JSON.parse(store.getItem('fuzzy-stock/pending')!);
-    expect(input.version).toBe(11);
+    expect(input.version).toBe(12);
     const decoded = decodePending(input); expect(decoded.units.map(u => u.ledger.masters.items['D']?.unitSteps)).toEqual([{ 個: 1, kg: 0.1 }, { 個: 1, kg: 0.1 }]);
     expect(inquire(store, decoded).savedUnits).toBe(1);
     expect(retry(store, result.snapshot, decoded, '架空担当A', at).kind).toBe('saved');
     const read = load(store); expect(read.kind).toBe('ok');
-    if (read.kind === 'ok') { expect(read.pending).toBeNull(); expect(read.snapshot.ledger.history.map(e => e.eventId)).toEqual(['op1', 'op2']); expect(read.snapshot.version).toBe(11); }
+    if (read.kind === 'ok') { expect(read.pending).toBeNull(); expect(read.snapshot.ledger.history.map(e => e.eventId)).toEqual(['op1', 'op2']); expect(read.snapshot.version).toBe(12); }
   });
   for (const index of [0, 1]) test(`版5pending単位${index + 1}の欠落を拒否し保存を維持`, () => {
     const { store } = partial(), input = JSON.parse(store.getItem('fuzzy-stock/pending')!);
@@ -300,7 +302,7 @@ describe('Task5: 保存と履歴の全数量を精度文脈に照合する', () 
   });
 
   test('版4へ落とした小数の候補を整数として開かない', () => {
-    const value = JSON.parse(serialize(decimalState()), (key, entry: unknown) => key === 'consumable' ? undefined : entry);
+    const value = JSON.parse(serialize(decimalState()), (key, entry: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') ? undefined : entry);
     value.version = 4;
     delete value.ledger.masters.items.D.unitSteps;
     for (const e of value.ledger.history) for (const pair of e.masters ?? []) { delete pair.after?.unitSteps; delete pair.before?.unitSteps; }

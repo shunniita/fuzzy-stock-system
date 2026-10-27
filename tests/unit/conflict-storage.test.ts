@@ -45,8 +45,8 @@ const json = (snapshot: Snapshot): Record<string, unknown> => JSON.parse(seriali
 describe('競合保持: 版6の第三記録列', () => {
   test('初期化・置換は現行版と空列で書き、置換と再読込は列を引き継ぐ', () => {
     const empty = initial(seedLedger(), emptySupply);
-    expect(empty.version).toBe(11); expect(empty.conflictReviews).toEqual([]);
-    expect(json(empty)).toMatchObject({ version: 11, conflictReviews: [] });
+    expect(empty.version).toBe(12); expect(empty.conflictReviews).toEqual([]);
+    expect(json(empty)).toMatchObject({ version: 12, conflictReviews: [] });
     const { store, current } = seeded([review()]);
     expect(current.conflictReviews).toEqual([review()]);
     const loaded = load(store);
@@ -73,13 +73,13 @@ describe('競合保持: 版6の第三記録列', () => {
   test.each([1, 2, 3, 4, 5])('版%dの書式に新欄が紛れ込むと黙って落とさず拒否する', version => {
     // 版4以前は精度属性を、版1は数量の表を持たない。新欄だけが拒否の理由になるよう、他の旧書式の差は取り除く。
     const { current } = seeded([review()]);
-    const text = JSON.stringify({ ...(version === 1 ? current : json(current)), version }, (key, value: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'receiptTemplates' || (key === 'unitSteps' && version < 5) ? undefined : value);
+    const text = JSON.stringify({ ...(version === 1 ? current : json(current)), version }, (key, value: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') || key === 'itemLabels' || key === 'receiptTemplates' || (key === 'unitSteps' && version < 5) ? undefined : value);
     expect(() => parse(text)).toThrow('旧版は照合記録の列を持たない');
   });
 
   test('固定した版5資料は空列へ補完して読み、保存先を書かない', () => {
     const snapshot = parse(conflictV5.snapshot);
-    expect(snapshot.version).toBe(11); expect(snapshot.conflictReviews).toEqual([]); expect(Object.isFrozen(snapshot.conflictReviews)).toBe(true);
+    expect(snapshot.version).toBe(12); expect(snapshot.conflictReviews).toEqual([]); expect(Object.isFrozen(snapshot.conflictReviews)).toBe(true);
     for (const c of conflictV5.cases) {
       const store = new Memory();
       for (const [key, value] of Object.entries(c.data)) store.data.set(key, value);
@@ -96,11 +96,11 @@ describe('競合保持: 版6の第三記録列', () => {
     const unknown = commit(store, current, operation(), movedUnits(current));
     expect(unknown.kind).toBe('unknown');
     const envelope = JSON.parse(store.getItem('fuzzy-stock/pending')!) as { format: string; version: number; quantities?: unknown; pending: { units: Record<string, unknown>[] } };
-    expect(envelope.version).toBe(11);
+    expect(envelope.version).toBe(12);
     expect(decodePending(envelope).units[0]?.conflictReviews).toEqual([review()]);
     // 版4以前の書式は精度属性を持たない。
     const legacy = (value: unknown, version: number | null): unknown =>
-      JSON.parse(JSON.stringify(value, (key, v: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'receiptTemplates' || (key === 'unitSteps' && (version === null || version < 5)) ? undefined : v));
+      JSON.parse(JSON.stringify(value, (key, v: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') || key === 'itemLabels' || key === 'receiptTemplates' || (key === 'unitSteps' && (version === null || version < 5)) ? undefined : v));
     const without = (version: number | null): unknown => {
       const units = envelope.pending.units.map(({ conflictReviews: _drop, ...rest }) => rest);
       return legacy(version === null ? { ...envelope.pending, units, quantities: envelope.quantities } : { ...envelope, version, pending: { ...envelope.pending, units } }, version);
@@ -117,7 +117,7 @@ describe('競合保持: 版6の第三記録列', () => {
     expect(result.kind).toBe('saved');
     if (result.kind !== 'saved') return;
     expect(result.snapshot.conflictReviews).toEqual([review()]);
-    expect(result.snapshot.version).toBe(11);
+    expect(result.snapshot.version).toBe(12);
     const head = store.getItem('fuzzy-stock/head'), written = parse(store.getItem(`fuzzy-stock/slot-${head}`)!);
     expect(written.conflictReviews).toEqual([review()]);
     expect(store.getItem('fuzzy-stock/pending')).toBeNull();

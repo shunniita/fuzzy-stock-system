@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
-  changeStage, correctOccurredAt, practiceLedger, hold, InclusionRequired, merge, move,
+  changeStage, correctOccurredAt, practiceLedger as practiceBase, hold, InclusionRequired, merge, move,
   recount, register, release, split, use, voidRecord, type Ledger, type Meta,
 } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '架空組立', criterion: 'inspection' });
 import { emptySupply } from '../../src/domain/supply.ts';
 import { commit, fingerprintOf, initial, load, parse, replace, serialize } from '../../src/ui/storage.ts';
 

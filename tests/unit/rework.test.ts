@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { beginRework, changeMasters, changeStage, correctOccurredAt, declareDiscrepancy, practiceLedger, handOver, hold, InclusionRequired, isUsable, merge, productionOf, recount, recordReworkPart, register, release, reworksOf, split, start, totalOf, use, voidRecord, type Ledger, type Meta, type Process, type Project } from '../../src/domain/ledger.ts';
+import { beginRework, changeMasters, changeStage, correctOccurredAt, declareDiscrepancy, practiceLedger as practiceBase, handOver, hold, InclusionRequired, isUsable, merge, productionOf, recount, recordReworkPart, register, release, reworksOf, split, start, totalOf, use, voidRecord, type Ledger, type Meta, type Process, type Project } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: '架空組立', criterion: 'workEnd' }, { id: '架空検査組立', criterion: 'inspection' });
+// 同じ工程IDの完了基準は一つなので、完了基準ごとに別の工程を使う。
+const processFor = (criterion: Process['criterion']): Process => criterion === 'workEnd' ? process : { id: '架空検査組立', criterion };
 
 const project = { kind: 'case', id: 'A-001' } satisfies Project;
 const process = { id: '架空組立', criterion: 'workEnd' } satisfies Process;
@@ -9,8 +13,8 @@ const part = (id: string, owner: Project = project) => ({ id, item: 'P', unit: '
 function base(criterion: Process['criterion'] = 'workEnd'): Ledger {
   let l = register(practiceLedger, meta('parts', 8), part('parts'), 'counted', 100);
   l = use(l, meta('original-use', 9), 'parts', 'counted', 20, '初回組立');
-  l = start(l, meta('start', 10), product('working'), { ...process, criterion }, 'counted', 20, ['original-use']);
-  return changeStage(l, meta('complete', 11), 'working', 'finished', 'counted', 20, { kind: 'awaitingHandover', process: { ...process, criterion } });
+  l = start(l, meta('start', 10), product('working'), processFor(criterion), 'counted', 20, ['original-use']);
+  return changeStage(l, meta('complete', 11), 'working', 'finished', 'counted', 20, { kind: 'awaitingHandover', process: processFor(criterion) });
 }
 const begun = () => beginRework(base(), meta('rework'), 'finished', 'repair', 'counted', 2, '架空のやり直し・修理');
 const count = (l: Ledger, id: string) => l.lots[id]?.quantity;
@@ -82,10 +86,10 @@ describe('AT-16・やり直し・修理の元現物と数量', () => {
 
   test('2.1: 検査を経て再完了しても20台', () => {
     let l = beginRework(base('inspection'), meta('rw'), 'finished', 'repair', 'counted', 2, '修理');
-    const inspection = { ...process, criterion: 'inspection' } satisfies Process;
+    const inspection = processFor('inspection');
     l = changeStage(l, meta('end', 13), 'repair', 'inspect', 'counted', 2, { kind: 'inspecting', process: inspection });
     l = changeStage(l, meta('check', 14), 'inspect', 'done', 'counted', 2, { kind: 'awaitingHandover', process: inspection });
-    expect(productionOf(l, process.id, 'R', '台', project).awaitingHandover).toMatchObject({ numeric: { value: 20 } });
+    expect(productionOf(l, inspection.id, 'R', '台', project).awaitingHandover).toMatchObject({ numeric: { value: 20 } });
   });
 
   test('2.3: 別のやり直し・修理を混同せず、分割・統合・再度のやり直し・修理を追跡する', () => {

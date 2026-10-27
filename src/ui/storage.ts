@@ -2,8 +2,8 @@ import { parseExactJson } from '../domain/exact-json.ts';
 import type { Ledger } from '../domain/ledger.ts';
 import type { Numeric, Quantity, Term, UnknownQuantity } from '../domain/quantity.ts';
 import type { Supply } from '../domain/supply.ts';
-import { deepFreeze } from '../domain/ledger.ts';
-import { masterTypeLabel, requireConsistentItemSettings, requireItemSettingsTransition, requireSameItemPrecisions } from '../domain/masters.ts';
+import { deepFreeze, legacyProcesses, requireConsistentProcesses } from '../domain/ledger.ts';
+import { masterTypeLabel, requireConsistentItemSettings, requireItemSettingsTransition, requireProcessTransition, requireSameItemPrecisions } from '../domain/masters.ts';
 import { requireQuantityTotals } from '../domain/shortage.ts';
 import { decodePending, decodeSnapshot } from './storageparse.ts';
 import { isReviewOperation, type ConflictReview } from './conflictrecord.ts';
@@ -22,7 +22,7 @@ export type SaveCheck = {
   resolution: { outcome: SaveOutcome; actor: string; at: string };
 };
 export type Snapshot = {
-  format: 'fuzzy-stock-f0'; version: 11; revision: number; lastWriter: string; opFloor: number;
+  format: 'fuzzy-stock-f0'; version: 12; revision: number; lastWriter: string; opFloor: number;
   ledger: Ledger; supply: Supply; ops: Readonly<Record<string, OpEntry>>; saveChecks: readonly SaveCheck[];
   conflictReviews: readonly ConflictReview[];
 };
@@ -496,7 +496,10 @@ function appendedIds(before: Pick<UnitState, 'ledger' | 'supply' | 'conflictRevi
   if (!sameValue(ledgerPrefix, before.ledger.history) || !sameValue(supplyPrefix, before.supply.log)) throw new Error('確定する単位の履歴が現在の状態に続いていない');
   const events = after.ledger.history.slice(before.ledger.history.length);
   requireConsistentItemSettings(after.ledger);
-  requireItemSettingsTransition(before.ledger.masters, after.ledger.masters, events.flatMap(event => event.kind === 'master' ? event.masters : []));
+  const masterChanges = events.flatMap(event => event.kind === 'master' ? event.masters : []);
+  requireItemSettingsTransition(before.ledger.masters, after.ledger.masters, masterChanges);
+  requireConsistentProcesses(after.ledger);
+  requireProcessTransition(before.ledger.masters, after.ledger.masters, masterChanges, recordedProcesses(after.ledger));
   const log = after.supply.log.slice(before.supply.log.length);
   const ids = [...events, ...log, ...reviews].map(event => event.eventId);
   const used = new Set([...before.ledger.history, ...before.supply.log].map(event => event.eventId));
@@ -549,7 +552,7 @@ function checkedSnapshot(value: Snapshot): Snapshot {
 }
 
 export function serializePending(pending: Pending): string {
-  return encodeWithQuantities({ format: 'fuzzy-stock-pending', version: 11, pending });
+  return encodeWithQuantities({ format: 'fuzzy-stock-pending', version: 12, pending });
 }
 
 export function serialize(snapshot: Snapshot): string {
@@ -706,7 +709,7 @@ function encodeQuantities(value: unknown, sortKeys: boolean): { body: string; ta
 }
 
 export function initial(ledger: Ledger, supply: Supply): Snapshot {
-  return deepFreeze({ format: 'fuzzy-stock-f0', version: 11, revision: 0, lastWriter: 'init', opFloor: 1, ledger, supply, ops: {}, saveChecks: [], conflictReviews: [] });
+  return deepFreeze({ format: 'fuzzy-stock-f0', version: 12, revision: 0, lastWriter: 'init', opFloor: 1, ledger, supply, ops: {}, saveChecks: [], conflictReviews: [] });
 }
 
 export function load(store: StoreLike): LoadResult {
@@ -966,7 +969,7 @@ export function targetsOf(before: UnitState | { ledger: Ledger; supply: Supply; 
       case 'stop': local.add(`停止${event.stop.id}`); break;
       case 'void': local.add(`操作${event.targetEventId}`); break;
       case 'master':
-        for (const { after } of event.masters) local.add(`${masterTypeLabel[after.type]}${after.type === 'actor' ? after.id : after.code ?? `（仮）${after.name ?? after.id}`}`);
+        for (const { after } of event.masters) local.add(`${masterTypeLabel[after.type]}${after.type === 'actor' || after.type === 'process' ? after.id : after.code ?? `（仮）${after.name ?? after.id}`}`);
         break;
       case 'identify': case 'adopt': local.add(`照合事項${event.issueId}`); break;
       case 'assignProject': break;
@@ -1022,4 +1025,9 @@ export function targetsOf(before: UnitState | { ledger: Ledger; supply: Supply; 
     }
   }
   return [...targets];
+}
+
+// 停止の工程が「R組立」以外など、完了基準を補えない記録では補う工程がない。その場合の拒否は整合検査に任せる。
+function recordedProcesses(ledger: Ledger): ReturnType<typeof legacyProcesses> {
+  try { return legacyProcesses(ledger); } catch { return {}; }
 }

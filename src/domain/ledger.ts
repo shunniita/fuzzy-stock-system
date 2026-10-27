@@ -1,14 +1,11 @@
-import { checkedConsumable, codeOwner, deepFreeze, practiceMasters, inScopeAt, inputStepOf, masterTypeDisplayLabel, own, perBoxAt, quantityStepOf, refOf, reservedCaseIds, unassignedCode, type ConsumableSetting, type LocationMaster, type Master, type Masters, type Source } from './masters.ts';
-import { initialPackaging, checkTrialReview, effectiveFrom, masterOf, masterRef, registered, type NewMaster, type TrialReview } from './master-edit.ts';
+import { checkedConsumable, codeOwner, deepFreeze, nextProcessOf, practiceMasters, inScopeAt, inputStepOf, processRef, masterTypeDisplayLabel, own, perBoxAt, quantityStepOf, refOf, reservedCaseIds, unassignedCode, type ConsumableSetting, type LocationMaster, type Master, type Masters, type ProcessMaster, type Source } from './masters.ts';
+import { initialPackaging, checkTrialReview, effectiveFrom, masterOf, masterRef, processNameFree, registered, type NewMaster, type TrialReview } from './master-edit.ts';
 import { add, observe, quantityOf, sameQuantity, subtract, type Basis, type Observation, type Quantity } from './quantity.ts';
 import { sumScalarsFinal, validateScalar, type Step } from './scalar.ts';
 import type { Scan } from './code.ts';
 import { checkAlternativeSource, type AlternativeOperation, type AlternativeRecord, type AlternativeSource } from './alternative-record.ts';
 import { captureItemLabels, type EventItemLabels } from './history-labels.ts';
 import { ledgerEventItemIds, type ForwardOperationTargets } from './history-targets.ts';
-
-// 手元の次工程の場所。工程に載った物は、ここへは移動でなく次工程への引渡しで渡す（MFG-06）。
-export const nextProcessLocation = 'N';
 
 // 未入力の案件・用途を共通在庫へ変換しないよう、共通と所属不明を別の値にする（MOD-02）。
 export type Project = { kind: 'case'; id: string } | { kind: 'common' } | { kind: 'unassigned' };
@@ -21,14 +18,155 @@ export type HoldReason = (typeof holdReasons)[number];
 // 工程の完了基準（MFG-02、TBD-04）。inspectionなら作業終了のあと検査待ちを経て完成（渡す前）になる。
 export type Process = { id: string; criterion: 'workEnd' | 'inspection' };
 
-// TBD-04が確定するまではSCN-01・AT-40の架空工程を使う。
-export const processes: readonly Process[] = [{ id: 'R組立', criterion: 'inspection' }];
-
 // 工程上の位置（SCP-05）。所在・案件・用途・取り分けた理由とは別の属性で、許可された遷移の順に縛らない。
 // none は工程に載っていない物（未使用の部品、次工程へ渡した物）。工程に載った物は未使用の部品として数えない（MFG-03c）。
 export type Stage = { kind: 'none' } | { kind: 'working' | 'inspecting' | 'awaitingHandover'; process: Process };
 
 export const noStage: Stage = Object.freeze({ kind: 'none' });
+
+type ProcessRecords = Pick<Ledger, 'lots' | 'history' | 'stops'>;
+
+// 記録に写された工程の値。停止は工程IDだけを写すので完了基準はnull。保留中の減少（applied: false）の行き先も、適用すれば現れるので含める。
+// 履歴を記録の順に先に見る。保存途中の各単位は履歴の接頭辞を共有するので、最初に現れる値が単位によって変わらない。
+// 保管単位・停止の辞書の並びは、整数風のIDが先に並ぶため記録の順と一致しない。
+function* embeddedProcesses(ledger: ProcessRecords): Generator<{ id: string; criterion: Process['criterion'] | null }> {
+  const ofLot = function* (lot: Lot | null) { if (lot !== null && lot.stage.kind !== 'none') yield lot.stage.process; };
+  for (const event of ledger.history) {
+    for (const { before, after } of event.changes) { yield* ofLot(before); yield* ofLot(after); }
+    if (event.kind === 'stage' && event.to.kind !== 'none') yield event.to.process;
+    if (event.kind === 'rework' && event.returnSource !== undefined) yield event.returnSource.process;
+    if (event.kind === 'stop') yield { id: event.stop.process, criterion: null };
+  }
+  for (const lot of Object.values(ledger.lots)) yield* ofLot(lot);
+  for (const stop of Object.values(ledger.stops)) yield { id: stop.process, criterion: null };
+}
+
+export function processUsed(ledger: ProcessRecords, id: string): boolean {
+  for (const process of embeddedProcesses(ledger)) if (process.id === id) return true;
+  return false;
+}
+
+// 工程の設定を持たない旧版の台帳の工程。記録に現れた工程だけを補う。
+// 旧版の停止は固定の工程「R組立」（確認の完了）からしか選べなかったので、ほかの工程の停止は完了基準が分からない。
+export function legacyProcesses(ledger: ProcessRecords): Record<string, ProcessMaster> {
+  const unknown = Object.values(ledger.stops).find(stop => stop.process !== 'R組立');
+  if (unknown !== undefined) throw new Error(`停止 ${unknown.id} の工程 ${unknown.process} の完了基準が分からない`);
+  return filledProcesses(ledger);
+}
+
+// 記録で最初に現れた完了基準で、IDを名前として利用中の工程を補う。停止は記録の順のその位置で「R組立」を確認の完了にする。
+// 旧形の手直しは同じ工程IDに別の完了基準を写した記録も受理してきたので拒否せず、最初の値を新しい作業に使う。
+function filledProcesses(ledger: ProcessRecords): Record<string, ProcessMaster> {
+  const found = new Map<string, Process['criterion']>();
+  for (const { id, criterion } of embeddedProcesses(ledger)) {
+    const known = criterion ?? (id === 'R組立' ? 'inspection' : null);
+    if (known !== null && !found.has(id)) found.set(id, known);
+  }
+  return Object.fromEntries([...found].map(([id, criterion]) => [id, { type: 'process', id, name: id, criterion, active: true }]));
+}
+
+type NameTimeline = { at: Map<string, number>; names: Map<string, { index: number; name: string }[]> };
+const nameTimelines = new WeakMap<readonly LedgerEvent[], NameTimeline>();
+
+// 記録したときの工程の名前。名前の変更は台帳の履歴に順に残るので、その記録より前の最後の名前を引く（要件2.6）。
+// 旧版の工程は名前の記録を持たず、IDが当時の名前と同じなので、変更がなければIDを返す。
+export function processNameAt(ledger: Ledger, eventId: string, id: string): string {
+  let timeline = nameTimelines.get(ledger.history);
+  if (timeline === undefined) {
+    timeline = { at: new Map(), names: new Map() };
+    for (const [index, event] of ledger.history.entries()) {
+      timeline.at.set(event.eventId, index);
+      if (event.kind !== 'master') continue;
+      for (const { after } of event.masters) if (after.type === 'process') timeline.names.set(after.id, [...timeline.names.get(after.id) ?? [], { index, name: after.name }]);
+    }
+    nameTimelines.set(ledger.history, timeline);
+  }
+  const index = timeline.at.get(eventId) ?? ledger.history.length;
+  return timeline.names.get(id)?.findLast(entry => entry.index < index)?.name ?? id;
+}
+
+// 工程の各欄を変えてよい変更操作。登録（beforeがnull）は対象外。
+const processFieldActions: Readonly<Record<'name' | 'criterion' | 'active', readonly string[]>> = { name: ['rename'], criterion: ['criterion'], active: ['deactivate', 'reactivate'] };
+
+// 読込と保存の境界で、工程の設定と次工程の指定が、記録と変更履歴に食い違わないことを確かめる（要件6.5）。
+export function requireConsistentProcesses(ledger: Ledger): void {
+  const { processes, locations } = ledger.masters;
+  const names = new Set<string>();
+  for (const p of Object.values(processes)) {
+    if (names.has(p.name.trim())) throw new Error(`工程の名前「${p.name.trim()}」が重なっている`);
+    names.add(p.name.trim());
+  }
+  const next = Object.values(locations).filter(l => l.nextProcess);
+  if (next.length > 1) throw new Error('次工程の場所は一か所まで');
+  // 記録の完了基準は写した値で進むので、登録との一致は照合しない。一致は着手時と完了基準の変更時に守る。
+  for (const stop of Object.values(ledger.stops)) if (own(processes, stop.process) === undefined) throw new Error(`停止 ${stop.id} の工程 ${stop.process} が登録されていない`);
+  for (const p of embeddedProcesses(ledger)) if (own(processes, p.id) === undefined) throw new Error(`記録に使われた工程 ${p.id} が登録されていない`);
+  const masterEvents = ledger.history.filter((event): event is LedgerEvent & { kind: 'master' } => event.kind === 'master');
+  requireProcessHistory(masterEvents, processes, filledProcesses(ledger));
+  requireNextProcessHistory(masterEvents, locations);
+}
+
+// 工程の変更前は直前の変更後と同じで、各欄は対応する操作でだけ変わり、最後の変更後が現在値になる。
+// 登録の操作を経ない工程は、旧版の記録から補ったものか練習の初期値で、IDを名前とした利用中の工程になる。最初の変更前（変更がなければ現在値）を、
+// 記録に使われていれば最初に現れた完了基準と、練習の工程なら練習の値と照合する。
+// shortcut: 記録に使われず練習にもない工程を現在値だけに足す改変は見分けない。登録操作を経ない工程の試験用の台帳をやめたら、補った値か練習の値に限る。
+function requireProcessHistory(events: readonly (LedgerEvent & { kind: 'master' })[], processes: Masters['processes'], filled: Masters['processes']): void {
+  const fromOrigin = (p: ProcessMaster) => {
+    const criterion = own(filled, p.id)?.criterion ?? own(practiceMasters.processes, p.id)?.criterion ?? p.criterion;
+    return p.name === p.id && p.active && p.criterion === criterion;
+  };
+  const last = new Map<string, ProcessMaster>();
+  for (const event of events) for (const { before, after } of event.masters) {
+    if (after.type !== 'process') continue;
+    if (before !== null && (before.type !== 'process' || before.id !== after.id)) throw new Error('工程の変更前と変更後が同じ工程を指さない');
+    if (before === null && !after.active) throw new Error(`工程 ${after.id} は利用停止のまま登録できない`);
+    const previous = last.get(after.id);
+    if (previous !== undefined && JSON.stringify(previous) !== JSON.stringify(before)) throw new Error(`工程 ${after.id} の変更前が直前の変更後と一致しない`);
+    if (previous === undefined && before?.type === 'process' && !fromOrigin(before)) throw new Error(`工程 ${after.id} の最初の変更前が、記録から補った値とも練習の初期値とも一致しない`);
+    const changed = before === null ? [] : (Object.keys(processFieldActions) as (keyof typeof processFieldActions)[]).filter(key => before[key] !== after[key]);
+    const illegal = changed.find(key => !processFieldActions[key].includes(event.action));
+    if (illegal !== undefined) throw new Error(`工程 ${after.id} の${illegal}を${event.action}で変えられない`);
+    last.set(after.id, after);
+  }
+  for (const [id, historical] of last) if (JSON.stringify(own(processes, id)) !== JSON.stringify(historical)) throw new Error(`現在の工程 ${id} が最後の変更履歴と一致しない`);
+  for (const p of Object.values(processes)) if (!last.has(p.id) && !fromOrigin(p)) throw new Error(`工程 ${p.id} は変更履歴がなく、記録から補った値とも練習の初期値とも一致しない`);
+}
+
+// 場所の次工程の指定は、指定の操作でだけ変わり、どの時点でも一か所までで、最後の変更後が現在値になる。
+// 登録では指定しない。ただし版11までは場所IDがNの場所を次工程として読むので、その登録だけは指定つきで現れる。
+function requireNextProcessHistory(events: readonly (LedgerEvent & { kind: 'master' })[], locations: Masters['locations']): void {
+  const flags = flagsBeforeHistory(events, locations);
+  const requireOne = () => { if ([...flags.values()].filter(Boolean).length > 1) throw new Error('次工程の場所は一か所まで'); };
+  requireOne();
+  const last = new Map<string, boolean>();
+  for (const event of events) {
+    for (const { before, after } of event.masters) {
+      if (after.type !== 'location') continue;
+      if (before !== null && (before.type !== 'location' || before.id !== after.id)) throw new Error('場所の変更前と変更後が同じ場所を指さない');
+      if (before === null && after.nextProcess && after.id !== 'N') throw new Error(`場所 ${after.code} は次工程の場所として登録できない`);
+      const previous = last.get(after.id);
+      const was = before?.type === 'location' ? before.nextProcess : null;
+      if (previous !== undefined && was !== previous) throw new Error(`場所 ${after.code} の次工程の指定が直前の変更後と一致しない`);
+      if (was !== null && was !== after.nextProcess && event.action !== 'nextProcess') throw new Error(`場所 ${after.code} の次工程の指定を${event.action}で変えられない`);
+      last.set(after.id, after.nextProcess);
+      flags.set(after.id, after.nextProcess);
+    }
+    requireOne();
+  }
+  for (const [id, flag] of last) if (own(locations, id)?.nextProcess !== flag) throw new Error(`場所 ${id} の現在の次工程の指定が最後の変更履歴と一致しない`);
+}
+
+// 最初の変更より前の次工程の指定。変更のない場所は現在値のまま、登録された場所は登録前に指定を持たない。
+function flagsBeforeHistory(events: readonly (LedgerEvent & { kind: 'master' })[], locations: Masters['locations']): Map<string, boolean> {
+  const flags = new Map(Object.values(locations).map(l => [l.id, l.nextProcess]));
+  const seen = new Set<string>();
+  for (const event of events) for (const { before, after } of event.masters) {
+    if (after.type !== 'location' || seen.has(after.id)) continue;
+    seen.add(after.id);
+    flags.set(after.id, before?.type === 'location' && before.nextProcess);
+  }
+  return flags;
+}
 
 export type Lot = {
   id: string;
@@ -172,7 +310,7 @@ export type Ledger = {
 export { deepFreeze };
 
 // 利用者の台帳は登録情報も空から始める。架空の登録情報は練習用と試験で明示して使う。
-export const emptyLedger: Ledger = deepFreeze({ lots: {}, history: [], issues: {}, stops: {}, masters: { items: {}, locations: {}, cases: {}, actors: {} } });
+export const emptyLedger: Ledger = deepFreeze({ lots: {}, history: [], issues: {}, stops: {}, masters: { items: {}, locations: {}, cases: {}, actors: {}, processes: {} } });
 export const practiceLedger: Ledger = deepFreeze({ lots: {}, history: [], issues: {}, stops: {}, masters: practiceMasters });
 
 const timestamp = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
@@ -276,12 +414,22 @@ function usableProject(ledger: Ledger, project: Project): void {
   if (!master.active) throw new Error(`案件・用途 ${master.code ?? master.name ?? project.id} は利用停止中`);
 }
 
-// 位置を保ったまま次工程Nに置くと、現物は次工程にあるのに完成（渡す前）や作業中のままで、引渡済みにも数えられない。
+// 位置を保ったまま次工程の場所に置くと、現物は次工程にあるのに完成（渡す前）や作業中のままで、引渡済みにも数えられない。
 // 次工程へは次工程への引渡しで渡す（MFG-06）。
-function notStagedAtNextProcess(lotId: string, stage: Stage, location: string, guidance = '次工程への引渡しで記録する'): void {
-  if (stage.kind !== 'none' && location === nextProcessLocation) {
-    throw new Error(`保管単位 ${lotId} は製造中・完成（渡す前）になるので、次工程${nextProcessLocation}には置けない。${guidance}`);
+function notStagedAtNextProcess(masters: Masters, lotId: string, stage: Stage, location: string, guidance = '次工程への引渡しで記録する'): void {
+  const next = nextProcessOf(masters);
+  if (stage.kind !== 'none' && location === next?.id) {
+    throw new Error(`保管単位 ${lotId} は製造中・完成（渡す前）になるので、次工程${next.code}には置けない。${guidance}`);
   }
+}
+
+// 新しく工程に載せる記録は、利用中の登録済みの工程と同じ完了基準を要求する。載った後の作業は、写した工程の完了基準のまま続ける。
+function requireUsableProcess(masters: Masters, process: Process): void {
+  required(process.id, '工程');
+  const master = own(masters.processes, process.id);
+  if (master === undefined) throw new Error(`工程 ${process.id} は登録されていない。先に工程を登録する`);
+  if (!master.active) throw new Error(`工程「${master.name}」は利用停止中`);
+  if (master.criterion !== process.criterion) throw new Error(`工程「${master.name}」の完了基準が登録と異なる`);
 }
 
 function unused(ledger: Ledger, id: string): void {
@@ -301,7 +449,7 @@ function newLot(ledger: Ledger, meta: Meta, lot: NewLot, stage: Stage, basis: Ba
   placeable(ledger, lot.location, meta);
   usableItem(ledger, lot.item);
   usableProject(ledger, lot.project);
-  notStagedAtNextProcess(lot.id, stage, lot.location);
+  notStagedAtNextProcess(ledger.masters, lot.id, stage, lot.location);
   required(lot.unit, '単位');
   const quantity = quantityOf(observeFor(ledger, lot, meta.eventId, basis, value));
   const lastCount = countOf(meta.eventId, basis, value);
@@ -315,7 +463,9 @@ function copyStage(stage: Stage): Stage {
 // 開始時点の仕掛品・工程完了品も、過去の作業の開始を作らずその位置で登録できる（RUN-02）。
 export function register(ledger: Ledger, meta: Meta, lot: NewLot & { stage?: Stage }, basis: Basis, value: number | null): Ledger {
   const { stage = noStage, ...rest } = lot;
-  return commit(ledger, { kind: 'register' }, meta, [newLot(ledger, meta, rest, stage, basis, value)]);
+  const created = newLot(ledger, meta, rest, stage, basis, value);
+  if (stage.kind !== 'none') requireUsableProcess(ledger.masters, stage.process);
+  return commit(ledger, { kind: 'register' }, meta, [created]);
 }
 
 // 作業を開始した数量を作業中の新しいまとまりにする。材料は別に記録した使用を対応付けるだけで、ここでは減らさない。
@@ -331,6 +481,7 @@ export function start(ledger: Ledger, meta: Meta, lot: NewLot, process: Process,
   }
   if (new Set(materials).size !== materials.length) throw new Error('同じ材料の使用記録を重ねて対応付けない');
   const created = newLot(ledger, meta, lot, { kind: 'working', process }, basis, value);
+  requireUsableProcess(ledger.masters, process);
   return commit(ledger, { kind: 'start', lotId: lot.id, materials: [...materials] }, meta, [created]);
 }
 
@@ -414,8 +565,8 @@ function decrease(ledger: Ledger, meta: Meta, d: Decrease, answer?: Inclusion): 
     unused(ledger, d.childId);
   }
   if (d.kind === 'stage') {
-    checkStageChange(lot.stage, d.to);
-    notStagedAtNextProcess(d.childId, d.to, lot.location);
+    checkStageChange(ledger.masters, lot.stage, d.to);
+    notStagedAtNextProcess(ledger.masters, d.childId, d.to, lot.location);
   }
   const children: Lot[] =
     d.kind === 'split' || d.kind === 'stage'
@@ -527,12 +678,14 @@ export function changeStage(
 }
 
 // 工程の違う位置へ移すと、どちらの工程の完了累計にも数えられないので、作業なしを経由させる。
-function checkStageChange(from: Stage, to: Stage): void {
-  if (to.kind === 'inspecting' && to.process.criterion !== 'inspection') throw new Error(`工程 ${to.process.id} は検査を完了基準にしていない`);
+function checkStageChange(masters: Masters, from: Stage, to: Stage): void {
+  if (to.kind === 'inspecting' && to.process.criterion !== 'inspection') throw new Error(`工程 ${processRef(masters, to.process.id)} は検査を完了基準にしていない`);
   if (sameStage(from, to)) throw new Error('変更前と変更後の作業の状態が同じ');
   if (from.kind !== 'none' && to.kind !== 'none' && from.process.id !== to.process.id) {
     throw new Error('別の工程の位置へは直接変えない。先に作業なしにする');
   }
+  if (from.kind !== 'none' && to.kind !== 'none' && from.process.criterion !== to.process.criterion) throw new Error('作業中の物の完了基準は着手時のまま変えない');
+  if (from.kind === 'none' && to.kind !== 'none') requireUsableProcess(masters, to.process);
 }
 
 // 完了基準に従った次の位置。検査を基準にする工程だけが検査待ちを持つ（MFG-02）。作業なしからの作業の開始はstartで記録する。
@@ -555,7 +708,7 @@ export function move(ledger: Ledger, meta: Meta, lotId: string, location: string
   notBeforeCreation(ledger, lot, meta.occurredAt);
   if (lot.location === location) throw new Error('移動元と移動先が同じ');
   placeable(ledger, location, meta);
-  notStagedAtNextProcess(lotId, lot.stage, location);
+  notStagedAtNextProcess(ledger.masters, lotId, lot.stage, location);
   return commit(ledger, { kind: 'move' }, meta, [{ ...lot, location }]);
 }
 
@@ -576,6 +729,7 @@ export function merge(ledger: Ledger, meta: Meta, sourceId: string, targetId: st
   if (source.location !== target.location) throw new Error('場所が違う保管単位は統合できない');
   if (source.holds.join() !== target.holds.join()) throw new Error('取り分けた理由が違う保管単位は統合できない');
   if (!sameStage(source.stage, target.stage)) throw new Error('作業の状態が違う保管単位は統合できない');
+  // 旧形の手直しには同じ工程IDに別の完了基準を写した物があり、統合すると片方の基準で進んでしまう。
   if (source.stage.kind !== 'none' && target.stage.kind !== 'none' && source.stage.process.criterion !== target.stage.process.criterion) throw new Error('工程の完了基準が違う保管単位は統合できない');
   // まとめ直すと、確認事項の対象と未反映の操作の関係が崩れる。先に解消する。
   for (const lot of [source, target]) {
@@ -1063,6 +1217,7 @@ export function recordStop(ledger: Ledger, meta: Meta, s: Omit<Stop, 'id' | 'res
   usableProject(ledger, s.project);
   if (s.shortage) usableItem(ledger, s.shortage.item);
   checkAffected(ledger, s, s.affected, meta.occurredAt);
+  if (own(ledger.masters.processes, s.process) === undefined) throw new Error(`工程 ${s.process} は登録されていない`);
   const stop: Stop = { ...s, project: { ...s.project }, shortage: s.shortage && { ...s.shortage }, id: meta.eventId, resumedBy: null };
   return commit(ledger, { kind: 'stop', stop }, meta, [], [], [stop]);
 }
@@ -1250,14 +1405,17 @@ type TrialRequest = { action: 'trial'; type: 'item' | 'location'; id: string; re
 export type MasterRequest =
   | TrialRequest
   | { action: 'register'; master: NewMaster }
-  | { action: 'rename'; type: 'item' | 'location' | 'case'; id: string; name: string; reason: string }
+  | { action: 'rename'; type: 'item' | 'location' | 'case' | 'process'; id: string; name: string; reason: string }
   | { action: 'deactivate' | 'reactivate'; type: Master['type']; id: string; reason: string }
   | { action: 'code'; type: 'item' | 'location' | 'case'; id: string; code: string; reason: string }
   | { action: 'source'; type: 'item' | 'case'; code: string; source: Source }
   | { action: 'perBox'; id: string; value: number; reason: string }
   | { action: 'packaging'; id: string; boxUnit: string; pieceUnit: string; value: number; reason: string }
   | { action: 'consumable'; id: string; setting: ConsumableSetting | null; reason: string }
-  | { action: 'scope'; id: string; inScope: boolean; reason: string };
+  | { action: 'scope'; id: string; inScope: boolean; reason: string }
+  | { action: 'criterion'; id: string; criterion: Process['criterion']; reason: string }
+  // idがnullなら次工程の場所の指定を解除する。
+  | { action: 'nextProcess'; id: string | null; reason: string };
 
 export type MasterChange = { before: Master | null; after: Master };
 
@@ -1291,6 +1449,12 @@ function planRename(ledger: Ledger, request: Request<'rename'>): MasterPlan {
   required(request.name, '新しい名称');
   required(request.reason, '理由');
   if (m.type === 'actor') throw new Error('担当者の名前は変えない');
+  if (m.type === 'process') {
+    const name = request.name.trim();
+    if (m.name === name) throw new Error('今と同じ名称');
+    processNameFree(ledger.masters, name, m.id);
+    return planOne(m, { ...m, name });
+  }
   if (m.name === request.name) throw new Error('今と同じ名称');
   return planOne(m, { ...m, name: request.name });
 }
@@ -1302,6 +1466,7 @@ function planActive(ledger: Ledger, meta: Meta, request: Request<'deactivate' | 
   if (m.active === active) throw new Error(active ? `${masterRef(m)}はすでに利用中` : `${masterRef(m)}はすでに利用停止中`);
   // 利用停止中の担当者は記録できないので、操作中の自分を止めると、画面が記録を受け付けなくなり、抜けるには初期化か復元しかない。
   if (m.type === 'actor' && !active && m.id === meta.actor) throw new Error('操作している担当者は利用停止できない。別の担当者に切り替えてから止める');
+  if (m.type === 'location' && !active && m.nextProcess) throw new Error(`場所 ${m.code} は次工程の場所に指定している。先に次工程の指定を解除する`);
   return planOne(m, { ...m, active });
 }
 
@@ -1309,7 +1474,7 @@ function planCode(ledger: Ledger, request: Request<'code'>, confirmed: boolean):
   const m = masterOf(ledger.masters, request.type, request.id);
   required(request.code, '品番・コード');
   required(request.reason, '理由');
-  if (m.type === 'actor') throw new Error('担当者には品番・コードがない');
+  if (m.type === 'actor' || m.type === 'process') throw new Error(`${masterTypeDisplayLabel[m.type]}には品番・コードがない`);
   if (m.code === request.code) throw new Error('今と同じ品番・コード');
   const owner = codeOwner(ledger.masters, request.type, request.code);
   if (!owner) return planOne(m, { ...m, code: request.code });
@@ -1506,6 +1671,35 @@ function planScope(ledger: Ledger, meta: Meta, request: Request<'scope'>): Maste
   return planOne(m, { ...m, scope: [...m.scope, { from, inScope: request.inScope }] });
 }
 
+// 着手した物は完了基準を写して持つので、記録に使われた工程の完了基準は変えない（要件2.2）。
+function planCriterion(ledger: Ledger, request: Request<'criterion'>): MasterPlan {
+  const m = masterOf(ledger.masters, 'process', request.id);
+  if (m.type !== 'process') throw new Error('工程を選ぶ');
+  required(request.reason, '理由');
+  if (request.criterion !== 'workEnd' && request.criterion !== 'inspection') throw new Error('工程の完了基準を選ぶ');
+  if (m.criterion === request.criterion) throw new Error('今と同じ完了基準');
+  if (processUsed(ledger, m.id)) throw new Error(`工程「${m.name}」は記録に使われているので、完了基準を変えない。別の工程を登録する`);
+  return planOne(m, { ...m, criterion: request.criterion });
+}
+
+// 指定の付け替えは、外す場所と付ける場所の前後を一つの変更として残す（要件3.1・3.4）。
+function planNextProcess(ledger: Ledger, request: Request<'nextProcess'>): MasterPlan {
+  required(request.reason, '理由');
+  const current = nextProcessOf(ledger.masters);
+  if ((current?.id ?? null) === request.id) throw new Error(request.id === null ? '次工程の場所は指定していない' : '今と同じ次工程の場所');
+  const changes: MasterChange[] = current === null ? [] : [{ before: current, after: { ...current, nextProcess: false } }];
+  if (request.id !== null) {
+    const target = masterOf(ledger.masters, 'location', request.id);
+    if (target.type !== 'location') throw new Error('場所を選ぶ');
+    if (!target.active) throw new Error(`場所 ${target.code} は利用停止中`);
+    // 全数を渡した後の記録は数えた0として残るが、物は置かれていない。数量不明・概算の0は物があり得るので除かない。
+    const staged = Object.values(ledger.lots).filter(l => l.mergedInto === null && l.location === target.id && l.stage.kind !== 'none' && !knownZero(l.quantity)).map(l => l.id);
+    if (staged.length > 0) throw new Error(`場所 ${target.code} には製造中・完成（渡す前）の物がある（${staged.join('・')}）。先に移動するか次工程への引渡しで記録する`);
+    changes.push({ before: target, after: { ...target, nextProcess: true } });
+  }
+  return { changes, confirmed: false };
+}
+
 function masterPlan(ledger: Ledger, meta: Meta, request: MasterRequest, confirmed: boolean): MasterPlan {
   switch (request.action) {
     case 'trial': return planTrial(ledger, request);
@@ -1518,21 +1712,24 @@ function masterPlan(ledger: Ledger, meta: Meta, request: MasterRequest, confirme
     case 'perBox': return planPerBox(ledger, meta, request);
     case 'packaging': case 'consumable': return planItemSetting(ledger, meta, request);
     case 'scope': return planScope(ledger, meta, request);
+    case 'criterion': return planCriterion(ledger, request);
+    case 'nextProcess': return planNextProcess(ledger, request);
   }
 }
 
 // 識別は利用者が入力した文字列なので、「__proto__」のような名前でも辞書の自前の欄として持つよう、計算したキーで作り直す。
 function withMasters(masters: Masters, changes: readonly MasterChange[]): Masters {
-  let { items, locations, cases, actors } = masters;
+  let { items, locations, cases, actors, processes } = masters;
   for (const { after } of changes) {
     switch (after.type) {
       case 'item': items = { ...items, [after.id]: after }; break;
       case 'location': locations = { ...locations, [after.id]: after }; break;
       case 'case': cases = { ...cases, [after.id]: after }; break;
       case 'actor': actors = { ...actors, [after.id]: after }; break;
+      case 'process': processes = { ...processes, [after.id]: after }; break;
     }
   }
-  return { items, locations, cases, actors };
+  return { items, locations, cases, actors, processes };
 }
 
 const issueRecordedAt = (ledger: Ledger, issueId: string): string | undefined => ledger.history.find((e) => e.eventId === issueId)?.recordedAt;
@@ -1645,9 +1842,7 @@ export function beginReturnedRework(ledger: Ledger, meta: Meta, request: Returne
   checkReturnedReworkTime(occurredAtOf(ledger, request.adoptEventId), meta.occurredAt);
   const process = { ...request.process, id: request.process.id.trim() };
   required(process.id, 'やり直し・修理の工程');
-  if (request.process.criterion !== 'workEnd' && request.process.criterion !== 'inspection') throw new Error('工程の完了基準を選ぶ');
-  const existing = [...processes, ...Object.values(ledger.lots).flatMap(l => l.stage.kind === 'none' ? [] : [l.stage.process])];
-  if (existing.some(p => p.id.trim() === process.id && p.criterion !== process.criterion)) throw new Error(`工程 ${process.id} の完了基準が既存の工程と異なる。既存の完了基準を選ぶ`);
+  requireUsableProcess(ledger.masters, process);
   if (lot.project.kind === 'unassigned') throw new Error('やり直し・修理の元の案件・用途を確認する');
   const place = own(ledger.masters.locations, lot.location);
   if (!place) throw new Error(`場所 ${lot.location} は手元の管理場所ではない`);
@@ -1659,7 +1854,7 @@ export function beginReturnedRework(ledger: Ledger, meta: Meta, request: Returne
   const inclusion = inclusionOf(ledger, lot, meta.occurredAt, answer);
   const parent = confirmedDecrease(ledger, lot, taken, inclusion);
   const child: Lot = { ...lot, id: request.childId, quantity: taken, lastCount: countOf(meta.eventId, request.basis, request.value), splitFrom: lot.id, mergedInto: null, stage: { kind: 'working', process } };
-  notStagedAtNextProcess(child.id, child.stage, lot.location, '返ってきた物をやり直し・修理する手元の場所へ移動してから開始する');
+  notStagedAtNextProcess(ledger.masters, child.id, child.stage, lot.location, '返ってきた物をやり直し・修理する手元の場所へ移動してから開始する');
   return commit(ledger, { kind: 'rework', lotId: lot.id, childId: child.id, reason: request.reason, basis: request.basis, value: request.value, applied: true, inclusion,
     returnSource: { adoptEventId: request.adoptEventId, process, confirmedPhysical: true } }, meta, [parent, child]);
 }

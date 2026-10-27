@@ -4,6 +4,7 @@
 /tests/fixtures/conflict-v5/cases.ts text eol=lf
 /tests/fixtures/public-operation-v10/cases.ts text eol=lf
 /tests/fixtures/consumables-v10/partial.json text eol=lf
+/tests/fixtures/process-v11/partial.json text eol=lf
 /web/index.html text eol=lf
 /web/style.css text eol=lf
 /LICENSE text eol=crlf

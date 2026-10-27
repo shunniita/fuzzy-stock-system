@@ -3,7 +3,7 @@ import {
   changeStage,
   correctOccurredAt,
   declareDiscrepancy,
-  practiceLedger,
+  practiceLedger as practiceBase,
   handOver,
   hold,
   isUsable,
@@ -31,6 +31,8 @@ import {
   type Project,
   type Stage,
 } from '../../src/domain/ledger.ts';
+import { withProcesses } from './process-fixture.ts';
+const practiceLedger = withProcesses(practiceBase, { id: 'R仮組', criterion: 'workEnd' });
 import type { Quantity } from '../../src/domain/quantity.ts';
 
 const a001: Project = { kind: 'case', id: 'A-001' };

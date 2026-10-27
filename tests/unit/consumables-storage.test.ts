@@ -16,7 +16,7 @@ describe('共通消耗品4.2・4.3・4.5: 保存版11と旧版', () => {
     expect(practiceLedger.masters.items.V?.consumable).toEqual({ pieceUnit: '本', rule: null });
     expect(fixedMasters.items.S?.consumable).toBeNull();
     expect(parse(serialize(initial(practiceLedger, emptySupply)))?.ledger.masters).toEqual(practiceLedger.masters);
-    expect(raw().version).toBe(11);
+    expect(raw().version).toBe(12);
   });
 
   test('旧writerの現在と履歴は設定なしへ移行する', () => {

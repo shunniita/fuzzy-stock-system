@@ -120,7 +120,7 @@ describe('F1-0 要件6: 確定の中の検査', () => {
     const current = initial(uses('counted', 3), emptySupply);
     store.data.set('fuzzy-stock/head', 'A');
     store.data.set('fuzzy-stock/slot-A', serialize(current));
-    const stopped = recordStop(use(current.ledger, meta(900), 'X', 'counted', 1, '架空作業'), meta(901), { process: '架空工程', item: 'R', unit: '台', project: { kind: 'case', id: 'A-001' }, reason: '架空の停止', shortage: null, affected: null });
+    const stopped = recordStop(use(current.ledger, meta(900), 'X', 'counted', 1, '架空作業'), meta(901), { process: 'R組立', item: 'R', unit: '台', project: { kind: 'case', id: 'A-001' }, reason: '架空の停止', shortage: null, affected: null });
     const broken = { ...stopped, stops: Object.fromEntries(Object.entries(stopped.stops).map(([id, stop]) => [id, { ...stop, affected: Number.NaN }])) };
     const result = commit(store, current, operation(), [{ conflictReviews: [], ledger: broken, supply: current.supply, targets: ['保管単位X'] }]);
     expect(result.kind).toBe('failed');
@@ -177,16 +177,16 @@ describe('F1-0 要件2: 往復で失わない', () => {
 });
 
 describe('F1-0 要件3: 版1からの移行', () => {
-  const v1Text = (snapshot: Snapshot) => JSON.stringify({ ...snapshot, version: 1 }, (key, value: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value);
+  const v1Text = (snapshot: Snapshot) => JSON.stringify({ ...snapshot, version: 1 }, (key, value: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') || key === 'itemLabels' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value);
 
-  test('版1の写しは当時表示不明を補い、業務内容を保って今の版（11）へ読む', () => {
+  test('版1の写しは当時表示不明を補い、業務内容を保って今の版（12）へ読む', () => {
     const original = initial(uses('unknown', 10), emptySupply);
     const decoded = parse(v1Text(original));
-    expect(decoded.version).toBe(11);
+    expect(decoded.version).toBe(12);
     expect(decoded).toEqual({ ...original, ledger: { ...original.ledger, masters: fixedMasters, history: original.ledger.history.map(e => ({ ...e, ...legacyEventLabels })) } });
   });
 
-  test('版1の写しを読んだだけでは保存先を書かず、次の確定は今の版（11）で書く', () => {
+  test('版1の写しを読んだだけでは保存先を書かず、次の確定は今の版（12）で書く', () => {
     const store = new MemoryStore();
     const original = initial(uses('counted', 10), emptySupply);
     store.data.set('fuzzy-stock/head', 'A');
@@ -198,7 +198,7 @@ describe('F1-0 要件3: 版1からの移行', () => {
     const result = commit(store, loaded.snapshot, operation(), [{ conflictReviews: [], ledger: next, supply: loaded.snapshot.supply, targets: ['保管単位X'] }]);
     expect(result.kind).toBe('saved');
     const written = store.data.get('fuzzy-stock/slot-B') ?? '';
-    expect(JSON.parse(written)).toMatchObject({ version: 11, quantities: expect.any(Object) });
+    expect(JSON.parse(written)).toMatchObject({ version: 12, quantities: expect.any(Object) });
     expect(store.data.get('fuzzy-stock/slot-A')).toBe(v1Text(original));
   });
 
@@ -209,7 +209,7 @@ describe('F1-0 要件3: 版1からの移行', () => {
     store.data.set('fuzzy-stock/slot-A', v1Text(current));
     const next = use(current.ledger, meta(900), 'X', 'counted', 1, '架空作業');
     const pending: Pending = { ...operation(), progress: 'saving', unknownSince: null, baseRevision: 0, units: [{ conflictReviews: [], ledger: next, supply: current.supply, targets: ['保管単位X'] }] };
-    store.data.set('fuzzy-stock/pending', JSON.stringify(pending, (key, value: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value));
+    store.data.set('fuzzy-stock/pending', JSON.stringify(pending, (key, value: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') || key === 'itemLabels' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' ? undefined : value));
     const loaded = load(store);
     expect(loaded).toMatchObject({ kind: 'ok', pending: { ...pending, units: pending.units.map(u => ({ ...u, ledger: { ...u.ledger, masters: fixedMasters, history: u.ledger.history.map(e => ({ ...e, ...legacyEventLabels })) } })) } });
   });
@@ -345,7 +345,7 @@ describe('F1-0 要件4: 不正な版2の拒否', () => {
         if (target === 'pending') store.data.set('fuzzy-stock/pending', JSON.stringify({
           ...operation(), progress: 'saving', unknownSince: null, baseRevision: 0,
           units: [{ ledger, supply: current.supply, targets: ['X'] }], quantities,
-        }, (key, value: unknown) => key === 'consumable' || key === 'itemLabels' || key === 'unitSteps' || key === 'receiptTemplates' ? undefined : value));
+        }, (key, value: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') || key === 'itemLabels' || key === 'unitSteps' || key === 'receiptTemplates' ? undefined : value));
         const before = [...store.data];
         const loaded = load(store);
         expect(loaded).toMatchObject(copies === 2

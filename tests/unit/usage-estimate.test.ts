@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { correctOccurredAt, practiceLedger, merge, processes, recount, register, resolveIssue, type Ledger, type Meta } from '../../src/domain/ledger.ts';
+import { correctOccurredAt, practiceLedger, merge, recount, register, resolveIssue, type Ledger, type Meta } from '../../src/domain/ledger.ts';
 import { emptySupply, type Supply, type SupplyEvent } from '../../src/domain/supply.ts';
 import type { ItemMaster } from '../../src/domain/masters.ts';
 import { saveReceiptTemplate, type ReceiptTemplate } from '../../src/domain/receipt-template.ts';
@@ -30,7 +30,7 @@ function prepared(template: ReceiptTemplate = recipe): State {
 
 const use = (lotId: string, value: number, basis: 'approximate' | 'counted' = 'approximate') => ({ lotId, basis, value });
 const input = (rows: EstimateInput[], extra: Partial<RecipeStart> = {}): RecipeStart => ({
-  lot: { id: 'W1', item: 'R', unit: '台', project, location: 'S1' }, process: processes[0]!, basis: 'counted', value: 20,
+  lot: { id: 'W1', item: 'R', unit: '台', project, location: 'S1' }, process: { id: 'R組立', criterion: 'inspection' }, basis: 'counted', value: 20,
   templateId: 'r1', rows, manual: [], ...extra,
 });
 const estimateOf = (state: State) => {
@@ -156,7 +156,7 @@ describe('保存と照合', () => {
     expect(readBackup(new TextEncoder().encode(backupTextOf(snapshot, at)))).toMatchObject({ kind: 'ok', snapshot });
   });
   test('版9の保存データにセット推計があれば拒否する', () => {
-    const wire = JSON.parse(serialize(initial(recorded().ledger, recorded().supply)), (key, value: unknown) => key === 'consumable' ? undefined : value);
+    const wire = JSON.parse(serialize(initial(recorded().ledger, recorded().supply)), (key, value: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') ? undefined : value);
     expect(() => decodeSnapshot({ ...wire, version: 9 })).toThrow('旧版はセット推計を持たない');
   });
   test.each([

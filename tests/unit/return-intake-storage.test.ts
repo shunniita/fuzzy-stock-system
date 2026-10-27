@@ -24,7 +24,7 @@ const storeOf = () => {
 describe('戻り割当の版7保存と再試行', () => {
   test('4.1: 数量・確認待ち・仮の記録証拠と解消がsnapshot/backupを往復する', () => {
     const snapshot = initial(assigned(), emptySupply);
-    expect(snapshot.version).toBe(11);
+    expect(snapshot.version).toBe(12);
     expect(parse(serialize(snapshot))).toEqual(snapshot);
     const backup = readBackup(new TextEncoder().encode(backupTextOf(snapshot, at)));
     expect(backup.kind).toBe('ok');

@@ -6,7 +6,7 @@ import { initial, parse, serialize } from '../../src/ui/storage.ts';
 
 describe('P1 1.1・1.2・4.1: 空の台帳と練習用の台帳', () => {
   test('空の台帳は登録情報も空で、保存して読み直しても空のまま', () => {
-    expect(emptyLedger.masters).toEqual({ items: {}, locations: {}, cases: {}, actors: {} });
+    expect(emptyLedger.masters).toEqual({ items: {}, locations: {}, cases: {}, actors: {}, processes: {} });
     const original = initial(emptyLedger, emptySupply);
     expect(parse(serialize(original))).toEqual(original);
   });

@@ -1,15 +1,14 @@
-import { isUsable, nextProcessLocation, processes, type Inclusion } from '../domain/ledger.ts';
-import { own, quantityStepOf } from '../domain/masters.ts';
+import { isUsable, type Inclusion } from '../domain/ledger.ts';
+import { nextProcessOf, own, processOf, quantityStepOf } from '../domain/masters.ts';
 import type { Basis } from '../domain/quantity.ts';
 import type { ReceiptTemplate } from '../domain/receipt-template.ts';
 import { subtractScalar, sumScalars } from '../domain/scalar.ts';
 import { EstimateInclusionRequired, estimateCandidates, estimateUseLimit, manualUseLimit, startWithEstimate, type Candidate, type EstimateInput, type ManualUse } from '../domain/usage-estimate.ts';
 import { checkField, choiceField, h, selectField, textField, type Values } from './dom.ts';
-import { amount, amountFields, basisOptions, codeTarget, itemFields, lotOptions, MaterialInclusionRequired, placeOptions, projectField, projectOf, quantityValue } from './fields.ts';
+import { amount, amountFields, basisOptions, codeTarget, itemFields, lotOptions, MaterialInclusionRequired, placeOptions, processOptions, projectField, projectOf, quantityValue } from './fields.ts';
 import { inclusionLabel, itemRef } from './format.ts';
 import type { Ctx, UiOp } from './supply-ui.ts';
 
-const processLabel = (p: (typeof processes)[number]) => `工程${p.id}（完了基準：${p.criterion === 'inspection' ? '作業終了後の確認の完了' : '作業終了'}）`;
 const changed = (node: HTMLElement) => node.dispatchEvent(new Event('input', { bubbles: true }));
 const estimateBasisOptions = [['approximate', 'だいたい（数えていない）'], ['counted', '数えた（今回の使用数全体）']] as const;
 
@@ -120,10 +119,11 @@ function recipeStartFields(ctx: Ctx): HTMLElement[] {
   });
   fillRecipes();
   return [
-    choiceField('process', '工程', processes.map((p) => [p.id, processLabel(p)])),
+    ...(processOptions(masters).length === 0 ? [h('p', { class: 'warn' }, '利用中の工程がありません。作業の種類「工程の登録・設定」で工程を登録してください。')] : []),
+    choiceField('process', '工程', processOptions(masters)),
     textField('newId', '作業中の保管単位の新しいID'),
     itemSelect!, unitSelect!, projectField(masters),
-    codeTarget(choiceField('location', '作業の場所', placeOptions(masters).filter(([id]) => id !== nextProcessLocation)), 'location', { hold: 'location' }),
+    codeTarget(choiceField('location', '作業の場所', placeOptions(masters).filter(([id]) => id !== nextProcessOf(masters)?.id)), 'location', { hold: 'location' }),
     basisField!, valueField!, status, recipe, preview, signature, root, ...manualFields(ctx), confirm,
   ];
 }
@@ -164,7 +164,8 @@ export function recipeStartOps(ctx: Ctx): Record<string, UiOp> {
     recipeStart: {
       label: 'セットで作業を開始（材料の使用を推計）', fields: () => recipeStartFields(ctx),
       run: (state, meta, v) => {
-        const process = processes.find((p) => p.id === v.text('process'))!;
+        const process = processOf(state.ledger.masters, v.text('process'));
+        if (!process) throw new Error('工程を選ぶ');
         const { basis, value } = amount(v);
         const templateId = v.text('recipe');
         const template = templateId === '' ? undefined : own(state.supply.receiptTemplates, templateId);

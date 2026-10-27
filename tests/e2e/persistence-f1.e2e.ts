@@ -55,15 +55,15 @@ for (const reload of [false, true]) {
   });
 }
 
-test('F1-0 要件3: 版1の写しを読み込んで表示し、次の保存から今の版（11）で書く', async ({ page }) => {
+test('F1-0 要件3: 版1の写しを読み込んで表示し、次の保存から今の版（12）で書く', async ({ page }) => {
   await recorded(page, 'register', lot('X', 'P', 'S1', 'unknown', ''), '09:00');
   await recorded(page, 'use', { lot: 'X', basis: 'counted', value: '3', usedFor: '架空作業' }, '10:00');
   const slotOf = () => page.evaluate(() => localStorage.getItem(`fuzzy-stock/slot-${localStorage.getItem('fuzzy-stock/head')}`) ?? '');
   await goTo(page, 'stock');
   const shown = await cell(page, 'X', '記録上の数と根拠').textContent() ?? '';
   const current = await slotOf();
-  expect(JSON.parse(current)).toMatchObject({ version: 11, conflictReviews: [], quantities: expect.any(Object) });
-  const v1 = JSON.stringify({ ...decodeSnapshot(JSON.parse(current)), version: 1 }, (key, value: unknown) => key === 'consumable' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' || key === 'itemLabels' ? undefined : value);
+  expect(JSON.parse(current)).toMatchObject({ version: 12, conflictReviews: [], quantities: expect.any(Object) });
+  const v1 = JSON.stringify({ ...decodeSnapshot(JSON.parse(current)), version: 1 }, (key, value: unknown) => key === 'consumable' || key === 'processes' || key === 'nextProcess' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' || key === 'itemLabels' ? undefined : value);
   await page.evaluate(text => localStorage.setItem(`fuzzy-stock/slot-${localStorage.getItem('fuzzy-stock/head')}`, text), v1);
   await page.reload();
   await expect(cell(page, 'X', '記録上の数と根拠')).toHaveText(shown);
@@ -75,7 +75,7 @@ test('F1-0 要件3: 版1の写しを読み込んで表示し、次の保存か�
   await goTo(page, 'stock');
   await expect(cell(page, 'X', '場所')).toHaveText('S2');
   const migrated = JSON.parse(await slotOf());
-  expect(migrated).toMatchObject({ version: 11, conflictReviews: [], quantities: expect.any(Object) });
+  expect(migrated).toMatchObject({ version: 12, conflictReviews: [], quantities: expect.any(Object) });
   const history = decodeSnapshot(migrated).ledger.history;
   expect(history).toHaveLength(3);
   expect(history.slice(0, 2).map(event => event.itemLabels)).toEqual([{ kind: 'legacy-unavailable' }, { kind: 'legacy-unavailable' }]);

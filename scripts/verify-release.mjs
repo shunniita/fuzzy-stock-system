@@ -100,6 +100,7 @@ try {
   await page.locator('#reset-practice').click();
   await page.getByRole('button', { name: '初期化する', exact: true }).click(); await page.locator('#nav-stock').click();
   const coreOf = async () => parse(await page.evaluate(() => localStorage.getItem('fuzzy-stock/slot-' + localStorage.getItem('fuzzy-stock/head'))));
+  await recorded(page, 'masterProcess', { name: '架空ZIP戻り工程', criterion: 'inspection' }, '11:00');
   await recorded(page, 'returnRecord', { item: 'R', location: 'T', basis: 'counted', value: '2', returnOrigin: 'fictional-original', note: '架空の実ZIP通し確認' }, '12:00');
   const form = page.getByRole('form', { name: '操作の入力' }); await selectOperation(form.locator('[name=op]'), 'returnAssign');
   const issue = await form.locator('[name=issue] option').nth(1).getAttribute('value'); assert.ok(issue);
@@ -107,7 +108,7 @@ try {
   await form.locator('[name=confirmed]').check(); await form.getByRole('button', { name: '記録する', exact: true }).click();
   assert.match(await page.locator('#input > [role=status]').innerText(), /記録した/); const beforeRework = await coreOf();
   assert.equal(beforeRework.ledger.lots['zip-return'].quantity.numeric.value, 2);
-  await record(page, 'returnRework', { lot: 'zip-return', childId: 'zip-repair', process: '架空ZIP戻り工程', criterion: 'inspection', basis: 'counted', value: '2', reason: '架空の新しい物理作業' }, '14:00');
+  await record(page, 'returnRework', { lot: 'zip-return', childId: 'zip-repair', process: '架空ZIP戻り工程', basis: 'counted', value: '2', reason: '架空の新しい物理作業' }, '14:00');
   assert.match(await page.locator('#input > [role=status]').innerText(), /物理的なやり直し・修理/); await form.locator('[name=confirmedPhysical]').check();
   await form.getByRole('button', { name: '記録する', exact: true }).click(); assert.match(await page.locator('#input > [role=status]').innerText(), /記録した/);
   const afterRework = await coreOf(); assert.deepEqual(afterRework.supply, beforeRework.supply);

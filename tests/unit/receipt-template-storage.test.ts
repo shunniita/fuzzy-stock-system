@@ -14,7 +14,7 @@ const recv = (s: Parameters<typeof receiveTemplate>[0], m: Meta, sets: number, q
 const state = () => ({ ledger: practiceLedger, supply: saveReceiptTemplate(practiceLedger, emptySupply, meta('op1'), template) });
 const raw = () => ({ ...initial(state().ledger, state().supply) });
 const pendingOf = (snapshot: ReturnType<typeof initial>) => ({
-  format: 'fuzzy-stock-pending', version: 11,
+  format: 'fuzzy-stock-pending', version: 12,
   pending: { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op2', opLabel: 'テンプレートから一括受入', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at,
     units: [{ ledger: snapshot.ledger, supply: snapshot.supply, targets: [], conflictReviews: [] }] },
 });
@@ -39,7 +39,7 @@ describe('セット 要件3.1 保存境界', () => {
       } else if (entry === 'pending') {
         const pending = { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op2', opLabel: 'テンプレートから一括受入', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at,
           units: [{ ledger: broken.ledger, supply: broken.supply, targets: [], conflictReviews: [] }] };
-        expect(() => decodePending({ format: 'fuzzy-stock-pending', version: 11, pending })).toThrow('出典');
+        expect(() => decodePending({ format: 'fuzzy-stock-pending', version: 12, pending })).toThrow('出典');
       } else {
         expect(() => parse(serialize(broken))).toThrow('明細1の担当者・日時');
       }
@@ -56,7 +56,7 @@ describe('セット 要件3.1 保存境界', () => {
   });
   test('固定形の版6pendingを空の構成へ移行し、原入力を書き換えない', () => {
     const pending = { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op1', opLabel: '受入', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at,
-      units: [{ ledger: JSON.parse(JSON.stringify(practiceLedger, (key, value: unknown) => key === 'consumable' ? undefined : value)), supply: { needs: {}, declarations: {}, requests: {}, levels: {}, acks: {}, receipts: {}, log: [] }, targets: [], conflictReviews: [] }] };
+      units: [{ ledger: JSON.parse(JSON.stringify(practiceLedger, (key, value: unknown) => (key === 'consumable' || key === 'processes' || key === 'nextProcess') ? undefined : value)), supply: { needs: {}, declarations: {}, requests: {}, levels: {}, acks: {}, receipts: {}, log: [] }, targets: [], conflictReviews: [] }] };
     const input = { format: 'fuzzy-stock-pending', version: 6, pending }, before = JSON.stringify(input);
     expect(decodePending(input).units[0]?.supply.receiptTemplates).toEqual({});
     expect(JSON.stringify(input)).toBe(before);
@@ -77,8 +77,8 @@ describe('セット 要件3.1 保存境界', () => {
     const legacy = { format: 'fuzzy-stock-f0', version, revision: 0, lastWriter: 'init', opFloor: 1,
       ledger: { lots: {}, history: [], issues: {}, stops: {} }, supply: { needs: {}, declarations: {}, requests: {}, levels: {}, acks: {}, receipts: {}, log: [] }, ops: {}, saveChecks: [], ...(version >= 6 ? { conflictReviews: [] } : {}) };
     // 版3以降は登録情報必須。旧精度版の登録情報は固定の保存fixtureで別途回帰する。
-    const oldMasters = Object.fromEntries(Object.entries(practiceLedger.masters).map(([group, entries]) => [group, Object.fromEntries(Object.entries(entries).map(([id, current]) => {
-      const { consumable: _setting, ...master } = 'consumable' in current ? current : { ...current, consumable: undefined };
+    const oldMasters = Object.fromEntries(Object.entries(practiceLedger.masters).filter(([group]) => group !== 'processes').map(([group, entries]) => [group, Object.fromEntries(Object.entries(entries).map(([id, current]) => {
+      const { consumable: _setting, nextProcess: _next, ...master } = { consumable: undefined, nextProcess: undefined, ...current };
       const { unitSteps, ...rest } = 'unitSteps' in master ? master : { ...master, unitSteps: undefined };
       return [id, version >= 5 ? master : rest];
     }))]));
@@ -206,7 +206,7 @@ describe('セット 要件3.1 保存境界', () => {
       } else if (entry === 'pending') {
         const pending = { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op2', opLabel: 'テンプレートから一括受入', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at,
           units: [{ ledger: broken.ledger, supply: broken.supply, targets: [], conflictReviews: [] }] };
-        expect(() => decodePending({ format: 'fuzzy-stock-pending', version: 11, pending })).toThrow('未受け取り行');
+        expect(() => decodePending({ format: 'fuzzy-stock-pending', version: 12, pending })).toThrow('未受け取り行');
       } else {
         expect(() => parse(serialize(broken))).toThrow('未受け取り行');
       }

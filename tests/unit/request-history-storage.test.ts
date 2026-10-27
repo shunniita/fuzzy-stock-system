@@ -21,7 +21,7 @@ const getRequest = (supply: Supply, id = 'q1') => {
 };
 const unitOf = (snapshot: Snapshot) => ({ ledger: snapshot.ledger, supply: snapshot.supply, targets: [], conflictReviews: [] });
 const pendingOf = (snapshot: Snapshot) => ({
-  format: 'fuzzy-stock-pending', version: 11,
+  format: 'fuzzy-stock-pending', version: 12,
   pending: { progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op1', opLabel: '依頼', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at, units: [unitOf(snapshot)] },
 });
 const readAsBackup = (snapshot: Snapshot) => readBackup(new TextEncoder().encode(backupTextOf(snapshot, at)));
@@ -93,7 +93,7 @@ describe('依頼照合 要件3.2: 正当な既存データと後日変更', () =
     const seed = seedScn02();
     expectAccepted(initial(seed.ledger, seed.supply));
     expectAccepted(initial(practiceLedger, manual()));
-    expect(parse(serialize(initial(seed.ledger, seed.supply))).version).toBe(11);
+    expect(parse(serialize(initial(seed.ledger, seed.supply))).version).toBe(12);
   });
 
   test('回答・発注・到着・取消後訂正と、過剰割り当て中の訂正を受け付ける', () => {
@@ -132,7 +132,9 @@ describe('依頼照合 要件3.2: 正当な既存データと後日変更', () =
     const { conflictReviews, ...withoutReviews } = current;
     const { receiptTemplates, ...withoutTemplates } = seed.supply;
     const { masters, ...withoutMasters } = seed.ledger;
-    const legacyMasters = { ...masters, items: Object.fromEntries(Object.entries(masters.items).map(([id, { consumable: _, ...master }]) => [id, master])) };
+    const { processes: _processes, ...v11Masters } = masters;
+    const legacyMasters = { ...v11Masters, items: Object.fromEntries(Object.entries(masters.items).map(([id, { consumable: _, ...master }]) => [id, master])),
+      locations: Object.fromEntries(Object.entries(masters.locations).map(([id, { nextProcess: _next, ...master }]) => [id, master])) };
     const oldMasters = { ...legacyMasters, items: Object.fromEntries(Object.entries(legacyMasters.items).map(([id, master]) => {
       const { unitSteps, ...old } = master;
       return [id, old];

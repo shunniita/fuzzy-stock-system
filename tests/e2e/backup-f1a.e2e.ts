@@ -248,7 +248,7 @@ test('AT-44・3.1〜3.4・4.1・4.3・4.5・4.10・5.1〜5.4: 閲覧用の出力
   await expect(notice(page)).toContainText('閲覧用の出力を書き出した');
 
   const book = XLSX.read(view.bytes, { type: 'array' });
-  expect(book.SheetNames).toEqual(['説明', '集計', '保管単位', '元の記録', '台帳の履歴', '供給の履歴', '依頼', '工程集計', '品目の設定']);
+  expect(book.SheetNames).toEqual(['説明', '集計', '保管単位', '元の記録', '台帳の履歴', '供給の履歴', '依頼', '工程集計', '品目の設定', '工程の設定']);
   const rows = (name: string): string[][] => {
     const sheet = book.Sheets[name];
     if (!sheet) throw new Error(`シートがない：${name}`);

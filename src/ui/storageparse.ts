@@ -1,11 +1,11 @@
 import type { Cause, EventDetail, Issue, Ledger, LedgerEvent, Lot, MasterChange, Meta, Process, Project, Stage, Stop, TrialReview } from '../domain/ledger.ts';
-import { checkedConsumable, checkPackagingUnits, checkedUnitSteps, integerUnitSteps, inputStepOf, own, quantityStepOf, requireConsistentItemPrecisions, fixedMasters, reservedCaseIds, type ConsumableSetting, type ActorMaster, type CaseMaster, type ItemMaster, type LocationMaster, type Master, type Masters, type Packaging, type PerBox, type ScopeEntry, type Source } from '../domain/masters.ts';
+import { checkedConsumable, checkPackagingUnits, checkedUnitSteps, integerUnitSteps, inputStepOf, own, quantityStepOf, requireConsistentItemPrecisions, fixedMasters, reservedCaseIds, type ConsumableSetting, type ActorMaster, type CaseMaster, type ItemMaster, type LocationMaster, type Master, type Masters, type Packaging, type PerBox, type ProcessMaster, type ScopeEntry, type Source } from '../domain/masters.ts';
 import type { Basis, Numeric, Observation, Quantity, Term, UnknownQuantity } from '../domain/quantity.ts';
 import type { Arrival, Declaration, Need, Reply, Request, Supply, SupplyDetail, SupplyEvent } from '../domain/supply.ts';
 import type { OpEntry, Pending, SaveCheck, Snapshot, UnitState } from './storage.ts';
 import { isReviewFingerprint, isReviewOperation, parseConflictReviews, reviewOpLabel, reviewPendingValues, type ConflictReview } from './conflictrecord.ts';
 import { readCode, type CodeReference, type Scan } from '../domain/code.ts';
-import { validateReworkLinks } from '../domain/ledger.ts';
+import { legacyProcesses, requireConsistentProcesses, validateReworkLinks } from '../domain/ledger.ts';
 import { readNeedRow, validateNeedImports, type NeedImportDetail, type NeedImportInput } from '../domain/need-import.ts';
 import { checkAlternativeSource, validateAlternativeRecords, type AlternativeRecord } from '../domain/alternative-record.ts';
 import { validateScalar, validateSignedScalar, type Step } from '../domain/scalar.ts';
@@ -306,7 +306,7 @@ function scan(value: unknown, path: string): Scan {
   exactKeys(o, ['raw', 'format', 'interpreted'], path);
   const raw = field(o, 'raw', path, string);
   // 文法だけを再検査する。当時の名称・内部識別・利用状態を現在の登録情報で置き換えない。
-  const parsed = readCode(raw, { items: {}, cases: {}, locations: {}, actors: {} });
+  const parsed = readCode(raw, { items: {}, cases: {}, locations: {}, actors: {}, processes: {} });
   if (o.format !== parsed.format) return invalid(path, '原文と形式が一致しない');
   const detailsPath = `${path}.interpreted`;
   const details = record(o.interpreted, detailsPath);
@@ -355,12 +355,13 @@ function cause(value: unknown, path: string): Cause {
 }
 
 function anyMaster(value: unknown, path: string, version: number): Master {
-  const type = oneOf(record(value, path).type, `${path}.type`, ['item', 'location', 'case', 'actor']);
+  const type = oneOf(record(value, path).type, `${path}.type`, version >= 12 ? ['item', 'location', 'case', 'actor', 'process'] : ['item', 'location', 'case', 'actor']);
   switch (type) {
     case 'item': return itemMaster(value, path, version);
-    case 'location': return locationMaster(value, path);
+    case 'location': return locationMaster(value, path, version);
     case 'case': return caseMaster(value, path);
     case 'actor': return actorMaster(value, path);
+    case 'process': return processMaster(value, path);
   }
 }
 
@@ -378,7 +379,7 @@ function eventDetail(o: Record<string, unknown>, path: string, table: QuantityTa
     case 'adopt': return { kind, issueId: field(o, 'issueId', path, string), lotId: field(o, 'lotId', path, string) };
     case 'assignProject': return { kind, lotId: field(o, 'lotId', path, string), before: field(o, 'before', path, project), after: field(o, 'after', path, project), reason: field(o, 'reason', path, string) };
     case 'master': return o.action === 'trial' ? trialChange(o, path, version) : o.action === 'packaging' || o.action === 'consumable' ? settingChange(o, path, version) : {
-      kind, action: oneOf(o.action, `${path}.action`, ['register', 'rename', 'deactivate', 'reactivate', 'code', 'source', 'perBox', 'scope']), reason: field(o, 'reason', path, textOrNull),
+      kind, action: oneOf(o.action, `${path}.action`, version >= 12 ? ['register', 'rename', 'deactivate', 'reactivate', 'code', 'source', 'perBox', 'scope', 'criterion', 'nextProcess'] : ['register', 'rename', 'deactivate', 'reactivate', 'code', 'source', 'perBox', 'scope']), reason: field(o, 'reason', path, textOrNull),
       confirmed: field(o, 'confirmed', path, boolean), masters: array(o.masters, `${path}.masters`, (v, p) => masterChange(v, p, version)),
     };
     case 'recount': return { kind, lotId: field(o, 'lotId', path, string), value: field(o, 'value', path, amount), compared: quantity(o.compared, `${path}.compared`, table), cause: field(o, 'cause', path, cause), difference: quantity(o.difference, `${path}.difference`, table), applied: field(o, 'applied', path, boolean), inclusion: field(o, 'inclusion', path, inclusion), answeredFor: field(o, 'answeredFor', path, strings) };
@@ -442,7 +443,7 @@ function trialChange(o: Record<string, unknown>, path: string, version: number):
     exactKeys(pair, ['before', 'after'], p);
     const { before, after } = decoded;
     if (before === null || (before.type !== 'item' && before.type !== 'location') || after.type !== before.type || after.id !== before.id || !('trial' in after) || after.trial === before.trial) return invalid(p, '同じ品目/場所のtrial反転が必要');
-    const storedKeys = (m: Master) => Object.keys(m).filter(key => (version >= 5 || key !== 'unitSteps') && (version >= 11 || key !== 'consumable'));
+    const storedKeys = (m: Master) => Object.keys(m).filter(key => (version >= 5 || key !== 'unitSteps') && (version >= 11 || key !== 'consumable') && (version >= 12 || key !== 'nextProcess'));
     exactKeys(record(pair.before, `${p}.before`), storedKeys(before), `${p}.before`);
     exactKeys(record(pair.after, `${p}.after`), storedKeys(after), `${p}.after`);
     if (JSON.stringify({ ...before, trial: after.trial }) !== JSON.stringify(after)) return invalid(p, '試行変更でtrial以外の登録情報属性は変えない');
@@ -599,11 +600,24 @@ function itemMaster(value: unknown, path: string, version: number): ItemMaster {
   return item;
 }
 
-function locationMaster(value: unknown, path: string): LocationMaster {
+// 版12より前は場所「N」が固定の次工程だった。マスタ履歴の写しにも同じ規則を当て、現在値と履歴を食い違わせない。
+function locationMaster(value: unknown, path: string, version: number): LocationMaster {
   const o = record(value, path);
+  if (version < 12 && Object.hasOwn(o, 'nextProcess')) return invalid(`${path}.nextProcess`, '旧版は次工程の指定を持たない');
+  const id = field(o, 'id', path, string);
   return {
-    type: masterType(o, path, 'location'), id: field(o, 'id', path, string), code: field(o, 'code', path, string), name: field(o, 'name', path, string),
+    type: masterType(o, path, 'location'), id, code: field(o, 'code', path, string), name: field(o, 'name', path, string),
     trial: field(o, 'trial', path, boolean), active: field(o, 'active', path, boolean), scope: field(o, 'scope', path, (v, p) => timeline(v, p, scopeEntry)),
+    nextProcess: version < 12 ? id === 'N' : field(o, 'nextProcess', path, boolean),
+  };
+}
+
+function processMaster(value: unknown, path: string): ProcessMaster {
+  const o = record(value, path);
+  exactKeys(o, ['type', 'id', 'name', 'criterion', 'active'], path);
+  return {
+    type: masterType(o, path, 'process'), id: field(o, 'id', path, nonblank), name: field(o, 'name', path, nonblank),
+    criterion: oneOf(o.criterion, `${path}.criterion`, ['workEnd', 'inspection']), active: field(o, 'active', path, boolean),
   };
 }
 
@@ -635,9 +649,12 @@ function masters(value: unknown, path: string, version: number): Masters {
   const cases = masterGroup(o.cases, `${path}.cases`, caseMaster);
   const reserved = reservedCaseIds.find((id) => Object.hasOwn(cases, id));
   if (reserved !== undefined) return invalid(`${path}.cases.${reserved}`, '共通在庫・所属不明を表す値でない案件・用途の内部の識別が必要');
+  if (version < 12 && Object.hasOwn(o, 'processes')) return invalid(`${path}.processes`, '旧版は工程の設定を持たない');
   return {
-    items: masterGroup(o.items, `${path}.items`, (v, p) => itemMaster(v, p, version)), locations: masterGroup(o.locations, `${path}.locations`, locationMaster),
+    items: masterGroup(o.items, `${path}.items`, (v, p) => itemMaster(v, p, version)), locations: masterGroup(o.locations, `${path}.locations`, (v, p) => locationMaster(v, p, version)),
     cases, actors: masterGroup(o.actors, `${path}.actors`, actorMaster),
+    // 旧版の工程は、台帳の記録を読んだあとでledger()が補う。
+    processes: version < 12 ? {} : masterGroup(o.processes, `${path}.processes`, processMaster),
   };
 }
 
@@ -659,14 +676,22 @@ function validateMasterPrecision(decoded: Ledger, path: string): void {
 // 版2までの記録は登録情報を持たない。そのころの登録情報は固定の架空登録情報だけなので、それを補う（要件9.4）。
 function ledger(value: unknown, path: string, table: QuantityTable | null, version: number): Ledger {
   const o = record(value, path);
-  const decoded = {
+  const records = {
     lots: dictionary(o.lots, `${path}.lots`, (v, p) => lot(v, p, table)), history: array(o.history, `${path}.history`, (v, p) => ledgerEvent(v, p, table, version)), issues: dictionary(o.issues, `${path}.issues`, issue), stops: dictionary(o.stops, `${path}.stops`, stop),
-    masters: o.masters === undefined && version < 3 ? fixedMasters : field(o, 'masters', path, (v, p) => masters(v, p, version)),
   };
+  const stored = o.masters === undefined && version < 3 ? fixedMasters : field(o, 'masters', path, (v, p) => masters(v, p, version));
+  let processes = stored.processes;
+  if (version < 12) {
+    try { processes = legacyProcesses(records); }
+    catch (error) { return invalid(path, error instanceof Error ? error.message : String(error)); }
+  }
+  const decoded = { ...records, masters: { ...stored, processes } };
   validateMasterPrecision(decoded, path);
   requireConsistentItemSettings(decoded);
   validateSplitLineage(decoded, path);
   validateReworkLinks(decoded);
+  // 手直しの由来の照合が先に具体的な理由を示すよう、工程の整合は後で確かめる。
+  requireConsistentProcesses(decoded);
   for (const event of decoded.history) {
     if (event.kind !== 'master' || event.action !== 'trial') continue;
     for (const { after } of event.masters) {
@@ -1082,8 +1107,8 @@ export function decodeSnapshot(value: unknown): Snapshot {
   if (opFloor < 1) return invalid(`${path}.opFloor`, '1以上の番号下限が必要');
   const saveChecks = array(o.saveChecks, `${path}.saveChecks`, saveCheck);
   if (new Set(saveChecks.map(check => check.opId)).size !== saveChecks.length) return invalid(`${path}.saveChecks`, '操作IDごとの解消記録は一件まで');
-  // 旧版も読み込むが保存先は書き換えない。次の確定から共通消耗品の設定を持てる版11で書く。
-  const version = oneOf(o.version, `${path}.version`, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  // 旧版も読み込むが保存先は書き換えない。次の確定から工程の設定を持てる版12で書く。
+  const version = oneOf(o.version, `${path}.version`, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   if (version === 1 && o.quantities !== undefined) return invalid(`${path}.version`, '版1の写しは数量の表を持たない');
   const table = o.quantities === undefined ? null : quantityTable(o.quantities, `${path}.quantities`);
   const decodedLedger = ledger(o.ledger, `${path}.ledger`, table, version);
@@ -1099,7 +1124,7 @@ export function decodeSnapshot(value: unknown): Snapshot {
   const reviews = conflictReviews(o, path, version);
   requireDistinctRecordIds(decodedLedger, decodedSupply, reviews, path);
   return {
-    format: oneOf(o.format, `${path}.format`, ['fuzzy-stock-f0']), version: 11, revision: field(o, 'revision', path, nonnegative), lastWriter: field(o, 'lastWriter', path, string), opFloor,
+    format: oneOf(o.format, `${path}.format`, ['fuzzy-stock-f0']), version: 12, revision: field(o, 'revision', path, nonnegative), lastWriter: field(o, 'lastWriter', path, string), opFloor,
     ledger: decodedLedger, supply: decodedSupply, ops: dictionary(o.ops, `${path}.ops`, opEntry), saveChecks, conflictReviews: reviews,
   };
 }
@@ -1130,7 +1155,7 @@ export function decodePending(value: unknown): Pending {
   let version = 1;
   if (Object.hasOwn(envelope, 'format') || Object.hasOwn(envelope, 'version') || Object.hasOwn(envelope, 'pending')) {
     oneOf(envelope.format, `${path}.format`, ['fuzzy-stock-pending']);
-    version = oneOf(envelope.version, `${path}.version`, [4, 5, 6, 7, 8, 9, 10, 11]);
+    version = oneOf(envelope.version, `${path}.version`, [4, 5, 6, 7, 8, 9, 10, 11, 12]);
     o = record(envelope.pending, `${path}.pending`);
   }
   // 単位どうしは同じ数量の表を共有するので、検査済みの組も共有する。

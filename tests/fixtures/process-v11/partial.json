@@ -1,0 +1,852 @@
+{
+  "writerRevision": "d45714ce1e7aa09e5ee7fda5aafb57a86aabf2fd",
+  "writerRelease": "v1.2.0",
+  "snapshotVersion": 11,
+  "fictional": true,
+  "writerSources": {
+    "src/ui/storage.ts": "0c944e05a33d721e124f16ee51d0e8f33b1837f0bf596c83aab8633946a81ac2",
+    "src/ui/storageparse.ts": "fd4eb3aa57695ac970b2b7c0a886d1607d59a656bd8ef176710f8c3100ff2cc1",
+    "src/domain/ledger.ts": "122dc15c5fb6f78d1043a8657b73c7eeec1cfb1b38759fde8aa547ae8f6448da",
+    "src/domain/masters.ts": "71167eca65264034d4da513bc1a8801386707af9b6c4c80d8018fa0bd15080ad",
+    "src/ui/format.ts": "5d6f9f6cdd3bf54a59045ba42d588104717c5d982e8c8a44832583069d9f5048"
+  },
+  "sha256": "2b7a9a5a647cff4c7132e3c5f08c837d4ce622a9ef9648f5d70accf84599e8d1",
+  "data": [
+    [
+      "fuzzy-stock/head",
+      "B"
+    ],
+    [
+      "fuzzy-stock/pending",
+      "{\"format\":\"fuzzy-stock-pending\",\"version\":11,\"pending\":{\"progress\":\"partial\",\"unknownSince\":null,\"savingSince\":\"2026-10-27T15:00:00+09:00\",\"baseRevision\":0,\"opId\":\"op90\",\"opLabel\":\"架空の作業終了と中断\",\"fingerprint\":\"架空の原文\",\"values\":{\"lot\":\"X1\"},\"actor\":\"架空担当A\",\"startedAt\":\"2026-10-27T15:00:00+09:00\",\"units\":[{\"ledger\":{\"lots\":{\"P1\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":1,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"W1\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":3,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W2\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":5,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W3\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":9,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W4\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"N\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"W5\":{\"id\":\"W5\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":10,\"lastCount\":{\"value\":1,\"eventId\":\"rw1\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"X1\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":12,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}},\"X2\":{\"id\":\"X2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":13,\"lastCount\":{\"value\":1,\"eventId\":\"e4\"},\"splitFrom\":\"X1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}},\"history\":[{\"eventId\":\"r1\",\"occurredAt\":\"2026-10-27T08:00:00+09:00\",\"recordedAt\":\"2026-10-27T08:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"u1\",\"occurredAt\":\"2026-10-27T09:00:00+09:00\",\"recordedAt\":\"2026-10-27T09:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"use\",\"lotId\":\"P1\",\"basis\":\"counted\",\"value\":2,\"applied\":true,\"inclusion\":null,\"usedFor\":\"W1の着手（工程R組立）\",\"changes\":[{\"before\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"after\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":1,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"s1\",\"occurredAt\":\"2026-10-27T09:00:00+09:00\",\"recordedAt\":\"2026-10-27T09:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"},\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"start\",\"lotId\":\"W1\",\"materials\":[\"u1\"],\"changes\":[{\"before\":null,\"after\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":2,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e1\",\"occurredAt\":\"2026-10-27T10:00:00+09:00\",\"recordedAt\":\"2026-10-27T10:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W1\",\"basis\":\"counted\",\"value\":3,\"applied\":true,\"inclusion\":null,\"childId\":\"W2\",\"to\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":2,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":3,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":4,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e2\",\"occurredAt\":\"2026-10-27T11:00:00+09:00\",\"recordedAt\":\"2026-10-27T11:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W2\",\"basis\":\"counted\",\"value\":2,\"applied\":true,\"inclusion\":null,\"childId\":\"W3\",\"to\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":4,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":5,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":6,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e3\",\"occurredAt\":\"2026-10-27T12:00:00+09:00\",\"recordedAt\":\"2026-10-27T12:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W3\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"W4\",\"to\":{\"kind\":\"none\"},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":6,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":7,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"e3-m\",\"occurredAt\":\"2026-10-27T12:00:00+09:00\",\"recordedAt\":\"2026-10-27T12:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"move\",\"changes\":[{\"before\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"after\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"N\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"rw1\",\"occurredAt\":\"2026-10-27T13:00:00+09:00\",\"recordedAt\":\"2026-10-27T13:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"rework\",\"lotId\":\"W3\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"W5\",\"reason\":\"架空の傷の手直し\",\"changes\":[{\"before\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":7,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":9,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W5\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":10,\"lastCount\":{\"value\":1,\"eventId\":\"rw1\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"r2\",\"occurredAt\":\"2026-10-27T13:00:00+09:00\",\"recordedAt\":\"2026-10-27T13:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":11,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}}]},{\"eventId\":\"e4\",\"occurredAt\":\"2026-10-27T14:00:00+09:00\",\"recordedAt\":\"2026-10-27T14:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"X1\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"X2\",\"to\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":11,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}},\"after\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":12,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}},{\"before\":null,\"after\":{\"id\":\"X2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":13,\"lastCount\":{\"value\":1,\"eventId\":\"e4\"},\"splitFrom\":\"X1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}}]}],\"issues\":{},\"stops\":{},\"masters\":{\"items\":{\"P\":{\"type\":\"item\",\"id\":\"P\",\"code\":\"P\",\"name\":\"架空部品P\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"Q\":{\"type\":\"item\",\"id\":\"Q\",\"code\":\"Q\",\"name\":\"架空部品Q\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"R\":{\"type\":\"item\",\"id\":\"R\",\"code\":\"R\",\"name\":\"架空半製品R\",\"source\":null,\"units\":[\"台\"],\"unitSteps\":{\"台\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"S\":{\"type\":\"item\",\"id\":\"S\",\"code\":\"S\",\"name\":\"架空共通ネジS\",\"source\":null,\"units\":[\"本\",\"箱\"],\"unitSteps\":{\"本\":1,\"箱\":1},\"trial\":true,\"active\":true,\"packaging\":{\"boxUnit\":\"箱\",\"pieceUnit\":\"本\",\"perBox\":[{\"from\":null,\"value\":1000}]},\"consumable\":{\"pieceUnit\":\"本\",\"rule\":{\"threshold\":3000,\"standardOrder\":{\"value\":1,\"unit\":\"箱\"}}}},\"V\":{\"type\":\"item\",\"id\":\"V\",\"code\":\"V\",\"name\":\"架空共通ワッシャV\",\"source\":null,\"units\":[\"本\"],\"unitSteps\":{\"本\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":{\"pieceUnit\":\"本\",\"rule\":null}},\"X\":{\"type\":\"item\",\"id\":\"X\",\"code\":\"X\",\"name\":\"架空対象外部品X\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":false,\"active\":true,\"packaging\":null,\"consumable\":null}},\"locations\":{\"S1\":{\"type\":\"location\",\"id\":\"S1\",\"code\":\"S1\",\"name\":\"棚S1\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"S2\":{\"type\":\"location\",\"id\":\"S2\",\"code\":\"S2\",\"name\":\"棚S2\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"T\":{\"type\":\"location\",\"id\":\"T\",\"code\":\"T\",\"name\":\"作業台T\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"N\":{\"type\":\"location\",\"id\":\"N\",\"code\":\"N\",\"name\":\"次工程N\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"O\":{\"type\":\"location\",\"id\":\"O\",\"code\":\"O\",\"name\":\"対象外の棚O\",\"trial\":false,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]}},\"cases\":{\"A-001\":{\"type\":\"case\",\"id\":\"A-001\",\"code\":\"A-001\",\"name\":null,\"source\":null,\"active\":true},\"A-002\":{\"type\":\"case\",\"id\":\"A-002\",\"code\":\"A-002\",\"name\":null,\"source\":null,\"active\":true},\"B-001\":{\"type\":\"case\",\"id\":\"B-001\",\"code\":\"B-001\",\"name\":null,\"source\":null,\"active\":true}},\"actors\":{\"架空担当A\":{\"type\":\"actor\",\"id\":\"架空担当A\",\"active\":true},\"架空担当B\":{\"type\":\"actor\",\"id\":\"架空担当B\",\"active\":true}}}},\"supply\":{\"receiptTemplates\":{},\"needs\":{},\"declarations\":{},\"requests\":{},\"levels\":{},\"acks\":{},\"receipts\":{},\"log\":[]},\"conflictReviews\":[],\"targets\":[\"まとまりX1\"]},{\"ledger\":{\"lots\":{\"P1\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":1,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"W1\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":3,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W2\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":5,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W3\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":9,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W4\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"N\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"W5\":{\"id\":\"W5\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":10,\"lastCount\":{\"value\":1,\"eventId\":\"rw1\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"X1\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":12,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}},\"X2\":{\"id\":\"X2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":13,\"lastCount\":{\"value\":1,\"eventId\":\"e4\"},\"splitFrom\":\"X1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}},\"history\":[{\"eventId\":\"r1\",\"occurredAt\":\"2026-10-27T08:00:00+09:00\",\"recordedAt\":\"2026-10-27T08:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"u1\",\"occurredAt\":\"2026-10-27T09:00:00+09:00\",\"recordedAt\":\"2026-10-27T09:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"use\",\"lotId\":\"P1\",\"basis\":\"counted\",\"value\":2,\"applied\":true,\"inclusion\":null,\"usedFor\":\"W1の着手（工程R組立）\",\"changes\":[{\"before\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"after\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":1,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"s1\",\"occurredAt\":\"2026-10-27T09:00:00+09:00\",\"recordedAt\":\"2026-10-27T09:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"},\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"start\",\"lotId\":\"W1\",\"materials\":[\"u1\"],\"changes\":[{\"before\":null,\"after\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":2,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e1\",\"occurredAt\":\"2026-10-27T10:00:00+09:00\",\"recordedAt\":\"2026-10-27T10:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W1\",\"basis\":\"counted\",\"value\":3,\"applied\":true,\"inclusion\":null,\"childId\":\"W2\",\"to\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":2,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":3,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":4,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e2\",\"occurredAt\":\"2026-10-27T11:00:00+09:00\",\"recordedAt\":\"2026-10-27T11:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W2\",\"basis\":\"counted\",\"value\":2,\"applied\":true,\"inclusion\":null,\"childId\":\"W3\",\"to\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":4,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":5,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":6,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e3\",\"occurredAt\":\"2026-10-27T12:00:00+09:00\",\"recordedAt\":\"2026-10-27T12:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W3\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"W4\",\"to\":{\"kind\":\"none\"},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":6,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":7,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"e3-m\",\"occurredAt\":\"2026-10-27T12:00:00+09:00\",\"recordedAt\":\"2026-10-27T12:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"move\",\"changes\":[{\"before\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"after\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"N\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"rw1\",\"occurredAt\":\"2026-10-27T13:00:00+09:00\",\"recordedAt\":\"2026-10-27T13:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"rework\",\"lotId\":\"W3\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"W5\",\"reason\":\"架空の傷の手直し\",\"changes\":[{\"before\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":7,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":9,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W5\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":10,\"lastCount\":{\"value\":1,\"eventId\":\"rw1\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"r2\",\"occurredAt\":\"2026-10-27T13:00:00+09:00\",\"recordedAt\":\"2026-10-27T13:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":11,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}}]},{\"eventId\":\"e4\",\"occurredAt\":\"2026-10-27T14:00:00+09:00\",\"recordedAt\":\"2026-10-27T14:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"X1\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"X2\",\"to\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":11,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}},\"after\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":12,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}},{\"before\":null,\"after\":{\"id\":\"X2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":13,\"lastCount\":{\"value\":1,\"eventId\":\"e4\"},\"splitFrom\":\"X1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}}]},{\"eventId\":\"stop1\",\"occurredAt\":\"2026-10-27T15:00:00+09:00\",\"recordedAt\":\"2026-10-27T15:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stop\",\"stop\":{\"id\":\"stop1\",\"process\":\"R組立\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"reason\":\"架空の部品不足\",\"shortage\":null,\"affected\":1,\"resumedBy\":null},\"changes\":[]}],\"issues\":{},\"stops\":{\"stop1\":{\"id\":\"stop1\",\"process\":\"R組立\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"reason\":\"架空の部品不足\",\"shortage\":null,\"affected\":1,\"resumedBy\":null}},\"masters\":{\"items\":{\"P\":{\"type\":\"item\",\"id\":\"P\",\"code\":\"P\",\"name\":\"架空部品P\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"Q\":{\"type\":\"item\",\"id\":\"Q\",\"code\":\"Q\",\"name\":\"架空部品Q\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"R\":{\"type\":\"item\",\"id\":\"R\",\"code\":\"R\",\"name\":\"架空半製品R\",\"source\":null,\"units\":[\"台\"],\"unitSteps\":{\"台\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"S\":{\"type\":\"item\",\"id\":\"S\",\"code\":\"S\",\"name\":\"架空共通ネジS\",\"source\":null,\"units\":[\"本\",\"箱\"],\"unitSteps\":{\"本\":1,\"箱\":1},\"trial\":true,\"active\":true,\"packaging\":{\"boxUnit\":\"箱\",\"pieceUnit\":\"本\",\"perBox\":[{\"from\":null,\"value\":1000}]},\"consumable\":{\"pieceUnit\":\"本\",\"rule\":{\"threshold\":3000,\"standardOrder\":{\"value\":1,\"unit\":\"箱\"}}}},\"V\":{\"type\":\"item\",\"id\":\"V\",\"code\":\"V\",\"name\":\"架空共通ワッシャV\",\"source\":null,\"units\":[\"本\"],\"unitSteps\":{\"本\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":{\"pieceUnit\":\"本\",\"rule\":null}},\"X\":{\"type\":\"item\",\"id\":\"X\",\"code\":\"X\",\"name\":\"架空対象外部品X\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":false,\"active\":true,\"packaging\":null,\"consumable\":null}},\"locations\":{\"S1\":{\"type\":\"location\",\"id\":\"S1\",\"code\":\"S1\",\"name\":\"棚S1\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"S2\":{\"type\":\"location\",\"id\":\"S2\",\"code\":\"S2\",\"name\":\"棚S2\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"T\":{\"type\":\"location\",\"id\":\"T\",\"code\":\"T\",\"name\":\"作業台T\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"N\":{\"type\":\"location\",\"id\":\"N\",\"code\":\"N\",\"name\":\"次工程N\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"O\":{\"type\":\"location\",\"id\":\"O\",\"code\":\"O\",\"name\":\"対象外の棚O\",\"trial\":false,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]}},\"cases\":{\"A-001\":{\"type\":\"case\",\"id\":\"A-001\",\"code\":\"A-001\",\"name\":null,\"source\":null,\"active\":true},\"A-002\":{\"type\":\"case\",\"id\":\"A-002\",\"code\":\"A-002\",\"name\":null,\"source\":null,\"active\":true},\"B-001\":{\"type\":\"case\",\"id\":\"B-001\",\"code\":\"B-001\",\"name\":null,\"source\":null,\"active\":true}},\"actors\":{\"架空担当A\":{\"type\":\"actor\",\"id\":\"架空担当A\",\"active\":true},\"架空担当B\":{\"type\":\"actor\",\"id\":\"架空担当B\",\"active\":true}}}},\"supply\":{\"receiptTemplates\":{},\"needs\":{},\"declarations\":{},\"requests\":{},\"levels\":{},\"acks\":{},\"receipts\":{},\"log\":[]},\"conflictReviews\":[],\"targets\":[\"まとまりX1\"]}]},\"quantities\":{\"terms\":[[0,1,\"r1\",\"counted\",10],[1,-1,\"u1\",\"counted\",2],[0,1,\"s1\",\"counted\",3],[3,-1,\"e1\",\"counted\",3],[0,1,\"e1\",\"counted\",3],[5,-1,\"e2\",\"counted\",2],[0,1,\"e2\",\"counted\",2],[7,-1,\"e3\",\"counted\",1],[0,1,\"e3\",\"counted\",1],[8,-1,\"rw1\",\"counted\",1],[0,1,\"rw1\",\"counted\",1],[0,1,\"r2\",\"counted\",2],[12,-1,\"e4\",\"counted\",1],[0,1,\"e4\",\"counted\",1]],\"parts\":[],\"items\":[{\"kind\":\"known\",\"numeric\":{\"value\":10,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":1},{\"kind\":\"known\",\"numeric\":{\"value\":8,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":2},{\"kind\":\"known\",\"numeric\":{\"value\":3,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":3},{\"kind\":\"known\",\"numeric\":{\"value\":0,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":4},{\"kind\":\"known\",\"numeric\":{\"value\":3,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":5},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":6},{\"kind\":\"known\",\"numeric\":{\"value\":2,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":7},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":8},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":9},{\"kind\":\"known\",\"numeric\":{\"value\":0,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":10},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":11},{\"kind\":\"known\",\"numeric\":{\"value\":2,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":12},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":13},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":14}]}}"
+    ],
+    [
+      "fuzzy-stock/slot-A",
+      "{\"format\":\"fuzzy-stock-f0\",\"version\":11,\"revision\":2,\"lastWriter\":\"op90\",\"opFloor\":91,\"ledger\":{\"lots\":{\"P1\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":1,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"W1\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":3,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W2\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":5,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W3\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":9,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W4\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"N\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"W5\":{\"id\":\"W5\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":10,\"lastCount\":{\"value\":1,\"eventId\":\"rw1\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"X1\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":12,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}},\"X2\":{\"id\":\"X2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":13,\"lastCount\":{\"value\":1,\"eventId\":\"e4\"},\"splitFrom\":\"X1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}},\"history\":[{\"eventId\":\"r1\",\"occurredAt\":\"2026-10-27T08:00:00+09:00\",\"recordedAt\":\"2026-10-27T08:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"u1\",\"occurredAt\":\"2026-10-27T09:00:00+09:00\",\"recordedAt\":\"2026-10-27T09:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"use\",\"lotId\":\"P1\",\"basis\":\"counted\",\"value\":2,\"applied\":true,\"inclusion\":null,\"usedFor\":\"W1の着手（工程R組立）\",\"changes\":[{\"before\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"after\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":1,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"s1\",\"occurredAt\":\"2026-10-27T09:00:00+09:00\",\"recordedAt\":\"2026-10-27T09:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"},\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"start\",\"lotId\":\"W1\",\"materials\":[\"u1\"],\"changes\":[{\"before\":null,\"after\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":2,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e1\",\"occurredAt\":\"2026-10-27T10:00:00+09:00\",\"recordedAt\":\"2026-10-27T10:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W1\",\"basis\":\"counted\",\"value\":3,\"applied\":true,\"inclusion\":null,\"childId\":\"W2\",\"to\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":2,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":3,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":4,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e2\",\"occurredAt\":\"2026-10-27T11:00:00+09:00\",\"recordedAt\":\"2026-10-27T11:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W2\",\"basis\":\"counted\",\"value\":2,\"applied\":true,\"inclusion\":null,\"childId\":\"W3\",\"to\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":4,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":5,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":6,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e3\",\"occurredAt\":\"2026-10-27T12:00:00+09:00\",\"recordedAt\":\"2026-10-27T12:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W3\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"W4\",\"to\":{\"kind\":\"none\"},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":6,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":7,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"e3-m\",\"occurredAt\":\"2026-10-27T12:00:00+09:00\",\"recordedAt\":\"2026-10-27T12:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"move\",\"changes\":[{\"before\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"after\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"N\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"rw1\",\"occurredAt\":\"2026-10-27T13:00:00+09:00\",\"recordedAt\":\"2026-10-27T13:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"rework\",\"lotId\":\"W3\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"W5\",\"reason\":\"架空の傷の手直し\",\"changes\":[{\"before\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":7,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":9,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W5\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":10,\"lastCount\":{\"value\":1,\"eventId\":\"rw1\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"r2\",\"occurredAt\":\"2026-10-27T13:00:00+09:00\",\"recordedAt\":\"2026-10-27T13:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":11,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}}]},{\"eventId\":\"e4\",\"occurredAt\":\"2026-10-27T14:00:00+09:00\",\"recordedAt\":\"2026-10-27T14:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"X1\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"X2\",\"to\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":11,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}},\"after\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":12,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}},{\"before\":null,\"after\":{\"id\":\"X2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":13,\"lastCount\":{\"value\":1,\"eventId\":\"e4\"},\"splitFrom\":\"X1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}}]},{\"eventId\":\"stop1\",\"occurredAt\":\"2026-10-27T15:00:00+09:00\",\"recordedAt\":\"2026-10-27T15:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stop\",\"stop\":{\"id\":\"stop1\",\"process\":\"R組立\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"reason\":\"架空の部品不足\",\"shortage\":null,\"affected\":1,\"resumedBy\":null},\"changes\":[]}],\"issues\":{},\"stops\":{\"stop1\":{\"id\":\"stop1\",\"process\":\"R組立\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"reason\":\"架空の部品不足\",\"shortage\":null,\"affected\":1,\"resumedBy\":null}},\"masters\":{\"items\":{\"P\":{\"type\":\"item\",\"id\":\"P\",\"code\":\"P\",\"name\":\"架空部品P\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"Q\":{\"type\":\"item\",\"id\":\"Q\",\"code\":\"Q\",\"name\":\"架空部品Q\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"R\":{\"type\":\"item\",\"id\":\"R\",\"code\":\"R\",\"name\":\"架空半製品R\",\"source\":null,\"units\":[\"台\"],\"unitSteps\":{\"台\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"S\":{\"type\":\"item\",\"id\":\"S\",\"code\":\"S\",\"name\":\"架空共通ネジS\",\"source\":null,\"units\":[\"本\",\"箱\"],\"unitSteps\":{\"本\":1,\"箱\":1},\"trial\":true,\"active\":true,\"packaging\":{\"boxUnit\":\"箱\",\"pieceUnit\":\"本\",\"perBox\":[{\"from\":null,\"value\":1000}]},\"consumable\":{\"pieceUnit\":\"本\",\"rule\":{\"threshold\":3000,\"standardOrder\":{\"value\":1,\"unit\":\"箱\"}}}},\"V\":{\"type\":\"item\",\"id\":\"V\",\"code\":\"V\",\"name\":\"架空共通ワッシャV\",\"source\":null,\"units\":[\"本\"],\"unitSteps\":{\"本\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":{\"pieceUnit\":\"本\",\"rule\":null}},\"X\":{\"type\":\"item\",\"id\":\"X\",\"code\":\"X\",\"name\":\"架空対象外部品X\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":false,\"active\":true,\"packaging\":null,\"consumable\":null}},\"locations\":{\"S1\":{\"type\":\"location\",\"id\":\"S1\",\"code\":\"S1\",\"name\":\"棚S1\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"S2\":{\"type\":\"location\",\"id\":\"S2\",\"code\":\"S2\",\"name\":\"棚S2\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"T\":{\"type\":\"location\",\"id\":\"T\",\"code\":\"T\",\"name\":\"作業台T\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"N\":{\"type\":\"location\",\"id\":\"N\",\"code\":\"N\",\"name\":\"次工程N\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"O\":{\"type\":\"location\",\"id\":\"O\",\"code\":\"O\",\"name\":\"対象外の棚O\",\"trial\":false,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]}},\"cases\":{\"A-001\":{\"type\":\"case\",\"id\":\"A-001\",\"code\":\"A-001\",\"name\":null,\"source\":null,\"active\":true},\"A-002\":{\"type\":\"case\",\"id\":\"A-002\",\"code\":\"A-002\",\"name\":null,\"source\":null,\"active\":true},\"B-001\":{\"type\":\"case\",\"id\":\"B-001\",\"code\":\"B-001\",\"name\":null,\"source\":null,\"active\":true}},\"actors\":{\"架空担当A\":{\"type\":\"actor\",\"id\":\"架空担当A\",\"active\":true},\"架空担当B\":{\"type\":\"actor\",\"id\":\"架空担当B\",\"active\":true}}}},\"supply\":{\"receiptTemplates\":{},\"needs\":{},\"declarations\":{},\"requests\":{},\"levels\":{},\"acks\":{},\"receipts\":{},\"log\":[]},\"ops\":{\"op90\":{\"fingerprint\":\"架空の原文\",\"units\":[[\"e4\"],[\"stop1\"]]}},\"saveChecks\":[],\"conflictReviews\":[],\"quantities\":{\"terms\":[[0,1,\"r1\",\"counted\",10],[1,-1,\"u1\",\"counted\",2],[0,1,\"s1\",\"counted\",3],[3,-1,\"e1\",\"counted\",3],[0,1,\"e1\",\"counted\",3],[5,-1,\"e2\",\"counted\",2],[0,1,\"e2\",\"counted\",2],[7,-1,\"e3\",\"counted\",1],[0,1,\"e3\",\"counted\",1],[8,-1,\"rw1\",\"counted\",1],[0,1,\"rw1\",\"counted\",1],[0,1,\"r2\",\"counted\",2],[12,-1,\"e4\",\"counted\",1],[0,1,\"e4\",\"counted\",1]],\"parts\":[],\"items\":[{\"kind\":\"known\",\"numeric\":{\"value\":10,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":1},{\"kind\":\"known\",\"numeric\":{\"value\":8,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":2},{\"kind\":\"known\",\"numeric\":{\"value\":3,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":3},{\"kind\":\"known\",\"numeric\":{\"value\":0,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":4},{\"kind\":\"known\",\"numeric\":{\"value\":3,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":5},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":6},{\"kind\":\"known\",\"numeric\":{\"value\":2,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":7},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":8},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":9},{\"kind\":\"known\",\"numeric\":{\"value\":0,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":10},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":11},{\"kind\":\"known\",\"numeric\":{\"value\":2,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":12},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":13},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":14}]}}"
+    ],
+    [
+      "fuzzy-stock/slot-B",
+      "{\"format\":\"fuzzy-stock-f0\",\"version\":11,\"revision\":1,\"lastWriter\":\"op90\",\"opFloor\":91,\"ledger\":{\"lots\":{\"P1\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":1,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"W1\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":3,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W2\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":5,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W3\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":9,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"W4\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"N\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"W5\":{\"id\":\"W5\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":10,\"lastCount\":{\"value\":1,\"eventId\":\"rw1\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"X1\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":12,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}},\"X2\":{\"id\":\"X2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":13,\"lastCount\":{\"value\":1,\"eventId\":\"e4\"},\"splitFrom\":\"X1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}},\"history\":[{\"eventId\":\"r1\",\"occurredAt\":\"2026-10-27T08:00:00+09:00\",\"recordedAt\":\"2026-10-27T08:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"u1\",\"occurredAt\":\"2026-10-27T09:00:00+09:00\",\"recordedAt\":\"2026-10-27T09:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"use\",\"lotId\":\"P1\",\"basis\":\"counted\",\"value\":2,\"applied\":true,\"inclusion\":null,\"usedFor\":\"W1の着手（工程R組立）\",\"changes\":[{\"before\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"after\":{\"id\":\"P1\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":1,\"lastCount\":{\"value\":10,\"eventId\":\"r1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"s1\",\"occurredAt\":\"2026-10-27T09:00:00+09:00\",\"recordedAt\":\"2026-10-27T09:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"},\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"start\",\"lotId\":\"W1\",\"materials\":[\"u1\"],\"changes\":[{\"before\":null,\"after\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":2,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e1\",\"occurredAt\":\"2026-10-27T10:00:00+09:00\",\"recordedAt\":\"2026-10-27T10:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W1\",\"basis\":\"counted\",\"value\":3,\"applied\":true,\"inclusion\":null,\"childId\":\"W2\",\"to\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":2,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":3,\"lastCount\":{\"value\":3,\"eventId\":\"s1\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":4,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e2\",\"occurredAt\":\"2026-10-27T11:00:00+09:00\",\"recordedAt\":\"2026-10-27T11:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W2\",\"basis\":\"counted\",\"value\":2,\"applied\":true,\"inclusion\":null,\"childId\":\"W3\",\"to\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":4,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":5,\"lastCount\":{\"value\":3,\"eventId\":\"e1\"},\"splitFrom\":\"W1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"inspecting\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":6,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"e3\",\"occurredAt\":\"2026-10-27T12:00:00+09:00\",\"recordedAt\":\"2026-10-27T12:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"W3\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"W4\",\"to\":{\"kind\":\"none\"},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":6,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":7,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"e3-m\",\"occurredAt\":\"2026-10-27T12:00:00+09:00\",\"recordedAt\":\"2026-10-27T12:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"move\",\"changes\":[{\"before\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}},\"after\":{\"id\":\"W4\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"N\",\"quantity\":8,\"lastCount\":{\"value\":1,\"eventId\":\"e3\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]},{\"eventId\":\"rw1\",\"occurredAt\":\"2026-10-27T13:00:00+09:00\",\"recordedAt\":\"2026-10-27T13:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"rework\",\"lotId\":\"W3\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"W5\",\"reason\":\"架空の傷の手直し\",\"changes\":[{\"before\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":7,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}},\"after\":{\"id\":\"W3\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":9,\"lastCount\":{\"value\":2,\"eventId\":\"e2\"},\"splitFrom\":\"W2\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}},{\"before\":null,\"after\":{\"id\":\"W5\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":10,\"lastCount\":{\"value\":1,\"eventId\":\"rw1\"},\"splitFrom\":\"W3\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"R組立\",\"criterion\":\"inspection\"}}}}]},{\"eventId\":\"r2\",\"occurredAt\":\"2026-10-27T13:00:00+09:00\",\"recordedAt\":\"2026-10-27T13:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":11,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}}]},{\"eventId\":\"e4\",\"occurredAt\":\"2026-10-27T14:00:00+09:00\",\"recordedAt\":\"2026-10-27T14:00:00+09:00\",\"actor\":\"架空担当A\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"stage\",\"lotId\":\"X1\",\"basis\":\"counted\",\"value\":1,\"applied\":true,\"inclusion\":null,\"childId\":\"X2\",\"to\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}},\"correction\":false,\"changes\":[{\"before\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":11,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}},\"after\":{\"id\":\"X1\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":12,\"lastCount\":{\"value\":2,\"eventId\":\"r2\"},\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"working\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}},{\"before\":null,\"after\":{\"id\":\"X2\",\"item\":\"R\",\"unit\":\"台\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"T\",\"quantity\":13,\"lastCount\":{\"value\":1,\"eventId\":\"e4\"},\"splitFrom\":\"X1\",\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"awaitingHandover\",\"process\":{\"id\":\"架空塗装\",\"criterion\":\"workEnd\"}}}}]}],\"issues\":{},\"stops\":{},\"masters\":{\"items\":{\"P\":{\"type\":\"item\",\"id\":\"P\",\"code\":\"P\",\"name\":\"架空部品P\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"Q\":{\"type\":\"item\",\"id\":\"Q\",\"code\":\"Q\",\"name\":\"架空部品Q\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"R\":{\"type\":\"item\",\"id\":\"R\",\"code\":\"R\",\"name\":\"架空半製品R\",\"source\":null,\"units\":[\"台\"],\"unitSteps\":{\"台\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"S\":{\"type\":\"item\",\"id\":\"S\",\"code\":\"S\",\"name\":\"架空共通ネジS\",\"source\":null,\"units\":[\"本\",\"箱\"],\"unitSteps\":{\"本\":1,\"箱\":1},\"trial\":true,\"active\":true,\"packaging\":{\"boxUnit\":\"箱\",\"pieceUnit\":\"本\",\"perBox\":[{\"from\":null,\"value\":1000}]},\"consumable\":{\"pieceUnit\":\"本\",\"rule\":{\"threshold\":3000,\"standardOrder\":{\"value\":1,\"unit\":\"箱\"}}}},\"V\":{\"type\":\"item\",\"id\":\"V\",\"code\":\"V\",\"name\":\"架空共通ワッシャV\",\"source\":null,\"units\":[\"本\"],\"unitSteps\":{\"本\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":{\"pieceUnit\":\"本\",\"rule\":null}},\"X\":{\"type\":\"item\",\"id\":\"X\",\"code\":\"X\",\"name\":\"架空対象外部品X\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":false,\"active\":true,\"packaging\":null,\"consumable\":null}},\"locations\":{\"S1\":{\"type\":\"location\",\"id\":\"S1\",\"code\":\"S1\",\"name\":\"棚S1\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"S2\":{\"type\":\"location\",\"id\":\"S2\",\"code\":\"S2\",\"name\":\"棚S2\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"T\":{\"type\":\"location\",\"id\":\"T\",\"code\":\"T\",\"name\":\"作業台T\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"N\":{\"type\":\"location\",\"id\":\"N\",\"code\":\"N\",\"name\":\"次工程N\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]},\"O\":{\"type\":\"location\",\"id\":\"O\",\"code\":\"O\",\"name\":\"対象外の棚O\",\"trial\":false,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}]}},\"cases\":{\"A-001\":{\"type\":\"case\",\"id\":\"A-001\",\"code\":\"A-001\",\"name\":null,\"source\":null,\"active\":true},\"A-002\":{\"type\":\"case\",\"id\":\"A-002\",\"code\":\"A-002\",\"name\":null,\"source\":null,\"active\":true},\"B-001\":{\"type\":\"case\",\"id\":\"B-001\",\"code\":\"B-001\",\"name\":null,\"source\":null,\"active\":true}},\"actors\":{\"架空担当A\":{\"type\":\"actor\",\"id\":\"架空担当A\",\"active\":true},\"架空担当B\":{\"type\":\"actor\",\"id\":\"架空担当B\",\"active\":true}}}},\"supply\":{\"receiptTemplates\":{},\"needs\":{},\"declarations\":{},\"requests\":{},\"levels\":{},\"acks\":{},\"receipts\":{},\"log\":[]},\"ops\":{\"op90\":{\"fingerprint\":\"架空の原文\",\"units\":[[\"e4\"]]}},\"saveChecks\":[],\"conflictReviews\":[],\"quantities\":{\"terms\":[[0,1,\"r1\",\"counted\",10],[1,-1,\"u1\",\"counted\",2],[0,1,\"s1\",\"counted\",3],[3,-1,\"e1\",\"counted\",3],[0,1,\"e1\",\"counted\",3],[5,-1,\"e2\",\"counted\",2],[0,1,\"e2\",\"counted\",2],[7,-1,\"e3\",\"counted\",1],[0,1,\"e3\",\"counted\",1],[8,-1,\"rw1\",\"counted\",1],[0,1,\"rw1\",\"counted\",1],[0,1,\"r2\",\"counted\",2],[12,-1,\"e4\",\"counted\",1],[0,1,\"e4\",\"counted\",1]],\"parts\":[],\"items\":[{\"kind\":\"known\",\"numeric\":{\"value\":10,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":1},{\"kind\":\"known\",\"numeric\":{\"value\":8,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":2},{\"kind\":\"known\",\"numeric\":{\"value\":3,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":3},{\"kind\":\"known\",\"numeric\":{\"value\":0,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":4},{\"kind\":\"known\",\"numeric\":{\"value\":3,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":5},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":6},{\"kind\":\"known\",\"numeric\":{\"value\":2,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":7},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":8},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":9},{\"kind\":\"known\",\"numeric\":{\"value\":0,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":10},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":11},{\"kind\":\"known\",\"numeric\":{\"value\":2,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":12},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":true,\"terms\":13},{\"kind\":\"known\",\"numeric\":{\"value\":1,\"approximate\":false,\"unconfirmed\":\"none\"},\"computed\":false,\"terms\":14}]}}"
+    ]
+  ],
+  "expected": {
+    "saved": {
+      "production": {
+        "R組立": {
+          "working": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "s1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "rw1",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "inspecting": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "inProcess": {
+            "kind": "known",
+            "numeric": {
+              "value": 2,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "s1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "rw1",
+                  "basis": "counted",
+                  "value": 1
+                }
+              },
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "awaitingHandover": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e3",
+                  "basis": "counted",
+                  "value": 1
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "rw1",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "completed": {
+            "kind": "known",
+            "numeric": {
+              "value": 2,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "reworkStarted": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "rw1",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "returned": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          },
+          "handedOver": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e3",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        },
+        "架空塗装": {
+          "working": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "r2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e4",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "inspecting": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          },
+          "inProcess": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "r2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e4",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "awaitingHandover": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e4",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "completed": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e4",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "reworkStarted": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          },
+          "returned": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          },
+          "handedOver": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          }
+        }
+      },
+      "history": [
+        [
+          "r1",
+          "登録：P1（品目P「架空部品P」、案件・用途A-001、S1）10個・数えた"
+        ],
+        [
+          "u1",
+          "使用：P1から2個（数えた）、使用先 W1の着手（工程R組立）／品目P「架空部品P」"
+        ],
+        [
+          "s1",
+          "作業の開始：W1（品目R「架空半製品R」、案件・用途A-001、T、工程R組立・作業中）3台・数えた、材料の使用記録 u1／品目P「架空部品P」"
+        ],
+        [
+          "e1",
+          "作業終了：W1から3台（数えた）、W2へ（工程R組立・作業中 → 工程R組立・確認待ち）／品目R「架空半製品R」"
+        ],
+        [
+          "e2",
+          "確認の完了：W2から2台（数えた）、W3へ（工程R組立・確認待ち → 工程R組立・完成（渡す前））／品目R「架空半製品R」"
+        ],
+        [
+          "e3",
+          "次の作業へ渡す：W3から1台（数えた）、W4へ（工程R組立・完成（渡す前） → 作業なし）／品目R「架空半製品R」"
+        ],
+        [
+          "e3-m",
+          "移動：W4（T→N）／品目R「架空半製品R」"
+        ],
+        [
+          "rw1",
+          "やり直し・修理開始（同じ現物）：W3からW5へ1台（数えた）、理由「架空の傷の手直し」／品目R「架空半製品R」"
+        ],
+        [
+          "r2",
+          "登録：X1（品目R「架空半製品R」、案件・用途A-001、T）2台・数えた"
+        ],
+        [
+          "e4",
+          "作業終了：X1から1台（数えた）、X2へ（工程架空塗装・作業中 → 工程架空塗装・完成（渡す前））／品目R「架空半製品R」"
+        ]
+      ],
+      "stages": {
+        "P1": "なし",
+        "W1": "工程R組立・作業中",
+        "W2": "工程R組立・確認待ち",
+        "W3": "工程R組立・完成（渡す前）",
+        "W4": "なし",
+        "W5": "工程R組立・作業中",
+        "X1": "工程架空塗装・作業中",
+        "X2": "工程架空塗装・完成（渡す前）"
+      }
+    },
+    "retried": {
+      "production": {
+        "R組立": {
+          "working": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "s1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "rw1",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "inspecting": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "inProcess": {
+            "kind": "known",
+            "numeric": {
+              "value": 2,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "s1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "rw1",
+                  "basis": "counted",
+                  "value": 1
+                }
+              },
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e1",
+                  "basis": "counted",
+                  "value": 3
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "awaitingHandover": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e3",
+                  "basis": "counted",
+                  "value": 1
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "rw1",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "completed": {
+            "kind": "known",
+            "numeric": {
+              "value": 2,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "reworkStarted": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "rw1",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "returned": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          },
+          "handedOver": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e3",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        },
+        "架空塗装": {
+          "working": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "r2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e4",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "inspecting": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          },
+          "inProcess": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "r2",
+                  "basis": "counted",
+                  "value": 2
+                }
+              },
+              {
+                "sign": -1,
+                "observation": {
+                  "id": "e4",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "awaitingHandover": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e4",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "completed": {
+            "kind": "known",
+            "numeric": {
+              "value": 1,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": false,
+            "terms": [
+              {
+                "sign": 1,
+                "observation": {
+                  "id": "e4",
+                  "basis": "counted",
+                  "value": 1
+                }
+              }
+            ]
+          },
+          "reworkStarted": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          },
+          "returned": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          },
+          "handedOver": {
+            "kind": "known",
+            "numeric": {
+              "value": 0,
+              "approximate": false,
+              "unconfirmed": "none"
+            },
+            "computed": true,
+            "terms": []
+          }
+        }
+      },
+      "history": [
+        [
+          "r1",
+          "登録：P1（品目P「架空部品P」、案件・用途A-001、S1）10個・数えた"
+        ],
+        [
+          "u1",
+          "使用：P1から2個（数えた）、使用先 W1の着手（工程R組立）／品目P「架空部品P」"
+        ],
+        [
+          "s1",
+          "作業の開始：W1（品目R「架空半製品R」、案件・用途A-001、T、工程R組立・作業中）3台・数えた、材料の使用記録 u1／品目P「架空部品P」"
+        ],
+        [
+          "e1",
+          "作業終了：W1から3台（数えた）、W2へ（工程R組立・作業中 → 工程R組立・確認待ち）／品目R「架空半製品R」"
+        ],
+        [
+          "e2",
+          "確認の完了：W2から2台（数えた）、W3へ（工程R組立・確認待ち → 工程R組立・完成（渡す前））／品目R「架空半製品R」"
+        ],
+        [
+          "e3",
+          "次の作業へ渡す：W3から1台（数えた）、W4へ（工程R組立・完成（渡す前） → 作業なし）／品目R「架空半製品R」"
+        ],
+        [
+          "e3-m",
+          "移動：W4（T→N）／品目R「架空半製品R」"
+        ],
+        [
+          "rw1",
+          "やり直し・修理開始（同じ現物）：W3からW5へ1台（数えた）、理由「架空の傷の手直し」／品目R「架空半製品R」"
+        ],
+        [
+          "r2",
+          "登録：X1（品目R「架空半製品R」、案件・用途A-001、T）2台・数えた"
+        ],
+        [
+          "e4",
+          "作業終了：X1から1台（数えた）、X2へ（工程架空塗装・作業中 → 工程架空塗装・完成（渡す前））／品目R「架空半製品R」"
+        ],
+        [
+          "stop1",
+          "作業の中断：stop1 工程R組立・品目R「架空半製品R」（台）・案件・用途A-001、理由「架空の部品不足」、影響1台"
+        ]
+      ],
+      "stages": {
+        "P1": "なし",
+        "W1": "工程R組立・作業中",
+        "W2": "工程R組立・確認待ち",
+        "W3": "工程R組立・完成（渡す前）",
+        "W4": "なし",
+        "W5": "工程R組立・作業中",
+        "X1": "工程架空塗装・作業中",
+        "X2": "工程架空塗装・完成（渡す前）"
+      }
+    }
+  }
+}

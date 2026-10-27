@@ -3,7 +3,7 @@ import { fixedMasters } from '../../src/domain/masters.ts';
 import { changeStage, declareDiscrepancy, holdReasons, isUsable, openIssuesOf, start, totalOf, type Ledger, type Lot } from '../../src/domain/ledger.ts';
 import { holdLabel, quantityText, totalsOf, totalsText } from '../../src/ui/format.ts';
 import { seedLedger } from '../../src/ui/seed.ts';
-import { processes } from '../../src/domain/ledger.ts';
+const processes = [{ id: 'R組立', criterion: 'inspection' }] as const;
 import { meta } from './record-fixture.ts';
 
 // 移す前の画面（main.tsのrenderTotals）の計算そのまま。移したあとも同じ文言になることを守る。
