@@ -273,7 +273,8 @@ export function consumableLinesText(ledger: Ledger, cfg: StockItem, lots: readon
   const conversion = !packaging || !first ? ''
     : later.length === 0 ? `。${boxUnit}は1${boxUnit}あたり${first.value}${pieceUnit}の表示で換算（現物を数えた値ではない）`
     : `。${boxUnit}は受け取りのときの1${boxUnit}あたりの表示で換算（${first.value === null ? '設定前の入り数は不明' : `1${boxUnit}あたり${first.value}${pieceUnit}`}、${later.map((p) => `${jst(p.from)}以後の受け取りは${p.value}${pieceUnit}`).join('、')}。現物を数えた値ではない）`;
-  const subtotal = stock.unconverted.length > 0 && stock.pieces !== null && numericPart(stock.pieces) !== null;
+  // 残量区分だけの分も個数には含まれないため、分かる分の数を全体の合計と表示しない。
+  const subtotal = (stock.unconverted.length > 0 || stock.levelOnly.length > 0) && stock.pieces !== null && numericPart(stock.pieces) !== null;
   lines.push(`${subtotal ? '数量の数値部分の小計' : '数量合計'}（${pieceUnit}） ${pieces}${conversion}`);
   const precisionIds = new Set([...stock.precisionLimited, ...stock.stepMismatched].map((l) => l.id));
   const unconverted = stock.unconverted.filter((l) => !precisionIds.has(l.id));
