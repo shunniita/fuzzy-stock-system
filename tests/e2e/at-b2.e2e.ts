@@ -106,7 +106,8 @@ test('AT-20: ネジ未開封2箱と、残量が少ない開封箱を記録し、
   await expect(s).toContainText('未開封の箱：S-BOX 2箱・数えた');
   await expect(s).toContainText('箱は1箱あたり1000本の表示で換算（現物を数えた値ではない）');
   await expect(s).toContainText('残量区分のみ（数量へは換算しない）：S-OPEN 少ない');
-  await expect(s).toContainText('数量合計（本） 2000本・表示の数（ラベル・パッケージ）・中身未確認');
+  await expect(s).toContainText('数量の数値部分の小計（本） 2000本・表示の数（ラベル・パッケージ）・中身未確認');
+  await expect(s).not.toContainText('数量合計（本）');
   await expect(s).toContainText('既存の依頼 op4：1箱');
 });
 
