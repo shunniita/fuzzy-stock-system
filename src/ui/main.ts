@@ -49,6 +49,7 @@ import {
   type HoldReason,
   type Inclusion,
   type Ledger,
+  type Issue,
   type LedgerEvent,
   type Lot,
   type Meta,
@@ -93,7 +94,10 @@ import { emptySupply } from '../domain/supply.ts';
 import { requireQuantityTotals } from '../domain/shortage.ts';
 import { processOptions, stopProcessOptions, amount, amountFields, countOrUnknown, MaterialInclusionRequired, formValue, precisionHints, quantityStepFor, quantityTargetOf, quantityValue, basisOptions, codeTarget, itemFields, itemOptions, lotOptions as lotChoices, placeOptions as placeChoices, projectField, projectKey, projectOf, registerFromValues, restrictPlaces } from './fields.ts';
 import { codeInput, type CodeHolds, type CodeInput } from './code-input.ts';
-import { recountWithReceiptChoice, renderConsumables, renderSupply, supplyAsOf, supplyOps, type Ctx, type UiOp } from './supply-ui.ts';
+import { recountWithReceiptChoice, renderConsumables, renderSupply, supplyAsOf, supplyOps, type Ctx, type UiOp, type UiSubject } from './supply-ui.ts';
+import { fixSubject, otherOperations, type OperationTarget } from './subject-actions.ts';
+import { nextLotId, readMode, simpleOps, writeMode, type Mode } from './mode.ts';
+import { opNotes } from './op-notes.ts';
 import { seedLedger, seedScn02 } from './seed.ts';
 import { browserStore, fingerprintOf, initial, nextOpIdOf, sameSnapshot, targetsOf, unknownSinceOf, type CommitResult, type Pending, type RecordContents, type SettleResult, type Snapshot, type UnitState } from './storage.ts';
 import { backupFileName, recordCountsOf, viewFileName } from './backup.ts';
@@ -111,15 +115,20 @@ import { caseDetailPanel } from './caseview.ts';
 import { lotEvidencePanel } from './lot-evidence.ts';
 import { needImportOps } from './need-import-ui.ts';
 import { receiptTemplateOps } from './receipt-template-ui.ts';
+import { setsPanel, type SetSelection } from './setview.ts';
+import { templateNeedsOps } from './template-needs-ui.ts';
+import { requireTemplateNeedCaptureCapacity } from './template-needs-capacity.ts';
 import { recipeStartOps } from './recipe-start-ui.ts';
 import { followupPanel } from './followupview.ts';
-import { candidatesText, masterOps, mastersPanel, supplyRefsText } from './master-ui.ts';
+import { candidatesText, masterOf, masterOps, mastersPanel, supplyRefsText } from './master-ui.ts';
 import { returnIntakeOps } from './return-intake-ui.ts';
 
 const rootNode = document.getElementById('app');
 if (rootNode === null) throw new Error('画面のルートがありません');
 const appRoot = rootNode;
 const navigation = navigationOf(appRoot);
+let mode: Mode = readMode();
+appRoot.dataset['mode'] = mode;
 
 let snapshot = initial(emptyLedger, emptySupply);
 // 描画は一つの写しから取り出した台帳と供給を使う。更新はuseSnapshotだけで同時に行う。
@@ -141,6 +150,12 @@ let restoreSelection = 0;
 let resetFailure: string | null = null;
 let selectedProject = '';
 let selectedMaster = '';
+let selectedRequest = '';
+let selectedEvent = '';
+let selectedIssue = '';
+let selectionEpoch = 0;
+let masterQuery = '';
+let selectedSet: SetSelection = { product: '', template: '' };
 
 function useSnapshot(next: Snapshot): void {
   snapshot = next;
@@ -149,6 +164,7 @@ function useSnapshot(next: Snapshot): void {
 }
 let selectedLot: string | null = null;
 let currentOp = 'register';
+let currentTarget: OperationTarget | undefined;
 const filter = { item: '', project: '', location: '' };
 
 
@@ -170,7 +186,11 @@ function enteredTime(form: HTMLFormElement): string {
 const activeLots = (): Lot[] => Object.values(ledger.lots).filter((l) => l.mergedInto === null);
 
 const lotOptions = (where?: (lot: Lot) => boolean) => lotChoices(ledger, where);
-const lotField = (name = 'lot', label = '対象の保管単位', where?: (lot: Lot) => boolean) => codeTarget(choiceField(name, label, lotOptions(where)), 'lot', { quantity: 'value', basis: 'basis' });
+const lotSubject = (where: (lot: Lot) => boolean = () => true): Extract<UiSubject, { kind: 'lot' }> => ({ kind: 'lot', field: 'lot', accepts: lot => lot.mergedInto === null && where(lot) });
+const anyLotSubject = lotSubject();
+const caseLotSubject = lotSubject(lot => lot.project.kind === 'case');
+const completedLotSubject = lotSubject(lot => lot.stage.kind === 'awaitingHandover');
+const lotField = (name = 'lot', label = '対象の保管単位', subject = anyLotSubject) => codeTarget(choiceField(name, label, lotOptions(subject.accepts)), 'lot', { quantity: 'value', basis: 'basis' });
 const placeOptions = () => placeChoices(ledger.masters);
 const locationField = (label = '場所') => codeTarget(choiceField('location', label, placeOptions()), 'location', { hold: 'location' });
 const holdField = () => choiceField('reason', '理由', holdReasons.map((r) => [r, holdLabel[r]]));
@@ -226,6 +246,9 @@ function nextProcessFields(): HTMLElement[] {
 // 作業の開始と材料の使用を一つの入力で記録する。材料の行は使うものだけ選ぶ。
 const materialRows = [1, 2, 3] as const;
 
+const voidableSubject = { kind: 'event', field: 'target', accepts: (e: LedgerEvent) => (e.kind === 'use' || e.kind === 'handover') && !voidOf(ledger, e.eventId) } as const;
+const correctableSubject = { kind: 'event', field: 'target', accepts: (e: LedgerEvent) => e.kind !== 'correctTime' } as const;
+
 function historyChoices(events: readonly LedgerEvent[], withTime = false): [string, string][] {
   const targets = createHistoryTargetCollector({ ledger, supply });
   return events.map(e => [e.eventId, `${e.eventId}：${withTime ? `${jst(occurredAtOf(ledger, e.eventId))}：` : ''}${eventText(ledger, e, targets)}`]);
@@ -242,10 +265,12 @@ function materialFields(): HTMLElement[] {
 
 // 作業終了・確認の完了・次工程への引渡しは、完了基準に従った次の位置へ一部の数量を移す。
 function stageStep(label: string, from: Stage['kind'], toNextProcess = false): Op {
+  const subject = lotSubject(lot => lot.stage.kind === from);
   return {
     label,
+    subject,
     fields: () => [
-      lotField('lot', `対象の保管単位（${stageLabel[from]}）`, (l) => l.stage.kind === from),
+      lotField('lot', `対象の保管単位（${stageLabel[from]}）`, subject),
       textField('childId', '移した分の新しいID'),
       ...amountFields(),
       ...(toNextProcess ? nextProcessFields() : []),
@@ -298,13 +323,14 @@ function cause(v: Values) {
 
 type Op = {
   label: string;
+  subject?: UiSubject;
   fields: () => HTMLElement[];
   run: (l: Ledger, m: Meta, v: Values, inclusion: Inclusion | undefined) => Ledger;
 };
 
 const ops = {
   register: {
-    label: '登録（開始時点の現物・既にある物。依頼への受け取りは「受け取り」を使う）',
+    label: '現物の登録',
     fields: () => [
       textField('newId', '新しい保管単位のID（文字列のまま保存）'),
       ...itemFields(ledger.masters),
@@ -317,7 +343,7 @@ const ops = {
     run: (l, m, v) => registerFromValues(l, m, v),
   },
   start: {
-    label: '作業の開始（材料の使用とまとめて記録）',
+    label: '作業の開始',
     fields: () => [
       ...processFields(),
       textField('newId', '作業中の保管単位の新しいID'),
@@ -360,10 +386,11 @@ const ops = {
   },
   finish: stageStep('作業終了', 'working'),
   reworkBegin: {
-    label: 'やり直し・修理を開始（同じ現物を工程へ戻す）',
+    label: 'やり直し・修理を開始',
+    subject: completedLotSubject,
     fields: () => [
       h('p', {}, '手元の完成（渡す前）で、元の現物と数量が分かる分を同じ工程へ戻す。作業をしていない返ってきた物は仮の記録の新規割当後に「返ってきた物のやり直し・修理を開始」を使う。専用の取消は未実装。'),
-      lotField('lot', 'やり直し・修理元の保管単位', lot => lot.stage.kind === 'awaitingHandover'),
+      lotField('lot', 'やり直し・修理元の保管単位', completedLotSubject),
       textField('childId', 'やり直し・修理分の新しいID'), ...amountFields(), textField('reason', 'やり直し・修理の理由'),
     ],
     run: (l, m, v, inc) => {
@@ -390,6 +417,7 @@ const ops = {
   toNext: stageStep('次の作業へ渡す', 'awaitingHandover', true),
   stageFix: {
     label: '作業の状態の訂正',
+    subject: anyLotSubject,
     fields: () => [
       lotField(),
       textField('childId', '位置を変える分の新しいID'),
@@ -432,17 +460,18 @@ const ops = {
     run: (l, m, v) => updateStop(l, m, v.text('stop'), countOrUnknown(v, 'affected', '影響数')),
   },
   resume: {
-    label: '作業の再開（材料の受け取りとは別に記録）',
+    label: '作業の再開',
     fields: () => [openStopField()],
     run: (l, m, v) => resumeWork(l, m, v.text('stop')),
   },
   void: {
-    label: '間違えた記録の取り消し（使用・引渡し）',
+    label: '間違えた記録の取り消し',
+    subject: voidableSubject,
     fields: () => [
       choiceField(
         'target',
         '取り消す操作',
-        historyChoices(ledger.history.filter((e) => (e.kind === 'use' || e.kind === 'handover') && !voidOf(ledger, e.eventId))),
+        historyChoices(ledger.history.filter(voidableSubject.accepts)),
       ),
       textField('reason', '取り消す理由'),
     ],
@@ -450,6 +479,7 @@ const ops = {
   },
   use: {
     label: '使用',
+    subject: anyLotSubject,
     fields: () => [lotField(), ...amountFields(), textField('usedFor', '使用先の案件・用途・作業')],
     run: (l, m, v, inc) => {
       const { basis, value } = amount(v);
@@ -457,7 +487,8 @@ const ops = {
     },
   },
   handover: {
-    label: '外へ出す（譲渡・持ち出し）',
+    label: '外へ出す',
+    subject: anyLotSubject,
     fields: () => [lotField(), ...amountFields(), textField('counterpart', '相手先または処置')],
     run: (l, m, v, inc) => {
       const { basis, value } = amount(v);
@@ -465,12 +496,14 @@ const ops = {
     },
   },
   move: {
-    label: '移動（保管単位全部）',
+    label: '移動',
+    subject: anyLotSubject,
     fields: () => [lotField(), locationField('移動先')],
     run: (l, m, v) => move(l, m, v.text('lot'), v.text('location')),
   },
   splitMove: {
     label: '一部を分けて移動',
+    subject: anyLotSubject,
     fields: () => [
       lotField(),
       textField('childId', '分けた分の新しいID'),
@@ -485,7 +518,8 @@ const ops = {
     },
   },
   split: {
-    label: '分割（同じ場所で分ける）',
+    label: '分割',
+    subject: anyLotSubject,
     fields: () => [lotField(), textField('childId', '分けた分の新しいID'), ...amountFields()],
     run: (l, m, v, inc) => {
       const { basis, value } = amount(v);
@@ -493,9 +527,10 @@ const ops = {
     },
   },
   transfer: {
-    label: '案件・用途の付け替え（場所は変えない）',
+    label: '案件・用途の付け替え',
+    subject: caseLotSubject,
     fields: () => [
-      lotField('lot', '元案件・用途の保管単位', l => l.project.kind === 'case'),
+      lotField('lot', '元案件・用途の保管単位', caseLotSubject),
       codeTarget(choiceField('toProject', '先案件・用途', Object.values(ledger.masters.cases).filter(c => c.active).map(c => [c.id, caseRef(ledger.masters, c.id)])), 'project'),
       textField('childId', '振替した分の新しいID'),
       ...amountFields(),
@@ -507,13 +542,15 @@ const ops = {
   },
   merge: {
     label: '統合',
+    subject: anyLotSubject,
     fields: () => [lotField('lot', '統合元'), lotField('target', '統合先')],
     run: (l, m, v) => merge(l, m, v.text('lot'), v.text('target')),
   },
   recount: {
-    label: '数えて確認・訂正（原因不明でもよい）',
+    label: '数えて確認・訂正',
+    subject: anyLotSubject,
     fields: () => [
-      codeTarget(choiceField('lot', '対象の保管単位', lotOptions()), 'lot'),
+      codeTarget(choiceField('lot', '対象の保管単位', lotOptions(anyLotSubject.accepts)), 'lot'),
       textField('value', '保管単位全体を数えた数', 'number'),
       checkField('causeUnknown', '原因不明', true),
       textField('causeText', '原因の記述（原因不明でなければ）'),
@@ -525,22 +562,25 @@ const ops = {
     },
   },
   hold: {
-    label: '取り分ける（不良・使用可否確認待ち・返却待ち・予備）',
+    label: '取り分ける',
+    subject: anyLotSubject,
     fields: () => [lotField(), holdField(), textField('note', 'メモ（任意）')],
     run: (l, m, v) => hold(l, m, v.text('lot'), v.text('reason') as HoldReason, v.text('note') || undefined),
   },
   release: {
     label: '取り分けを戻す',
+    subject: anyLotSubject,
     fields: () => [lotField(), holdField(), textField('note', 'メモ（任意。予備を外すときは交換の理由が必要）')],
     run: (l, m, v) => release(l, m, v.text('lot'), v.text('reason') as HoldReason, v.text('note') || undefined),
   },
   declare: {
-    label: '数の食い違いをメモする（数量は変えない）',
+    label: '数の食い違いをメモする',
+    subject: anyLotSubject,
     fields: () => [lotField(), textField('note', '申告の内容')],
     run: (l, m, v) => declareDiscrepancy(l, m, v.text('lot'), v.text('note')),
   },
   provisional: {
-    label: '仮の記録（適用先の保管単位が分からない）',
+    label: '仮の記録',
     fields: () => [
       choiceField('direction', '内容', [
         ['found', '見つかった'],
@@ -559,11 +599,12 @@ const ops = {
   },
   correctTime: {
     label: '実際の日時の訂正',
+    subject: correctableSubject,
     fields: () => [
       choiceField(
         'target',
         '訂正する操作',
-        historyChoices(ledger.history.filter((e) => e.kind !== 'correctTime'), true),
+        historyChoices(ledger.history.filter(correctableSubject.accepts), true),
       ),
       textField('corrected', '正しい実際の日時（日本時間）', 'datetime-local'),
       checkField('correctedUnknown', '正しい実際の日時も不明'),
@@ -575,6 +616,7 @@ const ops = {
   },
   resolve: {
     label: '確認事項を片付ける',
+    subject: { kind: 'issue', field: 'issue', accepts: (i: Issue) => i.resolution === null },
     fields: () => [
       choiceField('issue', '確認事項', openIssues(ledger).map((i) => [i.id, `${i.id}：${issueLabel[i.reason]}（${i.lotId ?? '対象なし'}）`])),
       choiceField('outcome', '解消の仕方', [
@@ -589,9 +631,7 @@ const ops = {
 } satisfies Record<string, Op>;
 
 const ctx: Ctx = { ledger: () => ledger, supply: () => supply, asOfChanged: () => renderFollowup(), openConsumableSettings: () => {
-  currentOp = Object.keys(ledger.masters.items).length === 0 ? 'masterItem' : 'masterConsumable';
-  message = null; renderInput();
-  document.querySelector<HTMLSelectElement>('#input [name=op]')?.focus();
+  switchOperation(Object.keys(ledger.masters.items).length === 0 ? 'masterItem' : 'masterConsumable');
 } };
 
 // 既存の台帳の操作は、台帳だけを更新する操作として包む。供給の操作は supply-ui が持つ。
@@ -599,12 +639,13 @@ const allOps: Record<string, UiOp> = {
   ...Object.fromEntries(
     Object.entries(ops).map(([key, op]): [string, UiOp] => [
       key,
-      { label: op.label, fields: op.fields, run: (s, m, v, inc) => ({ state: { ...s, ledger: op.run(s.ledger, m, v, inc) } }) },
+      { label: op.label, ...('subject' in op ? { subject: op.subject } : {}), fields: op.fields, run: (s, m, v, inc) => ({ state: { ...s, ledger: op.run(s.ledger, m, v, inc) } }) },
     ]),
   ),
   ...supplyOps(ctx),
   ...needImportOps(ctx),
   ...receiptTemplateOps(ctx),
+  ...templateNeedsOps(ctx, () => nextOpIdOf(snapshot), templateNeedsPreflight),
   ...recipeStartOps(ctx),
   ...masterOps(ctx),
   ...returnIntakeOps(ctx),
@@ -613,6 +654,60 @@ const allOps: Record<string, UiOp> = {
 allOps['recount'] = recountWithReceiptChoice(allOps['recount']!, ctx);
 
 let message: { kind: 'ok' | 'error'; text: string } | null = null;
+
+function switchBlockedReason(): string | null {
+  if (conflict !== null && conflict.kind !== 'resolved') return '未解消の更新競合があるため、操作を切り替えられません。上の更新競合の照合を先に終えてください。';
+  if (pending !== null) return '保存中の入力があるため、操作を切り替えられません。保存の状態で照会・再試行・取りやめを選んでください。';
+  if (stale) return '別の画面で記録が保存されたため、操作を切り替えられません。再読込してください。';
+  if (saveView.kind === 'unreadable') return '保存記録を読み込めないため、操作を切り替えられません。';
+  if (persistenceBusy) return '保存の処理中のため、操作を切り替えられません。終わってからもう一度選んでください。';
+  return null;
+}
+
+// target は undefined で現在の対象を保ち、null で対象の固定を外す。
+function switchOperation(key: string, target?: OperationTarget | null): void {
+  const blocked = switchBlockedReason();
+  if (blocked !== null) {
+    // 入力欄を描き直すと退避中の元入力を消すので、理由だけを足す。
+    document.querySelector('#input [data-switch-blocked]')?.remove();
+    const note = h('p', { role: 'status', tabindex: '-1', 'data-switch-blocked': '' }, blocked);
+    document.getElementById('input')!.append(note);
+    note.focus();
+    return;
+  }
+  if (key === currentOp && (target === undefined || (target === null ? currentTarget === undefined : target.kind === currentTarget?.kind && target.id === currentTarget.id))) return;
+  if (hasEditedLiveInput() && !window.confirm('未保存の入力を破棄して、操作を切り替えますか。')) return;
+  currentOp = key;
+  currentTarget = target ?? undefined;
+  message = null;
+  renderInput();
+  focusInput();
+}
+
+// 簡単操作モードでは操作の選択欄を隠すので、最初に入力する欄へ移す。
+function focusInput(): void {
+  const first = mode === 'simple' ? '#input form :is(input, select, textarea):not([type=hidden]):not(:disabled):not([name=op])' : '#input [name=op]';
+  const focusable = [...document.querySelectorAll<HTMLElement>(first)].find((node) => node.offsetParent !== null);
+  focusable?.focus();
+}
+
+// 簡単操作モードでは、入口に出す操作を公開計画の範囲に絞る。二段選択とその入力は絞らない。
+function visibleOps(): Readonly<Record<string, UiOp>> {
+  return mode === 'advanced' ? allOps : Object.fromEntries(Object.entries(allOps).filter(([key]) => simpleOps.has(key)));
+}
+
+// 書きかけの入力はモードに合わせて描き直せない（欄の固定・表示が変わる）ので、記録か取りやめまで切り替えない。
+function setMode(next: Mode): boolean {
+  if (hasEditedLiveInput()) return false;
+  mode = next;
+  writeMode(next);
+  appRoot.dataset['mode'] = next;
+  // 簡単操作モードは案件・用途の絞り込み欄を出さないので、前のモードで付けた絞り込みを残さない。
+  filter.item = filter.project = filter.location = '';
+  renderViews();
+  renderInput();
+  return true;
+}
 
 function renderInput(): void {
   const root = section('input');
@@ -631,16 +726,21 @@ function renderInput(): void {
   const capture: FormCapture = { opId: nextOpIdOf(snapshot), op: allOps[currentOp]!, alternative: alternativeOperationOf(currentOp), baseRevision: snapshot.revision, epoch: resetEpoch, metadata: null, units: null, code: null };
   const picker = operationPicker(allOps, currentOp);
   const opSelect = picker.operation;
-  opSelect.addEventListener('input', (event) => {
-    if (currentOp === opSelect.value) event.stopPropagation();
-  });
+  opSelect.addEventListener('input', event => event.stopPropagation());
   opSelect.addEventListener('change', (event) => {
-    if (currentOp === opSelect.value) { event.stopPropagation(); return; }
-    currentOp = opSelect.value;
-    message = null;
-    renderInput();
-    root.querySelector<HTMLSelectElement>('[name=op]')?.focus();
+    event.stopPropagation();
+    const key = opSelect.value;
+    opSelect.value = currentOp;
+    switchOperation(key);
   });
+  const choice = field('操作', opSelect);
+  choice.className = 'operation-choice';
+  const stop = (text: string) => root.append(picker.browsing, choice, h('p', { role: 'status' }, text));
+  const subject = capture.op.subject;
+  if (currentTarget !== undefined && !targetFits(currentTarget)) {
+    stop(`対象 ${currentTarget.id} は現在この操作を記録できません。${targetOrigin[currentTarget.kind]}から別の操作を選んでください。`);
+    return;
+  }
   // 最初の選択肢が選ばれたまま再送すると、答えていないのに回答として扱われるので、空を先頭に置く。
   const inclusion = inclusionField('inclusion', '最後に数えた数に含まれていたか');
   // 衝突・重複の確認は、求められるまで隠す。確認したあとに入力を変えたら、確認をやり直させる。
@@ -649,7 +749,7 @@ function renderInput(): void {
   const form = h(
     'form',
     { 'aria-label': '操作の入力' },
-    field('操作', opSelect),
+    choice,
     ...capture.op.fields(),
     ...alternativeFields(capture.alternative),
     textField('occurredAt', '実際の日時（日本時間）', 'datetime-local'),
@@ -658,6 +758,14 @@ function renderInput(): void {
     confirm,
     h('button', { type: 'submit' }, '記録する'),
   );
+  try {
+    if (currentTarget !== undefined) fixTarget(form, capture.op, currentTarget);
+    if (mode === 'simple' && currentOp === 'register' && currentTarget === undefined) simpleRegister(form);
+  }
+  catch (error) {
+    stop(error instanceof Error ? error.message : String(error));
+    return;
+  }
   (form.elements.namedItem('occurredAt') as HTMLInputElement).value = nowIso().slice(0, 16);
   for (const [box, input] of unknownPairs) exclusive(form, box, input);
   const confirmBox = confirm.querySelector('input')!;
@@ -679,8 +787,10 @@ function renderInput(): void {
     event.preventDefault();
     void guarded(() => submit(form, !inclusion.hidden, capture));
   });
+  const note = opNotes[currentOp];
+  if (note !== undefined) choice.after(h('p', { class: 'op-note' }, note));
   capture.code = codeInput(form, ledger, capture.op.label, codeHolds);
-  root.append(capture.code.node, picker.browsing, form);
+  root.append(capture.code.node, picker.browsing, ...(mode === 'simple' ? [h('p', { class: 'simple-op' }, capture.op.label)] : []), form);
   if (message) root.append(h('p', { class: message.kind === 'ok' ? '' : 'error', role: 'status' }, message.text));
   liveInput = { form, capture, initial: fieldsOf(controlsOf(form, capture.code)), initialActor: actorSelect.value, initialOccurredAt: occurredOf(form), baseLastWriter: snapshot.lastWriter, generation: generationOf(snapshot) };
 }
@@ -832,6 +942,7 @@ async function submit(form: HTMLFormElement, answered: boolean, capture: FormCap
       })();
     const staged = source !== null && capture.alternative !== null ? beginAlternativeRecord(ledger, meta, capture.alternative, source, alternativeItems) : ledger;
     const result = capture.op.run({ ledger: staged, supply }, meta, v, answer);
+    capture.op.validateBeforeSave?.(form, result.state);
     let before = { ledger, supply };
     const units: UnitState[] = (result.units ?? [result.state]).map(state => {
       const unit = { ...state, conflictReviews: snapshot.conflictReviews, targets: targetsOf(before, state) };
@@ -875,7 +986,68 @@ async function submit(form: HTMLFormElement, answered: boolean, capture: FormCap
   // 負数や後入力で未反映になった操作があっても記録は成功と出るので、確認事項が開いたことをその場で知らせる（REC-05・UI-06）。
   const opened = openIssues(ledger).length - openedBefore;
   message = pending === null && !stale ? { kind: 'ok', text: `記録した（操作${eventId}）${opened > 0 ? `。確認事項が${opened}件開いた（未反映の操作がある）。確認が必要な記録で確認する` : ''}${notice ? `。${notice}` : ''}` } : null;
+  // 削除・利用停止・取消のように記録で対象が条件を外れたら、固定を解いて結果の文を出せる入力へ戻す。
+  // 保管単位は使い切っても詳細から別の操作へ移れるよう、固定を残して理由を出す。
+  if (message?.kind === 'ok' && currentTarget !== undefined && currentTarget.kind !== 'lot' && !targetFits(currentTarget)) currentTarget = undefined;
   renderAll();
+}
+
+const targetOrigin = { lot: '詳細', template: 'セット', master: '登録情報', request: '選んだ依頼', event: '選んだ記録', issue: '選んだ確認事項', case: '案件・用途の詳細', need: '案件・用途の詳細' } as const;
+
+// 「入れる」：IDは採番して隠し、所属は共通在庫に固定し、作業の状態と工程は出さない（作業なしになる）。
+function simpleRegister(form: HTMLFormElement): void {
+  const id = form.elements.namedItem('newId') as HTMLInputElement;
+  id.value = nextLotId(ledger.lots);
+  id.closest('label')!.hidden = true;
+  fixSubject(form, 'project', 'common');
+  for (const name of ['stage', 'process']) (form.elements.namedItem(name) as HTMLSelectElement).closest('label')!.hidden = true;
+}
+
+function fixTarget(form: HTMLFormElement, op: UiOp, target: OperationTarget): void {
+  if (target.kind === 'case') {
+    if (op.caseSubject !== undefined) fixSubject(form, op.caseSubject.field, target.id);
+    return;
+  }
+  const subject = op.subject;
+  if (subject?.kind !== target.kind) return;
+  if ('prepare' in subject) subject.prepare?.(form, target.id);
+  fixSubject(form, subject.field, target.id);
+}
+
+function targetFits(target: OperationTarget): boolean {
+  const subject = allOps[currentOp]?.subject;
+  switch (target.kind) {
+    case 'template':
+      return own(supply.receiptTemplates, target.id) !== undefined;
+    case 'lot': {
+      const lot = own(ledger.lots, target.id);
+      return subject?.kind === 'lot' && lot !== undefined && subject.accepts(lot);
+    }
+    case 'master': {
+      const master = masterOf(ledger.masters, target.id);
+      return subject?.kind === 'master' && master !== undefined && subject.accepts(master);
+    }
+    case 'request': {
+      const request = own(supply.requests, target.id);
+      return subject?.kind === 'request' && request !== undefined && subject.accepts(request);
+    }
+    case 'event': {
+      const event = ledger.history.find((e) => e.eventId === target.id);
+      return subject?.kind === 'event' && event !== undefined && subject.accepts(event);
+    }
+    case 'issue': {
+      const issue = own(ledger.issues, target.id);
+      return subject?.kind === 'issue' && issue !== undefined && subject.accepts(issue);
+    }
+    case 'case': {
+      const project = own(ledger.masters.cases, target.id), caseSubject = allOps[currentOp]?.caseSubject;
+      return caseSubject !== undefined && project !== undefined && caseSubject.accepts(project);
+    }
+    case 'need': {
+      const need = own(supply.needs, target.id);
+      return subject?.kind === 'need' && need !== undefined && subject.accepts(need);
+    }
+  }
 }
 
 function filteredLots(): Lot[] {
@@ -897,21 +1069,30 @@ function renderList(): void {
     });
     return node;
   };
+  const simple = mode === 'simple';
+  if (simple) {
+    const put = h('button', { type: 'button', class: 'big' }, '入れる');
+    // 既に「入れる」を開いていると切り替えが起きないので、入力欄へは常に移す。
+    put.addEventListener('click', () => { switchOperation('register', null); if (currentOp === 'register') focusInput(); });
+    root.append(put);
+  }
   root.append(
     h(
       'div',
       { class: 'filters' },
       filterSelect('item', '品目', Object.values(ledger.masters.items).map((i) => [i.id, itemNameText(ledger.masters, i.id)])),
-      filterSelect('project', '案件・用途', [...Object.values(ledger.masters.cases).map((c): Project => ({ kind: 'case', id: c.id })), { kind: 'common' } as const, { kind: 'unassigned' } as const].map((p) => [projectKey(p), projectText(ledger.masters, p)])),
+      ...simple ? [] : [filterSelect('project', '案件・用途', [...Object.values(ledger.masters.cases).map((c): Project => ({ kind: 'case', id: c.id })), { kind: 'common' } as const, { kind: 'unassigned' } as const].map((p) => [projectKey(p), projectText(ledger.masters, p)]))],
       filterSelect('location', '場所', Object.values(ledger.masters.locations).map((l) => [l.id, `${l.name}（${l.code}）${l.active ? '' : '（利用停止）'}`])),
     ),
   );
   const lots = filteredLots();
   root.append(renderTotals(lots));
+  // 簡単操作モードは所属と作業の状態を変えないので、その列を出さない。値は詳細に残る。
+  const shown = (column: string) => !simple || (column !== '案件・用途' && column !== '作業の状態');
   const table = h(
     'table',
     { 'aria-label': '在庫の保管単位' },
-    h('thead', {}, h('tr', {}, ...['ID', '品目', '案件・用途', '場所', '記録上の数と根拠', '取り分けた理由', '作業の状態', '最後に数えた数', '最終記録更新', '確認が必要'].map((t) => h('th', {}, t)))),
+    h('thead', {}, h('tr', {}, ...['ID', '品目', '案件・用途', '場所', '記録上の数と根拠', '取り分けた理由', '作業の状態', '最後に数えた数', '最終記録更新', '確認が必要'].filter(shown).map((t) => h('th', {}, t)))),
   );
   const body = h('tbody');
   for (const lot of lots) {
@@ -922,11 +1103,11 @@ function renderList(): void {
         { class: lot.id === selectedLot ? 'selected' : '', 'data-lot': lot.id },
         h('td', {}, lotButton(lot.id)),
         h('td', {}, itemRef(ledger.masters, lot.item)),
-        h('td', {}, projectText(ledger.masters, lot.project)),
+        ...simple ? [] : [h('td', {}, projectText(ledger.masters, lot.project))],
         h('td', {}, locationRef(ledger.masters, lot.location)),
         h('td', {}, quantityText(lot.quantity, lot.unit)),
         h('td', {}, holdsText(lot)),
-        h('td', {}, stageText(lot.stage, id => processRef(ledger.masters, id))),
+        ...simple ? [] : [h('td', {}, stageText(lot.stage, id => processRef(ledger.masters, id)))],
         h('td', {}, lastCountText(ledger, lot)),
         h('td', {}, jst(lastUpdatedOf(ledger, lot.id))),
         h('td', issues.length ? { class: 'warn' } : {}, issues.length ? `確認が必要 ${issues.length}件` : 'なし'),
@@ -940,7 +1121,14 @@ function renderList(): void {
 
 function renderTotals(lots: Lot[]): HTMLElement {
   const list = h('ul', { 'aria-label': '絞り込んだ範囲の集計' });
-  for (const t of totalsOf(ledger, lots)) list.append(h('li', t.issueCount ? { class: 'warn' } : {}, totalsText(ledger.masters, t)));
+  for (const t of totalsOf(ledger, lots)) {
+    const text = totalsText(ledger.masters, t), props = t.issueCount ? { class: 'warn' } : {};
+    if (mode !== 'simple') { list.append(h('li', props, text)); continue; }
+    // 簡単操作モードは品目の集計から入り、押すとその品目の保管単位に絞る。
+    const open = h('button', { type: 'button', class: 'link' }, text);
+    open.addEventListener('click', () => { filter.item = t.item; renderList(); });
+    list.append(h('li', props, open));
+  }
   return list;
 }
 
@@ -966,6 +1154,18 @@ function renderDetail(): void {
   const children = Object.values(ledger.lots).filter((l) => l.splitFrom === lot.id);
   const issues = openIssuesOf(ledger, lot.id);
   const row = (term: string, ...desc: Child[]) => [h('dt', {}, term), h('dd', {}, ...desc)];
+  const actions = Object.entries(visibleOps()).filter(([, op]) => op.subject?.kind === 'lot' && op.subject.accepts(lot));
+  if (actions.length > 0) {
+    const primary = ['use', 'move', 'split', 'recount'];
+    const button = ([key, op]: [string, UiOp]) => {
+      const node = h('button', { type: 'button', 'data-op': key }, op.label);
+      node.addEventListener('click', () => switchOperation(key, { kind: 'lot', id: lot.id }));
+      return node;
+    };
+    root.append(h('div', { 'aria-label': 'この保管単位にできる操作' },
+      ...primary.flatMap(key => actions.filter(([candidate]) => candidate === key)).map(button),
+      otherOperations(actions.filter(([key]) => !primary.includes(key)).map(button))));
+  }
   root.append(
     h(
       'dl',
@@ -1005,15 +1205,30 @@ function renderDetail(): void {
   root.append(lotEvidencePanel(ledger, supply, lot.id));
 }
 
-function historyList(events: readonly LedgerEvent[], targets: HistoryTargetCollector = createHistoryTargetCollector({ ledger, supply })): HTMLElement {
+function historyList(events: readonly LedgerEvent[], targets: HistoryTargetCollector = createHistoryTargetCollector({ ledger, supply }), pick?: (id: string) => void): HTMLElement {
   const list = h('ol', { reversed: '' });
   for (const e of [...events].reverse()) {
     const corrected = occurredAtOf(ledger, e.eventId) !== e.occurredAt ? `（訂正前 ${jst(e.occurredAt)}）` : '';
+    let id: Child = e.eventId;
+    if (pick !== undefined) {
+      id = h('button', { type: 'button', class: 'link' }, e.eventId);
+      id.addEventListener('click', () => pick(e.eventId));
+    }
     list.append(
-      h('li', {}, `${e.eventId}　発生 ${jst(occurredAtOf(ledger, e.eventId))}${corrected}　記録 ${jst(e.recordedAt)}　担当 ${e.actor}　${eventText(ledger, e, targets)}`),
+      h('li', {}, id, `　発生 ${jst(occurredAtOf(ledger, e.eventId))}${corrected}　記録 ${jst(e.recordedAt)}　担当 ${e.actor}　${eventText(ledger, e, targets)}`),
     );
   }
   return list;
+}
+
+function issueButton(id: string): HTMLButtonElement {
+  const node = h('button', { type: 'button', class: 'link' }, id);
+  node.addEventListener('click', () => {
+    selectedIssue = id;
+    renderIssues();
+    document.getElementById('issue-selected-h')!.focus();
+  });
+  return node;
 }
 
 function renderIssues(): void {
@@ -1025,6 +1240,17 @@ function renderIssues(): void {
     root.append(h('p', {}, '確認事項はない'));
     return;
   }
+  const selected = own(ledger.issues, selectedIssue);
+  const actions = selected === undefined ? [] : Object.entries(visibleOps()).filter(([, op]) => op.subject?.kind === 'issue' && op.subject.accepts(selected));
+  if (selected !== undefined) root.append(
+    h('h3', { id: 'issue-selected-h', tabindex: '-1' }, '選んだ確認事項'),
+    h('p', {}, `${selected.id}：${issueLabel[selected.reason]}（${selected.lotId ?? '対象なし'}）`),
+    actions.length === 0 ? h('p', {}, 'この確認事項にできる操作はない') : h('div', { role: 'group', 'aria-label': 'この確認事項にできる操作' }, ...actions.map(([key, op]) => {
+      const node = h('button', { type: 'button', 'data-op': key }, op.label);
+      node.addEventListener('click', () => switchOperation(key, { kind: 'issue', id: selected.id }));
+      return node;
+    })),
+  );
   const table = h('table', { 'aria-label': '確認事項' }, h('thead', {}, h('tr', {}, ...['ID', '状態', '理由', '対象', '照合する内容・操作', '解消結果'].map((t) => h('th', {}, t)))));
   const body = h('tbody');
   for (const issue of [...all].sort((a, b) => Number(a.resolution !== null) - Number(b.resolution !== null))) {
@@ -1034,7 +1260,7 @@ function renderIssues(): void {
       h(
         'tr',
         { 'data-issue': issue.id },
-        h('td', {}, issue.id),
+        h('td', {}, issueButton(issue.id)),
         h('td', r ? {} : { class: 'warn' }, r ? '解消済み' : '確認が必要（未解決）'),
         h('td', {}, issueLabel[issue.reason]),
         h('td', {}, issue.lotId ? lotButton(issue.lotId) : '対象なし（仮の記録）'),
@@ -1060,6 +1286,7 @@ function renderIssues(): void {
   }
   table.append(body);
   root.append(table);
+  wrapTables(root);
 }
 
 // 工程ごとの工程内・完成（渡す前）と、履歴から求めた累計を分けて示す（MFG-01b）。中断台数は工程内数の内数として書く（11章）。
@@ -1109,18 +1336,24 @@ function renderProduction(): void {
 
 // 見るだけの操作では入力欄を作り直さない。包含の回答を求めている途中でも、入力を残したまま根拠を確かめられる（AT-22）。
 function renderViews(): void {
+  // 初期化・復元のあとは同じ操作IDが再び使われるので、前の台帳で選んだ依頼・記録・確認事項を引き継がない。
+  if (selectionEpoch !== resetEpoch) {
+    selectionEpoch = resetEpoch;
+    selectedRequest = selectedEvent = selectedIssue = '';
+  }
   const last = lastRecordedAt();
   document.getElementById('updated')!.textContent = `最終記録更新：${last ? jst(last) : 'なし'}`;
   renderList();
   renderProduction();
   renderDetail();
   renderIssues();
-  renderSupply(ctx);
+  renderRequests();
   renderCase();
   renderFollowup();
   renderConsumables(ctx);
   renderMasters();
-  section('history').append(historyList(ledger.history));
+  renderSets();
+  renderHistory();
   wrapTables(appRoot);
   syncNavigation();
 }
@@ -1303,15 +1536,30 @@ function holdForm(form: HTMLFormElement): void {
   heldForm = form;
 }
 
+function templateNeedsPreflight(form: HTMLFormElement | null, after: { ledger: Ledger; supply: typeof supply }): void {
+  const live = liveInput;
+  if (live === null || live.form !== form) throw new Error('現在の入力欄からプレビューし直してください');
+  const eventId = nextOpIdOf(snapshot);
+  const source = liveCaptureSource(live, { kind: 'rejected', opId: eventId, attemptedAt: nowIso(), reason: 'snapshotChanged' }, '保存前に更新競合を検出', targetsOf({ ledger, supply }, after));
+  const made = captureDraft(source, () => crypto.randomUUID());
+  if (made.kind !== 'captured') throw new Error(made.kind === 'kept' ? made.reason : '入力を確認してください');
+  requireTemplateNeedCaptureCapacity(made.draft, generationOf(snapshot) ?? 'legacy/unknown', eventId);
+}
+
+function liveCaptureSource(live: LiveInput, origin: ConflictOrigin, reason: string, targets: readonly string[]): CaptureSource {
+  const rejected = origin.kind === 'rejected';
+  return { initial: live.initial, fields: fieldsOf(controlsOf(live.form, live.capture.code)), initialActor: live.initialActor, actor: actorSelect.value,
+    initialOccurredAt: live.initialOccurredAt, occurredAt: occurredOf(live.form), origin, opKey: currentOp, opLabel: live.capture.op.label,
+    baseRevision: live.capture.baseRevision, baseLastWriter: live.baseLastWriter, detectedAt: nowIso(), detectedReason: reason, readEvidence: evidenceOf(live),
+    targets, unapplied: [rejected ? 'この送信は書込前に拒否・数量へ未反映' : live.unsavedSend ? '前回の送信は保存されていない・数量へ未反映' : '未送信・数量へ未反映'] };
+}
+
 // 外部更新の通知や書込前の拒否で、フォームを消す前に元入力を捕捉する。すでに未解消の入力があれば上書きしない。
 function captureLiveInput(origin: ConflictOrigin, reason: string, targets: readonly string[] = []): void {
   const live = liveInput;
   if ((conflict !== null && conflict.kind !== 'resolved') || live === null || !live.form.isConnected) return;
   const rejected = origin.kind === 'rejected';
-  const source: CaptureSource = { initial: live.initial, fields: fieldsOf(controlsOf(live.form, live.capture.code)), initialActor: live.initialActor, actor: actorSelect.value,
-    initialOccurredAt: live.initialOccurredAt, occurredAt: occurredOf(live.form), origin, opKey: currentOp, opLabel: live.capture.op.label,
-    baseRevision: live.capture.baseRevision, baseLastWriter: live.baseLastWriter, detectedAt: nowIso(), detectedReason: reason, readEvidence: evidenceOf(live),
-    targets: rejected ? targets : [], unapplied: [rejected ? 'この送信は書込前に拒否・数量へ未反映' : live.unsavedSend ? '前回の送信は保存されていない・数量へ未反映' : '未送信・数量へ未反映'] };
+  const source = liveCaptureSource(live, origin, reason, rejected ? targets : []);
   const made = captureDraft(source, () => crypto.randomUUID());
   if (made.kind === 'unchanged') return;
   if (made.kind === 'kept') {
@@ -1611,8 +1859,7 @@ function renderGettingStarted(): void {
   const next = steps.find(step => !step.done)!;
   const open = h('button', { type: 'button' }, '入力欄で開く');
   open.addEventListener('click', () => {
-    currentOp = next.op; message = null; renderInput();
-    document.querySelector<HTMLSelectElement>('#input [name=op]')?.focus();
+    switchOperation(next.op);
   });
   root.append(
     h('p', {}, '記録を始める前に、次の順で登録してください。その後、現物の登録で在庫を記録します。'),
@@ -1629,14 +1876,75 @@ function renderCase(): void {
     if (event.target instanceof HTMLSelectElement) selectedProject = event.target.value;
     renderCase();
   });
-  root.append(choice, caseDetailPanel(ledger, supply, selectedProject, id => { selectedLot = id; renderViews(); navigation.select({ kind: 'detail' }); }));
+  root.append(choice, caseDetailPanel(ledger, supply, selectedProject, id => { selectedLot = id; renderViews(); navigation.select({ kind: 'detail' }); }, { ops: allOps, open: switchOperation }));
   wrapTables(root);
+}
+
+// 履歴は長くなるので、選んだ記録と操作は一覧の上に置き、IDを押した直後に見える位置にする。
+function renderHistory(): void {
+  const root = section('history');
+  const event = ledger.history.find((e) => e.eventId === selectedEvent);
+  if (event !== undefined) {
+    const actions = Object.entries(visibleOps()).filter(([, op]) => op.subject?.kind === 'event' && op.subject.accepts(event));
+    const button = ([key, op]: [string, UiOp]) => {
+      const node = h('button', { type: 'button', 'data-op': key }, op.label);
+      node.addEventListener('click', () => switchOperation(key, { kind: 'event', id: event.eventId }));
+      return node;
+    };
+    root.append(
+      h('h3', { id: 'event-selected-h', tabindex: '-1' }, '選んだ記録'),
+      h('p', {}, historyChoices([event], true)[0]![1]),
+      actions.length === 0 ? h('p', {}, 'この記録にできる操作はない') : h('div', { role: 'group', 'aria-label': 'この記録にできる操作' }, ...actions.map(button)),
+    );
+  }
+  root.append(historyList(ledger.history, undefined, (id) => {
+    selectedEvent = id;
+    renderHistory();
+    document.getElementById('event-selected-h')!.focus();
+  }));
+}
+
+function renderRequests(): void {
+  renderSupply(ctx, {
+    ops: allOps,
+    selected: selectedRequest,
+    select: (id, focus) => {
+      selectedRequest = id;
+      renderRequests();
+      document.getElementById(focus)!.focus();
+    },
+    open: (op, id) => switchOperation(op, { kind: 'request', id }),
+    start: (op) => switchOperation(op, null),
+  });
 }
 
 function renderMasters(): void {
   const root = section('masters');
-  root.append(...mastersPanel(ledger, selectedMaster, (key) => { selectedMaster = key; renderMasters(); }));
+  root.append(...mastersPanel(ledger, visibleOps(), selectedMaster, {
+    select: (key, focus) => {
+      selectedMaster = key;
+      renderMasters();
+      document.getElementById(focus)!.focus();
+    },
+    open: (op, target) => switchOperation(op, target === undefined ? null : { kind: 'master', id: target }),
+    // 簡単操作モードではセットの行き先を出さないので、そこへ移る入口も出さない。
+    ...(mode === 'simple' ? {} : { openSets: (item: string) => {
+      selectedSet = { product: item, template: '' };
+      renderSets();
+      navigation.select({ kind: 'destination', destination: 'sets' });
+      document.getElementById('sets-h')!.focus();
+    } }),
+    query: masterQuery,
+    setQuery: query => { masterQuery = query; },
+  }));
   wrapTables(root);
+}
+
+function renderSets(): void {
+  if (!own(supply.receiptTemplates, selectedSet.template)) selectedSet = { ...selectedSet, template: '' };
+  section('sets').append(...setsPanel(ledger, supply, selectedSet, value => { selectedSet = value; renderSets(); }, (key, id) => {
+    switchOperation(key, id === undefined ? null : { kind: 'template', id });
+  }, key => allOps[key]!.label));
 }
 
 function renderFollowup(): void {
@@ -1872,6 +2180,15 @@ const { askReplace, chooseRestoreFile, cancelRestoreFile, restoreFileChosen } = 
 document.getElementById('reset-seed')!.addEventListener('click', () => askReset('固定の架空データ', () => ({ ledger: seedLedger(), supply: emptySupply })));
 document.getElementById('reset-scn02')!.addEventListener('click', () => askReset('SCN-02の架空データ', seedScn02));
 document.getElementById('reset-empty')!.addEventListener('click', () => askReset('空の台帳', () => ({ ledger: emptyLedger, supply: emptySupply })));
+const modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
+modeSelect.value = mode;
+const modeNote = h('p', { role: 'status' });
+modeSelect.after(modeNote);
+modeSelect.addEventListener('change', () => {
+  const changed = setMode(modeSelect.value === 'advanced' ? 'advanced' : 'simple');
+  if (!changed) modeSelect.value = mode;
+  modeNote.textContent = changed ? '' : '入力欄に書きかけの入力があります。記録するか取りやめてから切り替えてください。';
+});
 document.getElementById('reset-practice')!.addEventListener('click', () => askReset('練習用の台帳（架空の登録情報入り）', () => ({ ledger: practiceLedger, supply: emptySupply })));
 document.getElementById('backup-save')!.addEventListener('click', () => { void guarded(saveBackup); });
 document.getElementById('shared-enable')!.addEventListener('click', () => {

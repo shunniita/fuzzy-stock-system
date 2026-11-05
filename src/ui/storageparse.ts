@@ -19,6 +19,8 @@ import { createHistoryTargetCollector } from '../domain/history-targets.ts';
 import { assemblyRecipeRowLimit, assemblyRecipeTreeRowLimit } from '../domain/assembly-recipes.ts';
 import { requireConsistentItemSettings } from '../domain/masters.ts';
 import { initialPackaging } from '../domain/master-edit.ts';
+import { validateTemplateNeeds } from '../domain/template-needs-validation.ts';
+import { parseTemplateNeed, parseTemplateNeedDetail, parseTemplateNeedPlan } from './template-needs-parse.ts';
 
 type Decoder<T> = (value: unknown, path: string) => T;
 
@@ -829,8 +831,11 @@ function templateDetail(o: Record<string, unknown>, path: string, kind: 'receipt
 }
 
 function supplyDetail(o: Record<string, unknown>, path: string, version: number): SupplyDetail {
-  const kind = oneOf<SupplyDetail['kind']>(o.kind, `${path}.kind`, ['receiptTemplateSave', 'receiptTemplateDelete', 'templateReceipt', 'needImport', 'needImportResolve', 'needRegister', 'needRevise', 'shortageDeclare', 'declarationLink', 'requestRecord', 'orderConfirm', 'replyRecord', 'requestCancel', 'receiptRecord', 'receiptRevise', 'arrival', 'arrivalRevise', 'remainder', 'returnAck', 'usageEstimate']);
+  const kind = oneOf<SupplyDetail['kind']>(o.kind, `${path}.kind`, ['templateNeeds', 'receiptTemplateSave', 'receiptTemplateDelete', 'templateReceipt', 'needImport', 'needImportResolve', 'needRegister', 'needRevise', 'shortageDeclare', 'declarationLink', 'requestRecord', 'orderConfirm', 'replyRecord', 'requestCancel', 'receiptRecord', 'receiptRevise', 'arrival', 'arrivalRevise', 'remainder', 'returnAck', 'usageEstimate']);
   switch (kind) {
+    case 'templateNeeds':
+      if (version < 13) return invalid(path, '旧版は生成した必要明細の履歴を持たない');
+      return parseTemplateNeedDetail(o, path, eventMetaKeys(o, version), need, (v, p) => receiptTemplate(v, p, version));
     case 'receiptTemplateSave': case 'receiptTemplateDelete': case 'templateReceipt': return templateDetail(o, path, kind, version);
     case 'needImport': case 'needImportResolve': return importDetail(o, path, kind, version);
     case 'needRegister': return { kind, need: field(o, 'need', path, need) };
@@ -884,10 +889,13 @@ function validateSplitLineage(ledger: Ledger, path: string): void {
 function supply(value: unknown, path: string, masters: Masters, version: number): Supply {
   const o = record(value, path);
   const log = array(o.log, `${path}.log`, (v, p) => supplyEvent(v, p, version));
+  if (version < 13 && Object.hasOwn(o, 'templateNeeds')) return invalid(path, '旧版は生成した必要明細の計画を持たない');
+  const templateNeeds = version < 13 ? {} : dictionary(o.templateNeeds, `${path}.templateNeeds`, parseTemplateNeedPlan);
   const importedIds = new Set(log.flatMap(e => e.kind === 'needImport' ? e.decision.kind === 'hold' ? e.decision.candidates : [e.decision.after.id] : e.kind === 'needImportResolve' && e.resolution.kind === 'apply' ? [e.resolution.after.id] : []));
   const decoded = {
+    templateNeeds,
     receiptTemplates: version < 7 ? {} : dictionary(o.receiptTemplates, `${path}.receiptTemplates`, (v, p) => receiptTemplate(v, p, version)),
-    needs: dictionary(o.needs, `${path}.needs`, (v, p) => { const n = need(v, p); return importedIds.has(n.id) ? importedNeed(v, p) : n; }), declarations: dictionary(o.declarations, `${path}.declarations`, declaration), requests: dictionary(o.requests, `${path}.requests`, request),
+    needs: dictionary(o.needs, `${path}.needs`, (v, p) => { const n = need(v, p); return own(templateNeeds, n.project.id) ? parseTemplateNeed(v, p, need) : importedIds.has(n.id) ? importedNeed(v, p) : n; }), declarations: dictionary(o.declarations, `${path}.declarations`, declaration), requests: dictionary(o.requests, `${path}.requests`, request),
     levels: dictionary(o.levels, `${path}.levels`, (v, p) => { const l = record(v, p); return { level: field(l, 'level', p, level), eventId: field(l, 'eventId', p, string), quantityKey: field(l, 'quantityKey', p, string) }; }), acks: dictionary(o.acks, `${path}.acks`, string),
     receipts: dictionary(o.receipts, `${path}.receipts`, (v, p) => { const r = record(v, p); return { received: field(r, 'received', p, countOrNull), provisional: field(r, 'provisional', p, boolean), eventId: field(r, 'eventId', p, string), label: field(r, 'label', p, textOrNull) }; }), log,
   };
@@ -1041,6 +1049,7 @@ function checkSupplyPrecision(ledger: Ledger, supply: Supply, lotRef: (id: strin
   for (const [lotId, receipt] of Object.entries(supply.receipts)) count(receipt.received, lotRef(lotId));
   for (const e of supply.log) {
     switch (e.kind) {
+      case 'templateNeeds': for (const change of e.changes) { if (change.before !== null) checkNeed(change.before); checkNeed(change.after); } break;
       case 'needRegister': checkNeed(e.need); break;
       case 'needRevise': checkNeed(e.before); checkNeed(e.after); break;
       case 'shortageDeclare': count(e.declaration.value, e.declaration); break;
@@ -1107,8 +1116,8 @@ export function decodeSnapshot(value: unknown): Snapshot {
   if (opFloor < 1) return invalid(`${path}.opFloor`, '1以上の番号下限が必要');
   const saveChecks = array(o.saveChecks, `${path}.saveChecks`, saveCheck);
   if (new Set(saveChecks.map(check => check.opId)).size !== saveChecks.length) return invalid(`${path}.saveChecks`, '操作IDごとの解消記録は一件まで');
-  // 旧版も読み込むが保存先は書き換えない。次の確定から工程の設定を持てる版12で書く。
-  const version = oneOf(o.version, `${path}.version`, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  // 旧版も読み込むが保存先は書き換えない。次の確定から生成した必要明細を持てる版13で書く。
+  const version = oneOf(o.version, `${path}.version`, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   if (version === 1 && o.quantities !== undefined) return invalid(`${path}.version`, '版1の写しは数量の表を持たない');
   const table = o.quantities === undefined ? null : quantityTable(o.quantities, `${path}.quantities`);
   const decodedLedger = ledger(o.ledger, `${path}.ledger`, table, version);
@@ -1116,6 +1125,7 @@ export function decodeSnapshot(value: unknown): Snapshot {
   validatePrecision(decodedLedger, decodedSupply, precisionMemo(), path);
   validateAlternativeRecords(decodedLedger, decodedSupply);
   validateReceiptTemplates(decodedLedger, decodedSupply);
+  validateTemplateNeeds(decodedLedger, decodedSupply);
   validateUsageEstimates(decodedLedger, decodedSupply);
   validateReceipts(decodedSupply);
   validateRequests(decodedSupply);
@@ -1124,7 +1134,7 @@ export function decodeSnapshot(value: unknown): Snapshot {
   const reviews = conflictReviews(o, path, version);
   requireDistinctRecordIds(decodedLedger, decodedSupply, reviews, path);
   return {
-    format: oneOf(o.format, `${path}.format`, ['fuzzy-stock-f0']), version: 12, revision: field(o, 'revision', path, nonnegative), lastWriter: field(o, 'lastWriter', path, string), opFloor,
+    format: oneOf(o.format, `${path}.format`, ['fuzzy-stock-f0']), version: 13, revision: field(o, 'revision', path, nonnegative), lastWriter: field(o, 'lastWriter', path, string), opFloor,
     ledger: decodedLedger, supply: decodedSupply, ops: dictionary(o.ops, `${path}.ops`, opEntry), saveChecks, conflictReviews: reviews,
   };
 }
@@ -1137,6 +1147,7 @@ function unitState(value: unknown, path: string, table: QuantityTable | null, ve
   validatePrecision(decodedLedger, decodedSupply, memo, path);
   validateAlternativeRecords(decodedLedger, decodedSupply);
   validateReceiptTemplates(decodedLedger, decodedSupply);
+  validateTemplateNeeds(decodedLedger, decodedSupply);
   validateUsageEstimates(decodedLedger, decodedSupply);
   validateReceipts(decodedSupply);
   validateRequests(decodedSupply);
@@ -1155,7 +1166,7 @@ export function decodePending(value: unknown): Pending {
   let version = 1;
   if (Object.hasOwn(envelope, 'format') || Object.hasOwn(envelope, 'version') || Object.hasOwn(envelope, 'pending')) {
     oneOf(envelope.format, `${path}.format`, ['fuzzy-stock-pending']);
-    version = oneOf(envelope.version, `${path}.version`, [4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    version = oneOf(envelope.version, `${path}.version`, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
     o = record(envelope.pending, `${path}.pending`);
   }
   // 単位どうしは同じ数量の表を共有するので、検査済みの組も共有する。

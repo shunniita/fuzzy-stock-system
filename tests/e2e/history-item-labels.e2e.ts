@@ -170,7 +170,7 @@ test('履歴7/AR10: 真正schema8 flatのbootは非破壊、旧履歴の不明�
   const raw = JSON.parse(legacyJson(JSON.parse(serialize(initial(received.ledger, received.supply))))); raw.version = 8;
   for (const key of ['itemLabels', 'productUnit', 'assembly', 'routes']) expect(JSON.stringify(raw)).not.toContain(`"${key}"`);
   const text = JSON.stringify(raw);
-  await page.evaluate(value => { localStorage.clear(); localStorage.setItem('fuzzy-stock/head', 'A'); localStorage.setItem('fuzzy-stock/slot-A', value); }, text);
+  await page.evaluate(value => { localStorage.clear(); localStorage.setItem('fuzzy-stock-mode', 'advanced'); localStorage.setItem('fuzzy-stock/head', 'A'); localStorage.setItem('fuzzy-stock/slot-A', value); }, text);
   const original = await storageBytes(page); await page.reload(); await waitForApp(page); expect(await storageBytes(page)).toEqual(original);
   const oldId = Object.keys(received.ledger.lots)[0]!; await goTo(page, 'stock'); await row(page, oldId).getByRole('button', { name: oldId, exact: true }).click();
   await expect(page.locator('#detail dl').first()).toContainText('架空旧版の現在P');

@@ -77,8 +77,8 @@ test('6.2: 入力の誤りは理由つきで拒否され、何も記録されな
 test('F0-B2 12.2・F1-C: 振替と架空必要明細取込だけを公開し、依頼の自動作成や個別の保存は置かない', async ({ page }) => {
   await startEmpty(page);
   const labels = await allOperationLabels(page);
-  expect(labels.filter(t => t.includes('付け替え'))).toEqual(['案件・用途の付け替え（場所は変えない）']);
-  expect(labels.filter(t => t.includes('取込'))).toEqual(['必要明細取込の照合（保留の適用・見送り）']);
+  expect(labels.filter(t => t.includes('付け替え'))).toEqual(['案件・用途の付け替え']);
+  expect(labels.filter(t => t.includes('取込'))).toEqual(['必要明細取込の照合']);
   expect(labels.some((t) => /自動作成|保存/.test(t))).toBe(false);
 });
 
@@ -138,7 +138,7 @@ test('5.3: 受け入れた現物の数え直しでは、実際に受け取った
   const form = page.getByRole('form', { name: '操作の入力' });
   const choice = form.locator('[name=receiptEffect]');
   // 初期登録の現物（実際に受け取った数の記録がない）には選択が出ない。
-  await selectOperation(form.locator('[name=op]'), { label: '数えて確認・訂正（原因不明でもよい）' });
+  await selectOperation(form.locator('[name=op]'), { label: '数えて確認・訂正' });
   await form.locator('[name=lot]').selectOption('INIT');
   await expect(choice).toBeHidden();
   await form.locator('[name=lot]').selectOption('R1');

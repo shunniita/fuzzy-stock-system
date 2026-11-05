@@ -10,6 +10,7 @@ import { own, quantityStepOf, type Masters } from '../domain/masters.ts';
 import { subtractScalar } from '../domain/scalar.ts';
 import { expandAssemblyRecipe } from '../domain/assembly-recipes.ts';
 import { historyItems, type ItemFormatter } from './history-item-format.ts';
+import type { TemplateNeedContext } from '../domain/template-needs.ts';
 
 // 表示語はDESIGN_NOTES.mdと同じ流儀。色がなくても文字だけで区別できるようにする（UI-08a）。
 
@@ -27,12 +28,12 @@ const valueText = (value: number | null, unit: string): string => (value === nul
 const receiptLabelText = (label: string | null): string => (label === null ? '' : `・ラベル「${label}」`);
 
 // 供給の履歴の一行。何が起きたかを、対象と数と根拠が分かる形で示す。
-export function supplyEventText(m: Masters, e: SupplyEvent, itemIds?: readonly string[]): string {
+export function supplyEventText(m: Masters, e: SupplyEvent, itemIds?: readonly string[], versions?: TemplateNeedContext['versions']): string {
   // recordedは保存時に対象集合を検査済み。旧記録の間接対象は呼出側の実contextから渡す。
   const ids = itemIds ?? (e.itemLabels.kind === 'recorded' ? Object.keys(e.itemLabels.items) : null);
   if (ids === null) throw new Error(`旧供給履歴 ${e.eventId} の対象品目を実際の記録から渡す`);
   const items = historyItems(e.itemLabels, ids);
-  return items.complete(supplyEventDetails(m, e, items.ref)) + scanText(e.scan);
+  return items.complete(supplyEventDetails(m, e, items.ref, versions)) + scanText(e.scan);
 }
 
 export function importedNeedText(m: Masters, n: Omit<Need, 'id'>, ref: ItemFormatter = id => itemRef(m, id)): string {
@@ -72,8 +73,25 @@ function usageEstimateText(m: Masters, e: Extract<SupplyEvent, { kind: 'usageEst
   return `セット推計 ${e.eventId}：作業の開始${e.startEventId}・セット「${e.template.name}」（${e.template.id}）・製品${e.template.product === null ? '未設定' : ref(e.template.product)}・台数${e.sets}${unit}から算出した候補／${rows.join('、')}`;
 }
 
-function supplyEventDetails(m: Masters, e: SupplyEvent, ref: ItemFormatter): string {
+function supplyEventDetails(m: Masters, e: SupplyEvent, ref: ItemFormatter, versions?: TemplateNeedContext['versions']): string {
   switch (e.kind) {
+    case 'templateNeeds': {
+      const afterPlan = e.plansAfter[0], beforePlan = e.plansBefore[0];
+      const version = versions ? own(versions, afterPlan.version) : undefined;
+      const planText = `${projectText(m, { kind: 'case', id: afterPlan.project })}・セット「${version?.template.name ?? e.changes[0]?.after.source ?? afterPlan.version}」・初回版${afterPlan.initialVersion}・計算基準の版${beforePlan?.version ?? 'なし'} → ${afterPlan.version}・${beforePlan?.count ?? 0}台 → ${afterPlan.count}台`;
+      if (e.action === 'edit') {
+        const { before, after } = e.changes[0];
+        return `必要明細の${e.editKind === 'add' ? '追加' : e.editKind === 'exclude' ? '除外' : '変更'}：${planText}・品目${ref(after.item)}・${before === null ? '明細なし' : needQuantityText(before.required, before.unit)} → ${needQuantityText(after.required, after.unit)}・必要日${before?.dueDate ?? 'なし'} → ${after.dueDate ?? 'なし'}・元資料${before?.source ?? 'なし'} → ${after.source}・改訂${before?.revision ?? 'なし'} → ${after.revision}・理由${e.reason}`;
+      }
+      if (e.action === 'recalculate' || e.action === 'follow') {
+        return `必要明細の${e.action === 'recalculate' ? '台数再計算' : '最新版への追従'}：${planText}・選択${e.selected.join('、') || 'なし'}・${e.changes.map(change => `品目${ref(change.after.item)}・${change.before === null ? '明細なし' : needQuantityText(change.before.required, change.before.unit)} → ${needQuantityText(change.after.required, change.after.unit)}`).join('、') || '必要数の変更なし'}・理由${e.reason}`;
+      }
+      const projects = e.plansAfter.map(plan => {
+        const changes = e.changes.filter(change => change.after.project.id === plan.project);
+        return `${projectText(m, { kind: 'case', id: plan.project })}・セット「${changes[0]?.after.source ?? '不明'}」・${plan.count}台・セット版${plan.version}：${changes.map(change => `品目${ref(change.after.item)}・${needQuantityText(change.after.required, change.after.unit)}・必要日${change.after.dueDate ?? 'なし'}`).join('、')}`;
+      });
+      return `${e.group === null ? 'セットから必要明細を生成' : `組立用と検査用をまとめて生成（${e.group.mode === 'same' ? '同じ台数' : `分割${e.group.split}台`}）`}：${projects.join('；')}`;
+    }
     case 'receiptTemplateSave': return `セットの${e.before === null ? '登録' : '変更'}：${e.before === null ? '' : `${receiptTemplateText(m, e.before, ref)} → `}${receiptTemplateText(m, e.after, ref)}`;
     case 'receiptTemplateDelete': return `セットの削除：${receiptTemplateText(m, e.before, ref)}（過去の受け取りは保持）`;
     case 'templateReceipt': return templateReceiptText(m, e, ref);

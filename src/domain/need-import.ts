@@ -2,7 +2,7 @@ import { checkTime, deepFreeze, type Meta } from './ledger.ts';
 import { parseExactJson } from './exact-json.ts';
 import { inputStepOf, own, type ItemMaster, type Masters } from './masters.ts';
 import { observe } from './quantity.ts';
-import { checkDate, type Need, type NeedQuantity, type Supply } from './supply.ts';
+import { checkDate, checkLegacyNeedEdit, type Need, type NeedQuantity, type Supply } from './supply.ts';
 import { captureItemLabels } from './history-labels.ts';
 import { supplyEventItemIds } from './history-targets.ts';
 
@@ -147,6 +147,7 @@ function decide(supply: Supply, row: NeedRow, c: ReturnType<typeof context>): De
 
 export function previewNeedImport(supply: Supply, masters: Masters, raw: string): NeedImportPreview {
   const row = readNeedRow(raw), c = context(supply, masters, row);
+  if (c.project) checkLegacyNeedEdit(supply, c.project.id);
   checkRowPrecision(masters, row, c.item);
   return { input: { raw, row }, decision: decide(supply, row, c), token: JSON.stringify([raw, c.token]) };
 }
@@ -181,6 +182,8 @@ export function previewNeedImportResolution(supply: Supply, masters: Masters, im
   if (!held) throw Error('未解消の取込保留を選ぶ');
   if (action === 'dismiss') return { held, resolution: { kind: 'dismiss' }, token: JSON.stringify([held, 'dismiss']) };
   const c = context(supply, masters, held.input.row), draft = draftFor(held.input.row, c), before = own(supply.needs, needId);
+  if (c.project) checkLegacyNeedEdit(supply, c.project.id);
+  if (before) checkLegacyNeedEdit(supply, before.project.id);
   checkRowPrecision(masters, held.input.row, c.item);
   if (!draft) throw Error('識別情報と利用中の案件・用途・品目・単位を確認できない。文書を修正して再確認する');
   if (!before || !sameGroup(before, draft)) throw Error('同じ案件・用途・品目・単位の既存明細を選ぶ');
@@ -231,6 +234,7 @@ export function validateNeedImports(supply: Supply, masters: Masters): void {
     if (!e.eventId.trim() || events.has(e.eventId)) throw Error('取込履歴の操作IDが空、または重複');
     events.add(e.eventId);
     if (e.kind === 'needRegister') remember(e.need, e.eventId);
+    else if (e.kind === 'templateNeeds') for (const change of e.changes) remember(change.after, e.eventId);
     else if (e.kind === 'needRevise') {
       const current = needs.get(e.before.id);
       if (touched.has(e.before.id) && (!current || !sameNeed(current, e.before) || e.before.id !== e.after.id || !sameGroup(e.before, e.after))) throw Error('取込後の手動改訂の対応が不正');

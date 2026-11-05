@@ -66,11 +66,11 @@ export function returnIntakeOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     returnRecord: {
-      label: '返ってきた物を仮の記録に残す（まだ数量へ反映しない）',
+      label: '返ってきた物の仮の記録',
       fields: () => [codeTarget(selectField('item', '返ってきた物の品目', [['', '不明'], ...itemOptions(ctx.ledger().masters)]), 'item'),
         codeTarget(selectField('location', '返ってきた物がある場所', [['', '不明'], ...placeOptions(ctx.ledger().masters)]), 'location'), ...amountFields(),
         textField('returnOrigin', '元の現物の手掛かり（ID・出庫記録など。不明なら空欄）'), textField('note', '返ってきた物の備考'),
-        h('p', {}, '外から戻った物や元の現物が不明な返ってきた物を、未反映の仮の記録として受け付ける。既知品目の使用可能数には加えない。後で「返ってきた物の仮の記録を割り当てる（現在数量への包含を確認）」から現在数量への包含を確認する。')],
+        h('p', {}, '外から戻った物や元の現物が不明な返ってきた物を、未反映の仮の記録として受け付ける。既知品目の使用可能数には加えない。後で「返ってきた物の仮の記録の割り当て」から現在数量への包含を確認する。')],
       run: (s, m, v) => {
         const { basis, value } = amount(v);
         const note = `戻り品／元の現物の手掛かり：${v.text('returnOrigin').trim() || '不明'}／備考：${v.text('note')}`;
@@ -78,7 +78,7 @@ export function returnIntakeOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     returnAssign: {
-      label: '返ってきた物の仮の記録を割り当てる（現在数量への包含を確認）',
+      label: '返ってきた物の仮の記録の割り当て',
       fields: () => assignmentFields(ctx),
       run: (s, m, v) => {
         const common = { issueId: v.text('issue'), reason: v.text('reason'), confirmed: v.checked('confirmed') };

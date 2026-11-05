@@ -9,7 +9,7 @@ test('公開版A: 製品名と保存先を表示し、試行変更と新規再�
   const labels = await allOperationLabels(page);
   expect(labels.some(label => label.includes('試行対象の変更'))).toBe(false);
   expect(labels.some(label => label.includes('必要明細の再取込'))).toBe(false);
-  expect(labels).toContain('必要明細取込の照合（保留の適用・見送り）');
+  expect(labels).toContain('必要明細取込の照合');
   await expect(page.locator('#list th', { hasText: '試行対象' })).toHaveCount(0);
   for (const op of ['masterItem', 'masterLocation']) {
     await selectOperation(page.locator('[name=op]'), op);

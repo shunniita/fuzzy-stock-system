@@ -59,6 +59,13 @@ main > *, .destination > section { min-width: 0; }
   font-weight: 700; text-decoration: underline; text-underline-offset: 0.4em; text-decoration-thickness: 2px;
 }
 #issue-count { font-variant-numeric: tabular-nums; }
+.set-list { list-style: none; padding: 0; }
+.set-list > li { padding-block: 12px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.set-list [aria-current="true"] { border-color: var(--accent); font-weight: 700; }
+[data-set-detail] { overflow-wrap: anywhere; }
+[data-set-detail] > button, .other-operations > button { margin: 4px 8px 4px 0; }
+.other-operations { margin-block: 8px; }
+.other-operations > summary { cursor: pointer; padding-block: 4px; }
 .prototype-note { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; color: var(--muted); }
 .prototype-note p { font-size: 0.8125rem; margin: 0; }
 .prototype-note button { font-size: 0.8125rem; }
@@ -114,8 +121,10 @@ form label > input, form label > select, form label > textarea { font-size: 0.93
 form label.check { display: flex; gap: 8px; align-items: baseline; font-weight: 400; }
 fieldset { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 0; }
 legend { padding-inline: 6px; font-weight: 600; }
-.operation-picker { display: grid; gap: 6px; padding: 16px; margin-block: 20px; background: var(--accent-soft); border-radius: 8px; }
-.operation-picker > label { color: var(--accent-dark); font-weight: 700; font-size: 0.875rem; }
+/* 操作を選び直すまで入力欄は切り替わらないので、作業の種類と操作を一つの枠に見せる。 */
+.operation-picker { display: grid; gap: 6px; padding: 16px 16px 8px; margin-block: 20px 0; background: var(--accent-soft); border-radius: 8px 8px 0 0; }
+.operation-choice { padding: 8px 16px 16px; background: var(--accent-soft); border-radius: 0 0 8px 8px; margin-bottom: 6px; }
+.operation-picker > label, form label.operation-choice { color: var(--accent-dark); font-weight: 700; font-size: 0.875rem; }
 .operation-picker p { margin: 2px 0 0; font-size: 0.8125rem; color: var(--muted); }
 .code-input { border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 20px; background: #f8fafd; overflow-wrap: anywhere; }
 summary { cursor: pointer; color: var(--accent-dark); font-weight: 600; padding-block: 4px; }
@@ -150,6 +159,8 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; background:
   .destination > section, #input, #unreadable-content { padding: 16px 12px; }
   main, .destination { gap: 16px; }
   .filters, .management-group, .operation-picker, .code-input { padding: 12px; }
+  .operation-picker { padding-bottom: 6px; }
+  .operation-choice { padding: 6px 12px 12px; }
   .filters > label { width: 100%; }
   .bar { gap: 10px; }
   .management-group > button { width: 100%; }
@@ -162,3 +173,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; background:
   :focus-visible { outline-color: Highlight; }
   tr.selected { outline-color: Highlight; }
 }
+
+/* 簡単操作モード：行き先・製造・二段選択を隠す。記録と表示の規則は同じ。 */
+#app[data-mode=simple] :is(#nav-sets, #nav-supply, #production, #input .operation-picker, #input .operation-choice) { display: none; }
+.simple-op { margin: 16px 0 6px; font-weight: 700; color: var(--accent-dark); }
+button.big { font-size: 1.125rem; padding: 12px 32px; margin-bottom: 12px; }
+.operation-picker p.all-operations { margin: 0; font-size: 1rem; font-weight: 700; color: var(--accent-dark); }

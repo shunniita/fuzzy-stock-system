@@ -45,7 +45,7 @@ test('FH-B01・AT-48: SCN-01を最初から操作し、誤使用の訂正後にP
   await expect(cell(page, 'PA', '記録上の数と根拠')).toHaveText('記録上の数60個');
   await page.locator('#actor').selectOption('架空担当B');
   const form = page.getByRole('form', { name: '操作の入力' });
-  await selectOperation(form.locator('[name=op]'), { label: '間違えた記録の取り消し（使用・引渡し）' });
+  await selectOperation(form.locator('[name=op]'), { label: '間違えた記録の取り消し' });
   const mistaken = await form.locator('[name=target] option', { hasText: 'R追加（誤り）' }).getAttribute('value');
   await recorded(page, 'void', { target: mistaken!, reason: '実際は使用していない' }, '17:30');
 
@@ -187,7 +187,7 @@ test('MFG-01b: 完成（渡す前）を工程内へ戻す訂正は、完了累�
 test('MFG-06: 作業の開始の作業の場所に次工程Nを選べない（工程に載った物はNに置かない）', async ({ page }) => {
   await startEmpty(page);
   const form = page.getByRole('form', { name: '操作の入力' });
-  await selectOperation(form.locator('[name=op]'), { label: '作業の開始（材料の使用とまとめて記録）' });
+  await selectOperation(form.locator('[name=op]'), { label: '作業の開始' });
   await expect(form.locator('[name=location] option')).toHaveText(['選ぶ', '棚S1（S1）', '棚S2（S2）', '作業台T（T）', '対象外の棚O（O）']);
 });
 

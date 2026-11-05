@@ -1,5 +1,5 @@
 import { test, expect, chromium, type Page } from '@playwright/test';
-import { backupButton, downloadVia, goTo, lot, pickFile, record, recorded, row, startEmpty, waitForApp } from './helpers.ts';
+import { backupButton, downloadVia, goTo, lot, pickFile, record, recorded, row, startEmpty, waitForApp, launchAdvanced } from './helpers.ts';
 import { readyToSave, typeUse, draftOf } from './conflict-helpers.ts';
 
 async function enable(page: Page): Promise<void> {
@@ -176,7 +176,7 @@ test('FH-SCR-BACKUP-UI: 版2を画面で出力・復元し、未有効の保存�
 
 test('FH-SCR-QUOTA: native容量拒否で退避と取下げを未確定のまま保持する', async ({}, testInfo) => {
   const profile = testInfo.outputPath('quota-profile'), origin = 'http://127.0.0.1:4182';
-  const launch = () => chromium.launchPersistentContext(profile, { channel: 'msedge', headless: true, baseURL: `${origin}/` });
+  const launch = () => launchAdvanced(profile, { channel: 'msedge', headless: true, baseURL: `${origin}/` });
   let context = await launch();
   let cdp: Awaited<ReturnType<typeof context.newCDPSession>> | null = null;
   try {
@@ -292,7 +292,7 @@ test('FH-SCR-NATIVE: 同時capture・別ID保持・pending拒否・原子termina
 
 test('FH-SCR-RESTART: 実ブラウザー終了後の同profileから原文を回収できる', async ({}, testInfo) => {
   const profile = testInfo.outputPath('fictional-profile');
-  const launch = () => chromium.launchPersistentContext(profile, { channel: 'msedge', headless: true, baseURL: 'http://127.0.0.1:4182/', locale: 'ja-JP', timezoneId: 'Asia/Tokyo' });
+  const launch = () => launchAdvanced(profile, { channel: 'msedge', headless: true, baseURL: 'http://127.0.0.1:4182/', locale: 'ja-JP', timezoneId: 'Asia/Tokyo' });
   let context = await launch();
   try {
     const page = context.pages()[0]!;

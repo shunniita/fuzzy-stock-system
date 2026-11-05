@@ -1,7 +1,9 @@
-import { processRef } from '../domain/masters.ts';
+import { own, processRef } from '../domain/masters.ts';
+import { otherOperations, type OperationTarget } from './subject-actions.ts';
+import type { UiOp } from './supply-ui.ts';
 import { openIssuesOf, type Ledger, type Lot } from '../domain/ledger.ts';
 import { groupsOf, requestSummaryOf, shortageOf, stopGroupsOf, stopsOf, type GroupKey } from '../domain/shortage.ts';
-import { requestProgressOf, sameProject, type Supply } from '../domain/supply.ts';
+import { needOfGroup, requestProgressOf, sameProject, type Supply } from '../domain/supply.ts';
 import { h } from './dom.ts';
 import { holdLabel, issueLabel, itemRef, locationRef, projectText, quantityText, stageText } from './format.ts';
 import { needQuantityText, replyText, requestStateText, shortageLinesText, stopLineText } from './supply-format.ts';
@@ -48,7 +50,7 @@ export function caseDetailOf(ledger: Ledger, supply: Supply, projectId: string):
     title: projectText(ledger.masters, project),
     groups: [...keys.values()].map((key) => {
       const groupLots = lots.filter((lot) => lot.item === key.item && lot.unit === key.unit);
-      const need = Object.values(supply.needs).find((n) => n.project.id === projectId && n.item === key.item && n.unit === key.unit);
+      const need = needOfGroup(supply, project, key.item, key.unit);
       const requests = Object.values(supply.requests).filter((r) => sameProject(r.project, project) && r.item === key.item && r.unit === key.unit);
       const declarations = Object.values(supply.declarations).filter((d) => sameProject(d.project, project) && d.item === key.item && d.unit === key.unit);
       return {
@@ -97,15 +99,34 @@ export function caseDetailText(detail: CaseDetail): string {
   ].join('\n');
 }
 
-export function caseDetailPanel(ledger: Ledger, supply: Supply, projectId: string, openLotDetail: (lotId: string) => void): HTMLElement {
+export type CaseActions = { ops: Readonly<Record<string, UiOp>>; open: (op: string, target: OperationTarget) => void };
+
+function opButtons(actions: CaseActions, target: OperationTarget, fits: (op: UiOp) => boolean): HTMLButtonElement[] {
+  return Object.entries(actions.ops).filter(([, op]) => fits(op)).map(([key, op]) => {
+    const node = h('button', { type: 'button', 'data-op': key }, op.label);
+    node.addEventListener('click', () => actions.open(key, target));
+    return node;
+  });
+}
+
+export function caseDetailPanel(ledger: Ledger, supply: Supply, projectId: string, openLotDetail: (lotId: string) => void, actions?: CaseActions): HTMLElement {
   const detail = caseDetailOf(ledger, supply, projectId);
   const panel = h('div', { role: 'region', 'aria-label': `${detail.title}の詳細` }, h('h3', {}, detail.title));
+  const project = own(ledger.masters.cases, projectId);
+  const caseButtons = actions === undefined || project === undefined ? [] : opButtons(actions, { kind: 'case', id: projectId }, (op) => op.caseSubject?.accepts(project) === true);
+  // 受け取りはセット一式と一つの品目を共有する欄がほとんどないので、一つのフォームで切り替えず入口を二つ並べる。
+  const primary = ['templateReceive', 'receive', 'needRegister'], isPrimary = (b: HTMLButtonElement) => primary.includes(b.dataset['op']!);
+  if (caseButtons.length > 0) panel.append(h('div', { role: 'group', 'aria-label': 'この案件・用途にできる操作' },
+    ...primary.flatMap((key) => caseButtons.filter((b) => b.dataset['op'] === key)),
+    otherOperations(caseButtons.filter((b) => !isPrimary(b)))));
   if (detail.groups.length === 0) panel.append(h('p', {}, 'この案件・用途の記録はまだない'));
   const lots = caseLotsOf(ledger, projectId);
   for (const group of detail.groups) {
     const article = h('article', { class: 'group', 'data-item': group.item, 'data-unit': group.unit }, h('h4', {}, group.label));
     const appendLines = (label: string, lines: string[]) => article.append(h('h5', {}, label), h('ul', {}, ...lines.map((line) => h('li', {}, line))));
     appendLines('必要な数', [group.need]);
+    const need = needOfGroup(supply, { kind: 'case', id: projectId }, group.item, group.unit);
+    if (actions !== undefined && need !== undefined) article.append(...opButtons(actions, { kind: 'need', id: need.id }, (op) => op.subject?.kind === 'need' && op.subject.accepts(need)));
     appendLines('未着・依頼', group.outstanding.split('\n'));
     const groupLots = lots.filter((lot) => lot.item === group.item && lot.unit === group.unit);
     for (const [label, selected] of [

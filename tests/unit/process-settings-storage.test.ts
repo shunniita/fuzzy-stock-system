@@ -18,7 +18,7 @@ const product = (id: string) => ({ id, item: 'R', unit: '台', project: { kind: 
 // 版11のwriterと同じく、工程の設定と次工程の指定を持たない形に戻す。
 function asV11(ledger: Ledger): string {
   return JSON.stringify({ ...JSON.parse(serialize(initial(ledger, emptySupply))), version: 11 },
-    (key, value: unknown) => key === 'processes' || key === 'nextProcess' ? undefined : value);
+    (key, value: unknown) => key === 'templateNeeds' || key === 'processes' || key === 'nextProcess' ? undefined : value);
 }
 
 // 固定fixtureの中の保存写しをすべて集める。どのfixtureも現行codecで再生成しない旧writerの原文。
@@ -42,9 +42,9 @@ describe('工程の設定 1.1: 空・練習用の台帳と保存版12', () => {
     expect(Object.values(practiceLedger.masters.locations).filter(l => l.nextProcess).map(l => l.id)).toEqual(['N']);
   });
 
-  test.each([['空', emptyLedger], ['練習用', practiceLedger]] as const)('%sの台帳を版12で書いて同じ工程と指定に読み戻す', (_name, ledger) => {
+  test.each([['空', emptyLedger], ['練習用', practiceLedger]] as const)('%sの台帳を現行版で書いて同じ工程と指定に読み戻す', (_name, ledger) => {
     const text = serialize(initial(ledger, emptySupply));
-    expect(JSON.parse(text)).toMatchObject({ version: 12, ledger: { masters: { processes: expect.any(Object) } } });
+    expect(JSON.parse(text)).toMatchObject({ version: 13, ledger: { masters: { processes: expect.any(Object) } } });
     expect(parse(text)?.ledger.masters).toEqual(ledger.masters);
   });
 
@@ -145,7 +145,7 @@ describe('工程の設定 1.3: 工程と指定の整合を読込の各入口で�
     const s = current();
     damage(s);
     expect(() => parse(JSON.stringify(s))).toThrow(reason);
-    expect(() => decodePending({ format: 'fuzzy-stock-pending', version: 12, quantities: s.quantities, pending: { progress: 'saving', unknownSince: null, savingSince: '2026-10-27T09:00:00+09:00', baseRevision: 0, opId: 'op1', opLabel: '架空', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: '2026-10-27T09:00:00+09:00', units: [{ ledger: s.ledger, supply: s.supply, conflictReviews: [], targets: [] }] } })).toThrow(reason);
+    expect(() => decodePending({ format: 'fuzzy-stock-pending', version: 13, quantities: s.quantities, pending: { progress: 'saving', unknownSince: null, savingSince: '2026-10-27T09:00:00+09:00', baseRevision: 0, opId: 'op1', opLabel: '架空', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: '2026-10-27T09:00:00+09:00', units: [{ ledger: s.ledger, supply: s.supply, conflictReviews: [], targets: [] }] } })).toThrow(reason);
     expect(readBackup(new TextEncoder().encode(backupTextOf(s as Snapshot, '2026-10-27T09:00:00+09:00')))).toMatchObject({ kind: 'unreadable', reason: expect.stringContaining(reason) });
   });
 });

@@ -1,7 +1,7 @@
 import { chromium, expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { decodePending, decodeSnapshot } from '../../src/ui/storageparse.ts';
 import type { Snapshot } from '../../src/ui/storage.ts';
-import { waitForPersistence, selectOperation, goTo, cell, lot, record, recorded, row, set, startEmpty, waitForApp } from './helpers.ts';
+import { waitForPersistence, selectOperation, goTo, cell, lot, record, recorded, row, set, startEmpty, waitForApp, launchAdvanced } from './helpers.ts';
 
 const origin = 'http://127.0.0.1:4182';
 const receiptLabel = '000007|架空の箱・同じラベル';
@@ -84,7 +84,7 @@ test('AT-38前半・1.3: 受け取り直後にEdgeを正常終了し、同じ専
   const loadingErrors: string[] = [];
   let phase = '初回Edge起動';
   try {
-    context = await test.step(phase, () => chromium.launchPersistentContext(profile, options));
+    context = await test.step(phase, () => launchAdvanced(profile, options));
     phase = '初回ページ作成';
     const first = await context.newPage();
     first.on('pageerror', error => errors.push(error.message));
@@ -146,7 +146,7 @@ test('AT-38前半・1.3: 受け取り直後にEdgeを正常終了し、同じ専
     context = null;
 
     phase = '同じプロファイルでEdge再起動';
-    context = await test.step(phase, () => chromium.launchPersistentContext(profile, options));
+    context = await test.step(phase, () => launchAdvanced(profile, options));
     phase = '再起動後のページ作成';
     const second = await context.newPage();
     second.on('pageerror', error => errors.push(error.message));

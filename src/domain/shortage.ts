@@ -2,7 +2,7 @@ import { createdAtOf, isUsable, openIssues, productionTallyOf, voidOf, type Prod
 import { add, observe, quantityOf, subtract, type Quantity } from './quantity.ts';
 import { quantityStepOf, type Masters } from './masters.ts';
 import { addScalar, positivePartMinus, subtractScalar, sumScalars, sumScalarsFinal, type Step } from './scalar.ts';
-import { allocatedToReceipt, checkDate, chronological, orderContradicts, isStaleRevision, receiptStatusOf, receivedOf, requestProgressOf, sameProject, type DateText, type Supply } from './supply.ts';
+import { allocatedToReceipt, checkDate, chronological, orderContradicts, isStaleRevision, needOfGroup, receiptStatusOf, receivedOf, requestProgressOf, sameProject, type DateText, type Supply } from './supply.ts';
 
 // 不足を求める単位。案件・用途・品目・単位ごとに独立に求める（別の案件・用途・共通・所属不明の現物や、違う単位を混ぜない）。
 export type GroupKey = { project: Project; item: string; unit: string };
@@ -94,7 +94,7 @@ export function shortageOf(ledger: Ledger, supply: Supply, key: GroupKey): Short
   const onHand = sum(unused.map((l) => l.quantity), step);
   const usable = sum(unused.filter(isUsable).map((l) => l.quantity), step);
   const used = usedQuantity(ledger, key, step);
-  const need = key.project.kind === 'case' ? Object.values(supply.needs).find((n) => n.project.id === (key.project as { id: string }).id && n.item === key.item && n.unit === key.unit) : undefined;
+  const need = needOfGroup(supply, key.project, key.item, key.unit);
   const required = need ? quantityOf(observe(need.id, need.required.basis, need.required.value, step)) : null;
 
   const reasons: UndecidableReason[] = [];
@@ -229,7 +229,7 @@ function settledDeclared(ledger: Ledger, supply: Supply, key: GroupKey, step: St
 // 実効の不足。求められない項があれば全体を不明にし、0として扱わない（手配対象数0・既存依頼が不要という誤表示を防ぐ）。
 function effectiveShortageOf(ledger: Ledger, view: ShortageView, supply: Supply, key: GroupKey, step: Step): number | null {
   const declared = Object.values(supply.declarations).filter((d) => sameProject(d.project, key.project) && d.item === key.item && d.unit === key.unit);
-  const hasNeed = key.project.kind === 'case' && Object.values(supply.needs).some((n) => n.project.id === (key.project as { id: string }).id && n.item === key.item && n.unit === key.unit);
+  const hasNeed = needOfGroup(supply, key.project, key.item, key.unit) !== undefined;
   if (!hasNeed) return declared.length === 0 ? null : settledDeclared(ledger, supply, key, step, declared);
   const linked = declared.filter((d) => d.linked);
   const unlinked = declared.filter((d) => !d.linked);
@@ -379,7 +379,7 @@ export function dateStatusOf(supply: Supply, masters: Masters, requestId: string
   if (!r) throw new Error(`依頼 ${requestId} がない`);
   const outstanding = (requestProgressOf(masters, r).outstanding ?? 0) > 0;
   if (!outstanding) return { noReply: false, overdue: false, lateForNeed: false };
-  const need = r.project.kind === 'case' ? Object.values(supply.needs).find((n) => n.project.id === (r.project as { id: string }).id && n.item === r.item && n.unit === r.unit) : undefined;
+  const need = needOfGroup(supply, r.project, r.item, r.unit);
   const eta = r.reply.kind === 'none' ? null : r.reply.date;
   return {
     noReply: eta === null,

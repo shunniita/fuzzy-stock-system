@@ -26,7 +26,7 @@ const rejectThree = (value: ReturnType<typeof raw>, reason?: string) => {
 };
 function legacy(value: unknown, version = 8) {
   return JSON.parse(JSON.stringify(value, (key, entry: unknown) => {
-    if ((key === 'consumable' || key === 'processes' || key === 'nextProcess') || key === 'itemLabels' || (version < 7 && key === 'receiptTemplates') || (version < 6 && key === 'conflictReviews') || (version < 5 && key === 'unitSteps') || (version < 3 && key === 'masters')) return undefined;
+    if ((key === 'templateNeeds' || key === 'consumable' || key === 'processes' || key === 'nextProcess') || key === 'itemLabels' || (version < 7 && key === 'receiptTemplates') || (version < 6 && key === 'conflictReviews') || (version < 5 && key === 'unitSteps') || (version < 3 && key === 'masters')) return undefined;
     return entry;
   }));
 }
@@ -88,9 +88,9 @@ describe('履歴表示 task3 統合保存版9と旧版', () => {
   });
   test('新規snapshot/pending/backupを版12で往復し、外側backup版1を保つ', () => {
     const s = snapshot();
-    expect(s.version).toBe(12);
+    expect(s.version).toBe(13);
     expect(parse(serialize(s))).toEqual(s);
-    expect(JSON.parse(serializePending(pending(s))).version).toBe(12);
+    expect(JSON.parse(serializePending(pending(s))).version).toBe(13);
     expect(decodePending(JSON.parse(serializePending(pending(s))))).toEqual(pending(s));
     const envelope = JSON.parse(backupTextOf(s, at));
     expect(envelope.version).toBe(1);
@@ -99,7 +99,7 @@ describe('履歴表示 task3 統合保存版9と旧版', () => {
   test.each([1, 2, 3, 4, 5, 6, 7, 8])('真正旧版%sは当時表示不明へ読み、読込だけでは保存先を変えない', version => {
     const value = legacy({ ...(version === 1 ? snapshot() : raw()), version }, version), before = JSON.stringify(value);
     const restored = decodeSnapshot(value);
-    expect(restored.version).toBe(12);
+    expect(restored.version).toBe(13);
     expect(restored.ledger.history[0]).toHaveProperty('itemLabels', { kind: 'legacy-unavailable' });
     expect(restored.supply.log[0]).toHaveProperty('itemLabels', { kind: 'legacy-unavailable' });
     expect(JSON.stringify(value)).toBe(before);

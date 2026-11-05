@@ -8,7 +8,7 @@ import { chromium } from '@playwright/test';
 import { releaseFiles } from './package-release.mjs';
 import { readBackup } from '../src/ui/backup.ts';
 import { parse } from '../src/ui/storage.ts';
-import { record, recorded, selectOperation } from '../tests/e2e/helpers.ts';
+import { record, recorded, selectOperation, set, waitForPersistence } from '../tests/e2e/helpers.ts';
 import { verifyPublicFlow } from '../tests/e2e/public-flow.ts';
 
 if (process.argv.length !== 3) throw new Error('node scripts/verify-release.mjs <配布候補ZIP>');
@@ -51,6 +51,7 @@ async function stopServer() {
     server = undefined;
   } finally { clearTimeout(deadline); }
 }
+let simpleAtFirstOpen = false;
 async function openApp(origin) {
   browser = await chromium.launchPersistentContext(join(temporary, 'edge-profile'), { channel: 'msedge', headless: true, acceptDownloads: true, locale: 'ja-JP', timezoneId: 'Asia/Tokyo' });
   await browser.route('**/*', route => {
@@ -65,6 +66,13 @@ async function openApp(origin) {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin);
   await usable(page);
+  // 配布物は初めて開くと簡単操作モードになる。以下の流れは全操作を使うので、利用者と同じく管理から切り替える。
+  if (await page.locator('#app').getAttribute('data-mode') === 'simple') {
+    simpleAtFirstOpen = true;
+    await page.locator('#nav-management').click();
+    await page.locator('#mode-select').selectOption('advanced');
+    await page.locator('#nav-stock').click();
+  }
   return page;
 }
 try {
@@ -131,6 +139,47 @@ try {
   assert.match(consumableText, /中身未確認/);
   const consumableProof = { item: 'ZIP-D', packaging: '袋', total: '10.3個', standardOrder: '2袋', basisPreserved: true };
   await page.locator('#nav-stock').click();
+  await recorded(page, 'templateSave', { templateName: '架空ZIP必要明細セット', templateProduct: 'R', templateProductUnit: '台', t0item: 'P', t0unit: '個', t0perSet: '2', t0location: 'S1' });
+  const beforeGeneration = await coreOf();
+  const template = Object.values(beforeGeneration.supply.receiptTemplates).find(template => template.name === '架空ZIP必要明細セット');
+  assert.ok(template);
+  await selectOperation(form.locator('[name=op]'), 'templateNeedGenerate');
+  await form.locator('[name=needTemplate]').selectOption(template.id);
+  await form.locator('[name=needCase]').fill('0000909');
+  await form.locator('[name=needCount]').fill('10');
+  await form.getByRole('button', { name: '必要明細をプレビュー', exact: true }).click();
+  await form.locator('[name=needConfirmed]').check();
+  await form.getByRole('button', { name: '記録する', exact: true }).click();
+  await waitForPersistence(page);
+  assert.match(await page.locator('#input > [role=status]').innerText(), /記録した/);
+  const afterGeneration = await coreOf(), plan = afterGeneration.supply.templateNeeds['0000909'];
+  assert.ok(plan);
+  assert.equal(plan.count, 10);
+  assert.equal(plan.initialVersion, plan.version);
+  assert.equal(afterGeneration.ledger.masters.cases['0000909'].code, '0000909');
+  const needs = Object.values(afterGeneration.supply.needs).filter(need => need.project.kind === 'case' && need.project.id === '0000909');
+  assert.equal(needs.length, 1);
+  assert.deepEqual(needs[0].required, { basis: 'label', value: 20 });
+  assert.deepEqual(afterGeneration.ledger.lots, beforeGeneration.ledger.lots);
+  assert.deepEqual(afterGeneration.supply.receipts, beforeGeneration.supply.receipts);
+  assert.deepEqual(afterGeneration.supply.requests, beforeGeneration.supply.requests);
+  const templateNeedProof = { project: '0000909', count: 10, required: 20, basis: 'label', initialVersion: plan.initialVersion, version: plan.version, physicalAndRequestsUnchanged: true };
+  const changeNeed = async values => {
+    await selectOperation(form.locator('[name=op]'), 'templateNeedEdit');
+    for (const [name, value] of Object.entries(values)) await set(form.locator(`[name=${name}]`), value);
+    await form.getByRole('button', { name: '変更をプレビュー', exact: true }).click();
+    await form.locator('[name=needConfirmed]').check();
+    await form.getByRole('button', { name: '記録する', exact: true }).click();
+    await waitForPersistence(page);
+    assert.match(await page.locator('#input > [role=status]').innerText(), /記録した/);
+  };
+  await changeNeed({ needProject: '0000909', needAction: 'change', need: needs[0].id, basis: 'approximate', value: '20', needReason: '架空の根拠だけの変更' });
+  await changeNeed({ needProject: '0000909', needAction: 'recalculate', needCount: '20', needReason: '架空の増産・根拠は未選択で保持' });
+  const afterRecalculation = await coreOf();
+  assert.deepEqual(afterRecalculation.supply.needs[needs[0].id].required, { basis: 'approximate', value: 20 });
+  assert.equal(afterRecalculation.supply.templateNeeds['0000909'].count, 20);
+  assert.equal(afterRecalculation.supply.log.at(-1).calculationPolicy, 'preserve-exclusion');
+  const basisPreservationProof = { recalculatedCount: 20, required: 20, basis: 'approximate', calculationPolicy: 'preserve-exclusion', explicitSelection: false };
   const stock = await page.locator('#list').innerText();
   assert.ok(stock.includes('品目'), '在庫一覧が使える');
   const storage = await page.evaluate(() => JSON.stringify(Object.entries(localStorage).sort()));
@@ -184,11 +233,16 @@ try {
   const reopened = await openApp(origin);
   assert.equal(await reopened.locator('#list').innerText(), stock, 'ブラウザーと配信を再起動しても在庫を保持する');
   assert.equal(await reopened.evaluate(() => JSON.stringify(Object.entries(localStorage).sort())), restoredStorage, '同じ専用プロファイルの保存記録を保持する');
+  const reopenedCore = parse(await reopened.evaluate(() => localStorage.getItem('fuzzy-stock/slot-' + localStorage.getItem('fuzzy-stock/head'))));
+  assert.deepEqual(reopenedCore.supply.templateNeeds, afterRecalculation.supply.templateNeeds, '必要明細の由来・版を復元・再起動後も保持する');
+  assert.deepEqual(reopenedCore.supply.needs, afterRecalculation.supply.needs, '必要数と概算の根拠を復元・再起動後も保持する');
+  assert.deepEqual(reopenedCore.supply.log, afterRecalculation.supply.log, '必要明細の生成と再計算の履歴を復元・再起動後も保持する');
   await reopened.locator('#nav-supply').click();
   assert.equal(await reopened.locator('#consumables [data-stock="ZIP-D"]').innerText(), consumableText, '消耗品の設定と数量を復元・再起動後も保持する');
   assert.deepEqual(external, []);
   assert.deepEqual(errors, []);
-  report = { archive, revision: manifest.revision, files: manifest.files.length + 1, publicProof, returnProof, consumableProof, checks: ['all file hashes', 'Japanese extraction path', 'start-local.cmd', 'usable boot', 'empty ledger registration, use, move, recount, history and backup restore', 'bundled browser help', 'returned physical intake, assignment and rework with preserved history and supply', 'configured consumable with decimal quantity, backup restore and restart', 'save and reload', 'backup download and restore after reset', 'Excel lazy import and download', 'configured port from local-settings.txt without Port override', 'browser and server restart with same profile and origin', 'no external app requests', 'no page errors'], backupBytes: backup.length, excelBytes: excel.length };
+  assert.equal(simpleAtFirstOpen, true, '初めて開いたときは簡単操作モード');
+  report = { archive, revision: manifest.revision, files: manifest.files.length + 1, simpleAtFirstOpen, publicProof, returnProof, consumableProof, templateNeedProof, basisPreservationProof, checks: ['all file hashes', 'Japanese extraction path', 'start-local.cmd', 'usable boot', 'empty ledger registration, use, move, recount, history and backup restore', 'bundled browser help', 'returned physical intake, assignment and rework with preserved history and supply', 'configured consumable with decimal quantity, backup restore and restart', 'template need generation, backup restore and browser/server restart', 'save and reload', 'backup download and restore after reset', 'Excel lazy import and download', 'configured port from local-settings.txt without Port override', 'browser and server restart with same profile and origin', 'no external app requests', 'no page errors'], backupBytes: backup.length, excelBytes: excel.length };
 } catch (error) { failures.push(error); }
 finally {
   try { if (browser) await browser.close(); }

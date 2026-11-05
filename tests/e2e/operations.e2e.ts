@@ -76,7 +76,7 @@ test('AT-21・PR2-4: 原因不明のまま原因を書くと原因不明は外�
   await goTo(page, 'stock');
   await recorded(page, 'register', lot('X', 'P', 'S1', 'counted', '60'), '09:00');
   const form = page.getByRole('form', { name: '操作の入力' });
-  await selectOperation(form.locator('[name=op]'), { label: '数えて確認・訂正（原因不明でもよい）' });
+  await selectOperation(form.locator('[name=op]'), { label: '数えて確認・訂正' });
   await form.locator('[name=causeText]').fill('架空の記入漏れ');
   await expect(form.locator('[name=causeUnknown]')).not.toBeChecked();
   await form.locator('[name=causeUnknown]').check();

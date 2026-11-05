@@ -1,5 +1,5 @@
 import { checkedConsumable, codeOwner, deepFreeze, nextProcessOf, practiceMasters, inScopeAt, inputStepOf, processRef, masterTypeDisplayLabel, own, perBoxAt, quantityStepOf, refOf, reservedCaseIds, unassignedCode, type ConsumableSetting, type LocationMaster, type Master, type Masters, type ProcessMaster, type Source } from './masters.ts';
-import { initialPackaging, checkTrialReview, effectiveFrom, masterOf, masterRef, processNameFree, registered, type NewMaster, type TrialReview } from './master-edit.ts';
+import { initialPackaging, checkCaseCode, checkTrialReview, effectiveFrom, masterOf, masterRef, processNameFree, registered, type NewMaster, type TrialReview } from './master-edit.ts';
 import { add, observe, quantityOf, sameQuantity, subtract, type Basis, type Observation, type Quantity } from './quantity.ts';
 import { sumScalarsFinal, validateScalar, type Step } from './scalar.ts';
 import type { Scan } from './code.ts';
@@ -1474,6 +1474,7 @@ function planActive(ledger: Ledger, meta: Meta, request: Request<'deactivate' | 
 function planCode(ledger: Ledger, request: Request<'code'>, confirmed: boolean): MasterPlan {
   const m = masterOf(ledger.masters, request.type, request.id);
   required(request.code, '品番・コード');
+  if (request.type === 'case') checkCaseCode(request.code);
   required(request.reason, '理由');
   if (m.type === 'actor' || m.type === 'process') throw new Error(`${masterTypeDisplayLabel[m.type]}には品番・コードがない`);
   if (m.code === request.code) throw new Error('今と同じ品番・コード');

@@ -5,7 +5,7 @@ export const operationGroups = [
   { id: 'production', label: '製造・工程', keys: ['start', 'recipeStart', 'finish', 'inspect', 'toNext', 'stageFix', 'stop', 'stopUpdate', 'resume'] },
   { id: 'processes', label: '工程の登録・設定', keys: ['masterProcess', 'masterProcessCriterion', 'masterNextProcess'] },
   { id: 'rework', label: 'やり直し・修理', keys: ['reworkBegin', 'reworkReplace', 'reworkDiscard', 'reworkRecover', 'returnRecord', 'returnAssign', 'returnRework'] },
-  { id: 'requests', label: '必要な数・依頼・発注', keys: ['needRegister', 'needRevise', 'declareShortage', 'linkDeclaration', 'requestRecord', 'orderConfirm', 'replyRecord', 'requestCancel'] },
+  { id: 'requests', label: '必要な数・依頼・発注', keys: ['templateNeedGenerate', 'templateNeedBatch', 'templateNeedEdit', 'needRegister', 'needRevise', 'declareShortage', 'linkDeclaration', 'requestRecord', 'orderConfirm', 'replyRecord', 'requestCancel'] },
   { id: 'receipts', label: '受け取り・割り当て・返却', keys: ['receive', 'templateReceive', 'templateSave', 'templateDelete', 'allocate', 'receiptRevise', 'arrivalRevise', 'surplusAllocate', 'spareSwap', 'returnAck', 'remainder'] },
   { id: 'corrections', label: '数え直し・訂正・照合', keys: ['recount', 'declare', 'correctTime', 'void', 'resolve', 'needImportResolve'] },
   { id: 'provisional', label: '仮の記録・所属の整理', keys: ['provisional', 'identify', 'adopt', 'assignProject'] },
@@ -40,8 +40,8 @@ export function operationPicker(operations: Readonly<Record<string, { label: str
   category.addEventListener('change', show);
   show();
   return {
-    browsing: h('div', { class: 'operation-picker' }, h('label', { for: 'operation-group' }, '作業の種類'), category,
-      h('p', { id: 'operation-group-help' }, '種類を選ぶと操作の候補が絞られます。入力中の操作は残ります。別の操作を選ぶと入力欄が切り替わります。')),
+    browsing: h('div', { class: 'operation-picker' }, h('p', { class: 'all-operations' }, 'すべての操作'), h('label', { for: 'operation-group' }, '作業の種類'), category,
+      h('p', { id: 'operation-group-help' }, '詳細や一覧の行から開けない操作も、ここから選べます。種類を選ぶと操作の候補が絞られます。入力中の操作は残ります。別の操作を選ぶと入力欄が切り替わります。')),
     operation,
   };
 }

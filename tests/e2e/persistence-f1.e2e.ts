@@ -62,8 +62,8 @@ test('F1-0 要件3: 版1の写しを読み込んで表示し、次の保存か�
   await goTo(page, 'stock');
   const shown = await cell(page, 'X', '記録上の数と根拠').textContent() ?? '';
   const current = await slotOf();
-  expect(JSON.parse(current)).toMatchObject({ version: 12, conflictReviews: [], quantities: expect.any(Object) });
-  const v1 = JSON.stringify({ ...decodeSnapshot(JSON.parse(current)), version: 1 }, (key, value: unknown) => key === 'consumable' || key === 'processes' || key === 'nextProcess' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' || key === 'itemLabels' ? undefined : value);
+  expect(JSON.parse(current)).toMatchObject({ version: 13, conflictReviews: [], quantities: expect.any(Object) });
+  const v1 = JSON.stringify({ ...decodeSnapshot(JSON.parse(current)), version: 1 }, (key, value: unknown) => key === 'templateNeeds' || key === 'consumable' || key === 'processes' || key === 'nextProcess' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' || key === 'itemLabels' ? undefined : value);
   await page.evaluate(text => localStorage.setItem(`fuzzy-stock/slot-${localStorage.getItem('fuzzy-stock/head')}`, text), v1);
   await page.reload();
   await expect(cell(page, 'X', '記録上の数と根拠')).toHaveText(shown);
@@ -75,7 +75,7 @@ test('F1-0 要件3: 版1の写しを読み込んで表示し、次の保存か�
   await goTo(page, 'stock');
   await expect(cell(page, 'X', '場所')).toHaveText('S2');
   const migrated = JSON.parse(await slotOf());
-  expect(migrated).toMatchObject({ version: 12, conflictReviews: [], quantities: expect.any(Object) });
+  expect(migrated).toMatchObject({ version: 13, conflictReviews: [], quantities: expect.any(Object) });
   const history = decodeSnapshot(migrated).ledger.history;
   expect(history).toHaveLength(3);
   expect(history.slice(0, 2).map(event => event.itemLabels)).toEqual([{ kind: 'legacy-unavailable' }, { kind: 'legacy-unavailable' }]);

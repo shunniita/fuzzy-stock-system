@@ -30,7 +30,7 @@ concurrency:
 jobs:
   verify:
     runs-on: windows-2025
-    timeout-minutes: 35
+    timeout-minutes: 50
     defaults:
       run:
         shell: pwsh

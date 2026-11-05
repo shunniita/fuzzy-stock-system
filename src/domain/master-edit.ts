@@ -8,6 +8,10 @@ function required(text: string, label: string): void {
   if (text.trim() === '') throw new Error(`${label}を入力する`);
 }
 
+export function checkCaseCode(code: string): void {
+  if (code !== code.trim()) throw new Error('案件コードの前後の空白を取り除いて確認する');
+}
+
 export type NewMaster =
   | { type: 'item'; code: string | null; name: string; units: readonly string[]; unitSteps: Readonly<Record<string, Step>>; trial: boolean; source: Source | null }
   | { type: 'location'; code: string; name: string; trial: boolean; inScope: boolean }
@@ -78,7 +82,7 @@ export function registered(masters: Masters, eventId: string, m: NewMaster): Mas
       codeFree(masters, 'location', m.code);
       return { type: 'location', id: newMasterId(masters.locations, m.code, 'location', eventId), code: m.code, name: m.name, trial: m.trial, active: true, scope: [{ from: null, inScope: m.inScope }], nextProcess: false };
     case 'case':
-      if (m.code !== null) { required(m.code, '品番・コード'); codeFree(masters, 'case', m.code); }
+      if (m.code !== null) { required(m.code, '品番・コード'); checkCaseCode(m.code); codeFree(masters, 'case', m.code); }
       if (m.name !== null) required(m.name, '呼び名');
       if (m.code === null && m.name === null) throw new Error('品番・コードのない仮の案件・用途には、呼び名を入力する');
       return { type: 'case', id: newMasterId(masters.cases, m.code, 'case', eventId, reservedCaseIds), code: m.code, name: m.name, source: sourceOf(m.source), active: true };

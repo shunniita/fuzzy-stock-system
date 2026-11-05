@@ -1,12 +1,13 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { browserZoomProfile, saveBrowserCapture } from './browser-zoom-profile.mjs';
-import { selectOperation, backupButton, bannerText, downloadVia, exportButton, goTo, jsonFile, lot, opLabels, pickFile, record, recorded, startEmpty, storageBytes, usePractice, waitForApp } from './helpers.ts';
+import { selectOperation, backupButton, bannerText, downloadVia, exportButton, goTo, jsonFile, lot, opLabels, pickFile, record, recorded, startEmpty, storageBytes, usePractice, waitForApp, launchAdvanced } from './helpers.ts';
 
 test('UI構成基盤: 既存区画と操作を一つずつ配置し、共通入力と上部通知を保つ', async ({ page }) => {
   await page.goto('/');
   await waitForApp(page);
   const pages = {
     stock: ['getting-started', 'list', 'detail', 'production'],
+    sets: ['sets'],
     supply: ['supply', 'case', 'followup', 'consumables'],
     issues: ['issues', 'history'],
     masters: ['masters'],
@@ -22,7 +23,7 @@ test('UI構成基盤: 既存区画と操作を一つずつ配置し、共通入�
   await expect(page.locator('#workspace > #input')).toHaveCount(1);
   await expect(page.locator('header #save')).toHaveCount(1);
   await expect(page.locator('header #conflict')).toHaveCount(1);
-  await expect(page.locator('nav[aria-label="行き先"] > button')).toHaveCount(5);
+  await expect(page.locator('nav[aria-label="行き先"] > button')).toHaveCount(6);
   for (const id of ['reset-seed', 'reset-scn02', 'reset-empty', 'backup-save', 'backup-restore', 'view-export']) {
     await expect(page.locator(`#${id}`)).toHaveCount(1);
     await expect(page.locator(`#page-management #${id}`)).toHaveCount(1);
@@ -57,12 +58,12 @@ test('保存通知: 種類を文字で添え、既存の保存文言を残す', 
   await expect(page.locator('#save')).toContainText('保存した（操作ID：');
 });
 
-test('ナビゲーション部品: 五行き先で同一入力を保持し、標準キーで選べる', async ({ page }) => {
+test('ナビゲーション部品: 六行き先で同一入力を保持し、標準キーで選べる', async ({ page }) => {
   await navigationFixture(page);
   const field = page.locator('#retained-input');
   const original = await field.elementHandle();
   await field.fill('架空の未送信入力');
-  for (const destination of ['stock', 'supply', 'issues', 'masters', 'management', 'stock']) {
+  for (const destination of ['stock', 'sets', 'supply', 'issues', 'masters', 'management', 'stock']) {
     const button = page.locator(`#nav-${destination}`);
     await button.focus();
     await page.keyboard.press(destination === 'issues' ? 'Space' : 'Enter');
@@ -71,7 +72,7 @@ test('ナビゲーション部品: 五行き先で同一入力を保持し、標
     await expect(button).toHaveCSS('font-weight', '700');
     await expect(button).toHaveCSS('text-decoration-line', 'underline');
     await expect(page.locator('#destinations [aria-current]')).toHaveCount(1);
-    for (const other of ['stock', 'supply', 'issues', 'masters', 'management']) {
+    for (const other of ['stock', 'sets', 'supply', 'issues', 'masters', 'management']) {
       await expect(page.locator(`#page-${other}`)).toBeVisible({ visible: other === destination });
     }
     await expect(page.locator('#input')).toBeVisible({ visible: destination !== 'management' });
@@ -123,7 +124,7 @@ test('ナビゲーション部品: 件数・読取不能・詳細参照を扱い
     return { writes, countBefore, detail, unreadableCount, hiddenPages, about, zero, invalidRejected };
   });
   expect(result).toEqual({ writes: 0, countBefore: '3件', detail: { current: 'stock', focus: 'detail-h' },
-    unreadableCount: '件数を確認できない', hiddenPages: 5, about: { current: 'management', focus: 'about-h' }, zero: '0件', invalidRejected: 4 });
+    unreadableCount: '件数を確認できない', hiddenPages: 6, about: { current: 'management', focus: 'about-h' }, zero: '0件', invalidRejected: 4 });
 });
 
 for (const corruption of ['missing', 'duplicate']) {
@@ -234,7 +235,7 @@ test('画面統合: 読取不能でも上部情報と回復を残し、古い台
   await page.evaluate(() => localStorage.setItem('fuzzy-stock/head', '架空の破損'));
   await page.reload(); await waitForApp(page);
   const before = await storageBytes(page);
-  for (const destination of ['stock', 'supply', 'issues', 'masters', 'management']) {
+  for (const destination of ['stock', 'sets', 'supply', 'issues', 'masters', 'management']) {
     await page.locator(`#nav-${destination}`).click();
     await expect(page.locator('#actor')).toBeVisible();
     await expect(page.locator('#actor')).toBeDisabled();
@@ -360,7 +361,7 @@ test('表示統合: 長い原文と動的な表を保ち、狭幅ではページ
   await expect(page.locator('.table-scroll .table-scroll')).toHaveCount(0);
   for (const width of [1400, 901, 900, 899, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const destination of ['stock', 'supply', 'issues', 'masters', 'management']) {
+    for (const destination of ['stock', 'sets', 'supply', 'issues', 'masters', 'management']) {
       await page.locator(`#nav-${destination}`).click();
       const measured = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
       expect(measured.scroll, `${width}px ${destination}`).toBeLessThanOrEqual(measured.width);
@@ -466,7 +467,7 @@ test('共通手順: 管理操作をメニューから行い、記録は現在の
   expect(await storageBytes(page)).toEqual(unreadable);
 });
 
-const destinations = ['stock', 'supply', 'issues', 'masters', 'management'] as const;
+const destinations = ['stock', 'sets', 'supply', 'issues', 'masters', 'management'] as const;
 
 async function navigationState(page: Page) {
   return page.locator('#workspace').evaluate(root => ({
@@ -923,7 +924,7 @@ test('受け取り6.3: 1400pxの実Edgeウィンドウを200%ページ拡大し�
   const directory = '.local-logs/ui-reorganize';
   for (const factor of [1, 2] as const) {
     const profile = await browserZoomProfile(directory, factor);
-    const context = await chromium.launchPersistentContext(profile, {
+    const context = await launchAdvanced(profile, {
       channel: 'msedge', headless: true, viewport: null, locale: 'ja-JP', timezoneId: 'Asia/Tokyo', args: ['--window-size=1400,900'],
     });
     try {

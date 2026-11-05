@@ -80,6 +80,19 @@ export function createHistoryTargetCollector(context: HistoryTargetContext) {
     frame.items.add(request.item);
   }
 
+  function addTemplateNeedVersions(frame: Frame, event: Extract<SupplyTargetEvent, { kind: 'templateNeeds' }>): void {
+    const introduced = new Map(event.action === 'generate' || event.action === 'follow' ? event.versions.map(version => [version.id, version]) : []);
+    for (const recorded of context.supply?.log ?? []) {
+      if (recorded.eventId === event.eventId) break;
+      if (recorded.kind === 'templateNeeds' && (recorded.action === 'generate' || recorded.action === 'follow')) for (const version of recorded.versions) introduced.set(version.id, version);
+    }
+    for (const plan of [...event.plansBefore, ...event.plansAfter]) {
+      if (plan === null) continue;
+      const version = required(introduced.get(plan.version), '必要明細のセット版', plan.version);
+      for (const id of assemblyItemIds(version.template)) frame.items.add(id);
+    }
+  }
+
   function visitLedger(frame: Frame, event: LedgerTargetEvent, forward: ForwardOperationTargets | undefined): void {
     if (event.kind === 'master') return;
     for (const change of event.changes) {
@@ -144,6 +157,14 @@ export function createHistoryTargetCollector(context: HistoryTargetContext) {
 
   function visitSupply(frame: Frame, event: SupplyTargetEvent): void {
     switch (event.kind) {
+      case 'templateNeeds': {
+        for (const change of event.changes) {
+          if (change.before !== null) frame.items.add(change.before.item);
+          frame.items.add(change.after.item);
+        }
+        addTemplateNeedVersions(frame, event);
+        return;
+      }
       case 'receiptTemplateSave':
         if (event.before !== null) for (const id of assemblyItemIds(event.before)) frame.items.add(id);
         for (const id of assemblyItemIds(event.after)) frame.items.add(id);

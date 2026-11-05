@@ -22,7 +22,7 @@ export type SaveCheck = {
   resolution: { outcome: SaveOutcome; actor: string; at: string };
 };
 export type Snapshot = {
-  format: 'fuzzy-stock-f0'; version: 12; revision: number; lastWriter: string; opFloor: number;
+  format: 'fuzzy-stock-f0'; version: 13; revision: number; lastWriter: string; opFloor: number;
   ledger: Ledger; supply: Supply; ops: Readonly<Record<string, OpEntry>>; saveChecks: readonly SaveCheck[];
   conflictReviews: readonly ConflictReview[];
 };
@@ -409,8 +409,10 @@ export function commit(store: StoreLike, current: Snapshot, op: Omit<Pending, 'u
     return { kind: 'failed', reason: reasonOf(error) };
   }
 
+  let writtenPending: string;
   try {
-    store.setItem('fuzzy-stock/pending', serializePending(pending));
+    writtenPending = serializePending(pending);
+    store.setItem('fuzzy-stock/pending', writtenPending);
   } catch (error) {
     try {
       if (store.getItem('fuzzy-stock/pending') !== null) clearPending(store, pending);
@@ -447,7 +449,7 @@ export function commit(store: StoreLike, current: Snapshot, op: Omit<Pending, 'u
   }
   if (selected.loseResponseAt !== null) return uncertain(store, pending);
   try {
-    clearPending(store, pending);
+    clearPending(store, pending, writtenPending);
     return { kind: 'saved', snapshot };
   } catch {
     return uncertain(store, pending);
@@ -516,13 +518,14 @@ function appendedIds(before: Pick<UnitState, 'ledger' | 'supply' | 'conflictRevi
   return ids;
 }
 
-function requirePending(store: StoreLike, pending: Pending): void {
+function requirePending(store: StoreLike, pending: Pending, written?: string): void {
   const text = store.getItem('fuzzy-stock/pending');
-  if (text === null || !sameRegistration(decodePending(parseExactJson(text)), pending)) throw new Error('保存中の操作が変わっている');
+  // 検査済みの操作を書いた原文と一致する場合だけ、同じ内容の再復号を省く。
+  if (text === null || (text !== written && !sameRegistration(decodePending(parseExactJson(text)), pending))) throw new Error('保存中の操作が変わっている');
 }
 
-function clearPending(store: StoreLike, pending: Pending): void {
-  requirePending(store, pending);
+function clearPending(store: StoreLike, pending: Pending, written?: string): void {
+  requirePending(store, pending, written);
   store.removeItem('fuzzy-stock/pending');
 }
 
@@ -552,7 +555,7 @@ function checkedSnapshot(value: Snapshot): Snapshot {
 }
 
 export function serializePending(pending: Pending): string {
-  return encodeWithQuantities({ format: 'fuzzy-stock-pending', version: 12, pending });
+  return encodeWithQuantities({ format: 'fuzzy-stock-pending', version: 13, pending });
 }
 
 export function serialize(snapshot: Snapshot): string {
@@ -709,7 +712,7 @@ function encodeQuantities(value: unknown, sortKeys: boolean): { body: string; ta
 }
 
 export function initial(ledger: Ledger, supply: Supply): Snapshot {
-  return deepFreeze({ format: 'fuzzy-stock-f0', version: 12, revision: 0, lastWriter: 'init', opFloor: 1, ledger, supply, ops: {}, saveChecks: [], conflictReviews: [] });
+  return deepFreeze({ format: 'fuzzy-stock-f0', version: 13, revision: 0, lastWriter: 'init', opFloor: 1, ledger, supply, ops: {}, saveChecks: [], conflictReviews: [] });
 }
 
 export function load(store: StoreLike): LoadResult {
@@ -992,6 +995,7 @@ export function targetsOf(before: UnitState | { ledger: Ledger; supply: Supply; 
   }
   for (const event of after.supply.log.slice(before.supply.log.length)) {
     switch (event.kind) {
+      case 'templateNeeds': for (const change of event.changes) targets.add(`必要明細${change.after.id}`); break;
       case 'receiptTemplateSave': targets.add(`受入テンプレート${event.after.id}`); break;
       case 'receiptTemplateDelete': targets.add(`受入テンプレート${event.before.id}`); break;
       case 'templateReceipt': targets.add(`一括受入${event.eventId}`); break;
