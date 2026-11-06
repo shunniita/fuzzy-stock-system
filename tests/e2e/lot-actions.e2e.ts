@@ -126,6 +126,7 @@ test('対象候補: 16操作を状態で絞り、統合元だけを固定して�
   await form.getByRole('button', { name: '記録する', exact: true }).click();
   await expect(page.locator('#detail [aria-label="この保管単位にできる操作"]')).toHaveCount(0);
   await expect(page.locator('#input')).toContainText('対象 source は現在この操作を記録できません');
+  await expect(page.locator('#input [role=status]')).toContainText('記録した');
   await expect(form).toHaveCount(0);
   const saved = await snapshotOf(page);
   expect(saved.ledger.lots['source']?.mergedInto).toBe('target');

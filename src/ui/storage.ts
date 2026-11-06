@@ -364,6 +364,7 @@ function reviewRecoveryBlocked(snapshot: Snapshot, check: { resolution: Pick<Sav
 
 export function commit(store: StoreLike, current: Snapshot, op: Omit<Pending, 'units' | 'progress' | 'unknownSince' | 'baseRevision'>, units: UnitState[]): CommitResult {
   let pending: Pending;
+  let pendingText: string;
   let prepared: { unit: UnitState; ids: string[] }[];
   let slot: 'A' | 'B';
   let opFloor: number;
@@ -398,9 +399,13 @@ export function commit(store: StoreLike, current: Snapshot, op: Omit<Pending, 'u
     opFloor = nextFloor(current, op);
     if (Number(op.opId.slice(2)) < current.opFloor || current.saveChecks.some(check => check.opId === op.opId)) return { kind: 'mismatch', reason: `操作ID ${op.opId} は使用済みのため新しい保存に使えない` };
     if (units.length === 0 || !Number.isSafeInteger(current.revision + units.length)) throw new Error('確定する単位がない、または保存の版数が整数の精度を超える');
-    pending = deepFreeze(checkedPending({ ...op, units, progress: 'saving', unknownSince: null, savingSince: op.startedAt, baseRevision: current.revision }));
+    // 検査で作った原文は検査済みの値と同じ内容なので、そのまま書き込みに使う。
+    pendingText = serializePending({ ...op, units, progress: 'saving', unknownSince: null, savingSince: op.startedAt, baseRevision: current.revision });
+    pending = deepFreeze(decodePending(parseExactJson(pendingText)));
     for (const unit of pending.units) requireSameItemPrecisions(current.ledger.masters, unit.ledger.masters);
-    prepared = preparedUnits(current, pending.units, pending);
+    // 続き具合の検査は、現在の値と要素の参照を共有する入力の単位で行う。書くのは復号した単位（入力と同じ原文から作った値）。
+    const decoded = pending.units;
+    prepared = preparedUnits(current, units, pending).map(({ ids }, i) => ({ unit: decoded[i]!, ids }));
     const head = store.getItem('fuzzy-stock/head');
     if (head !== 'A' && head !== 'B') return { kind: 'conflict' };
     slot = head;
@@ -409,9 +414,8 @@ export function commit(store: StoreLike, current: Snapshot, op: Omit<Pending, 'u
     return { kind: 'failed', reason: reasonOf(error) };
   }
 
-  let writtenPending: string;
+  const writtenPending = pendingText;
   try {
-    writtenPending = serializePending(pending);
     store.setItem('fuzzy-stock/pending', writtenPending);
   } catch (error) {
     try {
@@ -463,10 +467,29 @@ function failureOf(error: unknown): { reason: string; quota?: true } {
   return { reason: reasonOf(error), ...(error instanceof DOMException && error.name === 'QuotaExceededError' ? { quota: true as const } : {}) };
 }
 
+// 凍結した写しが読まれた・書かれた原文。同じ原文の写し同士は、数量の表を作り直さずに一致とわかる（原文が違っても値が同じことはあるので、そのときは比べ直す）。
+// serializeに渡す凍結した写しは、復号しても変わらない形（復号器と同じ欄・版、中まで凍結）である前提。外れると、復号すれば違う写しを一致とみなす。
+const sourceText = new WeakMap<object, string>();
+
 // 数量を表の番号にしてから比べる。メモリ上の数量は観測の並びを数量ごとに持つので、そのまま文字列にすると比較が操作数の二乗で遅くなる。
 function sameValue(a: unknown, b: unknown): boolean {
+  const text = sourceText.get(a as object);
+  if (text !== undefined && text === sourceText.get(b as object)) return true;
+  if (sameMembers(a, b)) return true;
   const x = encodeQuantities(a, true); const y = encodeQuantities(b, true);
   return x.body === y.body && x.table === y.table;
+}
+
+// 履歴の接頭辞や保管単位の表は、多くの場合、前の値の要素をそのまま参照する。要素が全部同じ参照なら値も同じ。
+function sameMembers(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  // 欄で比べられるのは素の表と配列だけ。日時などは欄を持たず、穴のある配列は欄の数と長さが合わない。
+  const plain = (v: object) => Array.isArray(v) ? Object.keys(v).length === v.length : Object.getPrototypeOf(v) === Object.prototype;
+  if (Array.isArray(a) !== Array.isArray(b) || !plain(a) || !plain(b)) return false;
+  const x = a as Record<string, unknown>, y = b as Record<string, unknown>;
+  const keys = Object.keys(x);
+  return keys.length === Object.keys(y).length && keys.every(key => Object.hasOwn(y, key) && x[key] === y[key]);
 }
 
 export function sameSnapshot(a: Snapshot, b: Snapshot): boolean {
@@ -542,7 +565,9 @@ function uncertain(store: StoreLike, pending: Pending): { kind: 'unknown'; pendi
 
 export function parse(text: string): Snapshot {
   const value: unknown = parseExactJson(text);
-  return deepFreeze(decodeSnapshot(value));
+  const snapshot = deepFreeze(decodeSnapshot(value));
+  sourceText.set(snapshot, text);
+  return snapshot;
 }
 
 // メモリ上の値の検査も、数量を表にした形を通す。展開した入れ子をそのまま復号すると、数が不明の入れ子で操作数の三乗の時間がかかる。
@@ -559,7 +584,9 @@ export function serializePending(pending: Pending): string {
 }
 
 export function serialize(snapshot: Snapshot): string {
-  return encodeWithQuantities(snapshot);
+  const text = encodeWithQuantities(snapshot);
+  if (Object.isFrozen(snapshot)) sourceText.set(snapshot, text);
+  return text;
 }
 
 type QuantityItem =

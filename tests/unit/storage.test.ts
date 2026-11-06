@@ -1370,3 +1370,15 @@ describe('B3 task2.2 保存の確定境界（AT-23・AT-24・AT-38・AT-39の単
     expect(store.writes).toEqual([]);
   });
 });
+
+test('一致確認の近道: 同じ原文・同じ参照なら一致とし、値が違えば原文や要素の一部が同じでも一致としない', () => {
+  const base = initial(practiceBase, emptySupply);
+  const text = serialize(base);
+  expect(sameSnapshot(parse(text), base)).toBe(true);
+  expect(sameSnapshot(parse(text), parse(text))).toBe(true);
+  const revised = deepFreeze({ ...base, revision: base.revision + 1 });
+  serialize(revised);
+  expect(sameSnapshot(parse(text), revised)).toBe(false);
+  expect(sameSnapshot(base, deepFreeze({ ...base, ledger: { ...base.ledger, history: [...base.ledger.history] } }))).toBe(true);
+  expect(sameSnapshot(base, deepFreeze({ ...base, ops: { ...base.ops, op9: { fingerprint: '架空', units: [] } } }))).toBe(false);
+});

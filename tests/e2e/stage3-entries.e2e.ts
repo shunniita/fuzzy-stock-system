@@ -79,6 +79,99 @@ test('確認事項の行から: 仮の記録を選び、片付ける・対応付
   await expect(page.locator('#issues').getByText('この確認事項にできる操作はない')).toBeVisible();
 });
 
+test('確認事項の行から: 対応付けと新規登録は選んだ仮の記録を固定し、その仮の記録だけを片付ける', async ({ page }) => {
+  await startEmpty(page);
+  await recorded(page, 'register', { newId: 'X', item: 'P', unit: '個', project: 'B-001', location: 'S1', basis: 'counted', value: '5' }, '09:00');
+  await recorded(page, 'provisional', { direction: 'found', item: 'P', location: 'S1', basis: 'counted', value: '3', note: '架空の棚の奥' }, '09:10');
+  await recorded(page, 'provisional', { direction: 'found', item: 'P', location: 'T', basis: 'counted', value: '2', note: '架空の作業台の下' }, '09:20');
+  const actions = page.locator('#issues').getByRole('group', { name: 'この確認事項にできる操作' });
+  const open = async (issue: string, op: 'identify' | 'adopt') => {
+    await goTo(page, 'issues');
+    await page.locator(`#issues tr[data-issue="${issue}"]`).getByRole('button', { name: issue, exact: true }).click();
+    await actions.getByRole('button', { name: opLabels[op], exact: true }).click();
+    await expect(form(page).locator('input[type=hidden][name=issue]')).toHaveValue(issue);
+  };
+  // 後の仮の記録（op3）を選び、先の仮の記録（op2）が選ばれないことを確かめる。
+  await open('op3', 'adopt');
+  await form(page).locator('[name=newId]').fill('Y');
+  // 品目と場所は仮の記録に書いた値で始まる。
+  await expect(form(page).locator('[name=item]')).toHaveValue('P');
+  await expect(form(page).locator('[name=location]')).toHaveValue('T');
+  await form(page).locator('[name=project]').selectOption('B-001');
+  await form(page).getByRole('button', { name: '記録する', exact: true }).click();
+  const confirmed = form(page).locator('[name=confirmed]');
+  if (await confirmed.isVisible()) { await confirmed.check(); await form(page).getByRole('button', { name: '記録する', exact: true }).click(); }
+  await expect(page.locator('#input > [role=status]')).toContainText('記録した');
+  let saved = await snapshotOf(page);
+  expect(saved.ledger.issues['op3']?.resolution).not.toBeNull();
+  expect(saved.ledger.issues['op2']?.resolution).toBeNull();
+  expect(saved.ledger.lots['Y']?.location).toBe('T');
+  await open('op2', 'identify');
+  await form(page).locator('[name=lot]').selectOption('X');
+  await form(page).locator('[name=reason]').fill('架空の同じ箱');
+  await submit(page);
+  saved = await snapshotOf(page);
+  expect(saved.ledger.issues['op2']?.resolution).not.toBeNull();
+  expect(saved.ledger.history.filter(e => e.kind === 'identify').map(e => e.kind === 'identify' && e.issueId)).toEqual(['op2']);
+});
+
+test('保管単位の詳細から: 残り具合と予備の交換は、選んだ保管単位を固定して記録する', async ({ page }) => {
+  await startEmpty(page);
+  const unknown = { item: 'P', unit: '個', project: 'B-001', location: 'S1', basis: 'unknown', value: '' };
+  await recorded(page, 'register', { ...unknown, newId: 'OPEN1' }, '08:00');
+  await recorded(page, 'register', { ...unknown, newId: 'OPEN2' }, '08:00');
+  for (const id of ['R1', 'R2']) {
+    await recorded(page, 'receive', { newId: id, item: 'P', unit: '個', project: 'B-001', location: 'S1', basis: 'counted', value: '10' }, '08:10');
+    await recorded(page, 'surplusAllocate', { lot: id, childId: `${id}-sp`, basis: 'counted', value: '2', destination: 'spare', note: '架空の備え' }, '08:20');
+  }
+  const openFromDetail = async (lot: string, op: 'remainder' | 'spareSwap') => {
+    await goTo(page, 'stock');
+    await page.locator(`#list tr[data-lot="${lot}"]`).getByRole('button', { name: lot, exact: true }).click();
+    const other = page.locator('#detail .other-operations');
+    await other.locator('summary').click();
+    await other.locator(`button[data-op=${op}]`).click();
+    await expect(form(page).locator('input[type=hidden][name=lot]')).toHaveValue(lot);
+  };
+  // 候補の先頭（OPEN1・R1-sp）でない方を選び、固定が効いていることを確かめる。
+  await openFromDetail('OPEN2', 'remainder');
+  await form(page).locator('[name=level]').selectOption('few');
+  await submit(page);
+  expect(Object.keys((await snapshotOf(page)).supply.levels)).toEqual(['OPEN2']);
+  await openFromDetail('R2-sp', 'spareSwap');
+  await form(page).locator('[name=value]').fill('1');
+  await form(page).locator('[name=childId]').fill('R2-sw');
+  await form(page).locator('[name=note]').fill('架空の破損');
+  await submit(page);
+  const lots = (await snapshotOf(page)).ledger.lots;
+  expect(Object.keys(lots).filter(id => id.endsWith('-sw'))).toEqual(['R2-sw']);
+});
+
+test('所属が不明な保管単位の詳細から: 結び付けを対象固定で開き、所属がある物には出さない', async ({ page }) => {
+  await startEmpty(page);
+  const lot = { item: 'R', unit: '台', location: 'S1', basis: 'counted', value: '1' };
+  await recorded(page, 'register', { ...lot, newId: 'U-1', project: 'unassigned' }, '08:00');
+  await recorded(page, 'register', { ...lot, newId: 'U-2', project: 'unassigned' }, '08:00');
+  await recorded(page, 'register', { ...lot, newId: 'K', project: 'B-001' }, '08:00');
+  const detailOps = async (id: string) => {
+    await goTo(page, 'stock');
+    await page.locator(`#list tr[data-lot="${id}"]`).getByRole('button', { name: id, exact: true }).click();
+    return page.locator('#detail .other-operations');
+  };
+  await expect((await detailOps('K')).locator('summary')).toBeVisible();
+  await expect(page.locator('#detail [data-op=assignProject]')).toHaveCount(0);
+  const other = await detailOps('U-2');
+  await other.locator('summary').click();
+  await other.locator('button[data-op=assignProject]').click();
+  await expect(form(page).locator('input[type=hidden][name=lot]')).toHaveValue('U-2');
+  await form(page).locator('[name=project]').selectOption('A-002');
+  await form(page).locator('[name=reason]').fill('架空の指示書で判明');
+  await submit(page);
+  // 結び付けた物はもう対象にならないが、記録できたことは消さずに理由と並べる。
+  await expect(page.locator('#input [role=status]')).toContainText('対象 U-2 は現在この操作を記録できません');
+  const lots = (await snapshotOf(page)).ledger.lots;
+  expect([lots['U-1']?.project, lots['U-2']?.project]).toEqual([{ kind: 'unassigned' }, { kind: 'case', id: 'A-002' }]);
+});
+
 test('受け取った現物の詳細から: 実際に受け取った数の訂正と余った分の振り分けを対象固定で開く', async ({ page }) => {
   await startEmpty(page);
   await recorded(page, 'receive', { newId: 'R1', item: 'P', unit: '個', project: 'B-001', location: 'S1', basis: 'counted', value: '10' });

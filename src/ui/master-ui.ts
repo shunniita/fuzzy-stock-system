@@ -7,6 +7,7 @@ import {
   openIssues,
   type Issue,
   type Ledger,
+  type Lot,
   type MasterRequest,
   type NewMaster,
   type Process,
@@ -171,6 +172,8 @@ function foundIssue(ledger: Ledger, i: Issue): boolean {
   return i.resolution === null && i.reason === 'unassigned' && origin?.kind === 'provisional' && origin.direction === 'found';
 }
 
+const unassigned = (l: Lot): boolean => l.project.kind === 'unassigned';
+
 function foundIssueField(ledger: Ledger): HTMLLabelElement {
   const options = openIssues(ledger).flatMap((i): [string, string][] => foundIssue(ledger, i) ? [[i.id, `${i.id}：${eventText(ledger, ledger.history.find((e) => e.eventId === i.id)!)}`]] : []);
   return choiceField('issue', '見つかった物の仮の記録', options);
@@ -254,16 +257,29 @@ export function masterOps(ctx: Ctx): Record<string, UiOp> {
       label: '仮の記録を新しい保管単位にする',
       fields: () => {
         const masters = ctx.ledger().masters;
-        return [foundIssueField(ctx.ledger()), textField('newId', '新しい保管単位のID（文字列のまま保存）'), ...itemFields(masters),
-          projectField(masters), codeTarget(fixedPlaceTime(choiceField('location', '場所', placeOptions(masters))), 'location', { hold: 'location' })];
+        const issue = foundIssueField(ctx.ledger()), items = itemFields(masters);
+        const place = codeTarget(fixedPlaceTime(choiceField('location', '場所', placeOptions(masters))), 'location', { hold: 'location' });
+        // 仮の記録に書いた品目・場所で始める。選び直せる。
+        issue.querySelector('select')!.addEventListener('change', (event) => {
+          const origin = ctx.ledger().history.find((e) => e.eventId === (event.target as HTMLSelectElement).value);
+          if (origin?.kind !== 'provisional') return;
+          for (const [label, value] of [[items[0]!, origin.item], [place, origin.location]] as const) {
+            const select = label.querySelector('select')!;
+            if (value === null || ![...select.options].some((o) => o.value === value)) continue;
+            select.value = value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+        return [issue, textField('newId', '新しい保管単位のID（文字列のまま保存）'), ...items, projectField(masters), place];
       },
       run: (s, m, v) => ({ state: { ...s, ledger: adoptProvisional(s.ledger, m, v.text('issue'), { id: v.text('newId'), item: v.text('item'), unit: v.text('unit'), project: projectOf(v), location: v.text('location') }, v.checked('confirmed')) } }),
     },
     assignProject: {
+      subject: { kind: 'lot', field: 'lot', accepts: (l) => l.mergedInto === null && unassigned(l) },
       label: '所属が不明な保管単位の結び付け',
       fields: () => {
         const masters = ctx.ledger().masters;
-        return [codeTarget(choiceField('lot', '案件・用途が不明な保管単位', lotOptions(ctx.ledger(), (l) => l.project.kind === 'unassigned')), 'lot'),
+        return [codeTarget(choiceField('lot', '案件・用途が不明な保管単位', lotOptions(ctx.ledger(), unassigned)), 'lot'),
           codeTarget(choiceField('project', '結び付け先', projectsOf(masters).filter((p) => p.kind !== 'unassigned').map((p) => [projectKey(p), projectText(masters, p)])), 'project'), reasonField()];
       },
       run: (s, m, v) => ({ state: { ...s, ledger: assignProject(s.ledger, m, v.text('lot'), projectOf(v), v.text('reason'), v.checked('confirmed')) } }),

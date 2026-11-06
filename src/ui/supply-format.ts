@@ -268,6 +268,11 @@ export function stateTriadText(view: ShortageView, s: RequestSummary, openStops:
 // 補充確認は確定した判定ではなく、依頼を自動で作らない（SUP-05）。既存の依頼を併せて示す（SUP-04b）。
 // 1箱あたりの数を変えたあとは箱ごとに1箱あたりの数が違い得るので、箱ごとの1箱あたりの数と、適用時点ごとの1箱あたりの数を示す（MST-05、要件6.8）。
 export function consumableLinesText(ledger: Ledger, cfg: StockItem, lots: readonly Lot[], stock: StockOfItem, notice: Notice, requests: readonly Request[]): string[] {
+  return [...quantityLines(ledger, cfg, lots, stock), ...replenishmentLines(cfg, stock, notice), ...requestLines(ledger, requests)];
+}
+
+// 包装・バラ・合計と、合算していない分の内訳。
+function quantityLines(ledger: Ledger, cfg: StockItem, lots: readonly Lot[], stock: StockOfItem): string[] {
   const { pieceUnit } = cfg;
   const packaging = own(ledger.masters.items, cfg.item)?.packaging ?? null;
   const boxUnit = packaging?.boxUnit ?? '包装';
@@ -299,41 +304,40 @@ export function consumableLinesText(ledger: Ledger, cfg: StockItem, lots: readon
   if (stock.precisionLimited.length > 0) lines.push(`合算していない分（${quantityStepOf(ledger.masters, cfg.item, pieceUnit) === 1 ? '整数' : '数量'}の精度を保てる上限を超える）：${stock.precisionLimited.map((l) => `${l.id} ${quantityText(l.quantity, l.unit)}`).join('、')}`);
   if (stock.stepMismatched.length > 0) lines.push(`合算していない分（集計単位の最小単位に合わない）：${stock.stepMismatched.map(l => `${l.id} ${quantityText(l.quantity, l.unit)}`).join('、')}`);
   if (stock.levelOnly.length > 0) lines.push(`残量区分のみ（数量へは換算しない）：${stock.levelOnly.map((x) => `${x.lotId} ${remainderText[x.level]}`).join('、')}`);
+  return lines;
+}
 
-  if (cfg.rule) {
-    const rule = cfg.rule;
-    if (notice.kind === 'none') {
-      lines.push(`補充基準${rule.threshold}${rule.pieceUnit}。補充確認は出ていない（基準以上、または比べられる数値も区分もない）。標準依頼数量${rule.standardOrder.value}${rule.standardOrder.unit}`);
-    } else {
-      const basis = [
-        notice.approximate ? '約（だいたい）を含む' : null,
-        notice.unconfirmed ? '中身未確認（表示の数（ラベル・パッケージ））を含む' : null,
-        notice.hasUnknown ? '不明の部分・合算していない分がある' : null,
-        notice.levelOnly ? '残量区分のみの開封分がある' : null,
-        notice.openIssue ? '未解決の確認事項がある（保留した操作の前の数量を、通常の在庫として断定しない）' : null,
-      ].filter((t) => t !== null);
-      // 補充確認が出た理由ごとに見出しを分ける。基準以上の本数を「下回る」とは書かない。
-      const n = stock.pieces ? numericPart(stock.pieces) : null;
-      const head =
-        stock.precisionLimited.length > 0
-          ? `精度の上限で合算していない分があるので、補充の要否を断定できない`
-          : stock.stepMismatched.length > 0
-          ? '集計単位の最小単位に合わず合算していない分があるので、補充の要否を断定できない'
-          : n !== null
-          ? n < rule.threshold
-            ? `数量の数値部分が補充基準${rule.threshold}${rule.pieceUnit}を下回る`
-            : notice.openIssue
-              ? `数量の数値部分は補充基準${rule.threshold}${rule.pieceUnit}以上に見えるが、未解決の確認事項があるので、補充の要否を断定できない`
-              : `数量の数値部分は補充基準${rule.threshold}${rule.pieceUnit}以上に見えるが、だいたい・中身未確認を含むので、補充の要否を断定できない`
-          : notice.levelOnly
-            ? '数値部分がなく残量区分だけなので、数量では比べない'
-            : notice.openIssue
-              ? '数量の数値部分がなく、未解決の確認事項があるので、補充の要否を断定できない'
-              : '数量の数値部分がなく、合算していない分・不明の部分だけなので、補充の要否を断定できない';
-      lines.push(`補充確認：${head}（標準依頼数量${rule.standardOrder.value}${rule.standardOrder.unit}）。根拠：${basis.length === 0 ? '数えた数' : basis.join('・')}。確定した判定ではない。依頼は自動では作らない`);
-    }
+// 補充確認が出た理由ごとに見出しを分ける。
+function replenishmentLines(cfg: StockItem, stock: StockOfItem, notice: Notice): string[] {
+  const rule = cfg.rule;
+  if (!rule) return [];
+  if (notice.kind === 'none') return [`補充基準${rule.threshold}${rule.pieceUnit}。補充確認は出ていない（基準以上、または比べられる数値も区分もない）。標準依頼数量${rule.standardOrder.value}${rule.standardOrder.unit}`];
+  const basis = [
+    notice.approximate ? '約（だいたい）を含む' : null,
+    notice.unconfirmed ? '中身未確認（表示の数（ラベル・パッケージ））を含む' : null,
+    notice.hasUnknown ? '不明の部分・合算していない分がある' : null,
+    notice.levelOnly ? '残量区分のみの開封分がある' : null,
+    notice.openIssue ? '未解決の確認事項がある（保留した操作の前の数量を、通常の在庫として断定しない）' : null,
+  ].filter((t) => t !== null);
+  return [`補充確認：${replenishmentHead(rule, stock, notice)}（標準依頼数量${rule.standardOrder.value}${rule.standardOrder.unit}）。根拠：${basis.length === 0 ? '数えた数' : basis.join('・')}。確定した判定ではない。依頼は自動では作らない`];
+}
+
+// 基準以上の本数を「下回る」とは書かない。
+function replenishmentHead(rule: NonNullable<StockItem['rule']>, stock: StockOfItem, notice: Exclude<Notice, { kind: 'none' }>): string {
+  if (stock.precisionLimited.length > 0) return '精度の上限で合算していない分があるので、補充の要否を断定できない';
+  if (stock.stepMismatched.length > 0) return '集計単位の最小単位に合わず合算していない分があるので、補充の要否を断定できない';
+  const n = stock.pieces ? numericPart(stock.pieces) : null;
+  const threshold = `補充基準${rule.threshold}${rule.pieceUnit}`;
+  if (n !== null) {
+    if (n < rule.threshold) return `数量の数値部分が${threshold}を下回る`;
+    return `数量の数値部分は${threshold}以上に見えるが、${notice.openIssue ? '未解決の確認事項がある' : 'だいたい・中身未確認を含む'}ので、補充の要否を断定できない`;
   }
+  if (notice.levelOnly) return '数値部分がなく残量区分だけなので、数量では比べない';
+  return `数量の数値部分がなく、${notice.openIssue ? '未解決の確認事項がある' : '合算していない分・不明の部分だけな'}ので、補充の要否を断定できない`;
+}
 
+function requestLines(ledger: Ledger, requests: readonly Request[]): string[] {
+  const lines: string[] = [];
   const open = requests.filter((r) => r.cancelled === null);
   if (open.length === 0) lines.push('既存の依頼はない');
   for (const r of open) {

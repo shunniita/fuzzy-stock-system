@@ -738,7 +738,8 @@ function renderInput(): void {
   const stop = (text: string) => root.append(picker.browsing, choice, h('p', { role: 'status' }, text));
   const subject = capture.op.subject;
   if (currentTarget !== undefined && !targetFits(currentTarget)) {
-    stop(`対象 ${currentTarget.id} は現在この操作を記録できません。${targetOrigin[currentTarget.kind]}から別の操作を選んでください。`);
+    // 記録の結果で対象が条件を外れた直後は、記録できたことを理由の前に残す。
+    stop(`${message?.kind === 'ok' ? `${message.text}。` : ''}対象 ${currentTarget.id} は現在この操作を記録できません。${targetOrigin[currentTarget.kind]}から別の操作を選んでください。`);
     return;
   }
   // 最初の選択肢が選ばれたまま再送すると、答えていないのに回答として扱われるので、空を先頭に置く。
