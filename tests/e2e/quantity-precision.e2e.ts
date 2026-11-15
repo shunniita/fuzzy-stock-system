@@ -31,7 +31,7 @@ test('1.1・2.1・3.1〜3.4: 0.1単位の品目を登録し、必要1・受け�
   await fill(page, 'needRegister', { project: 'A-001', item: 'D', unit: 'kg' });
   await expect(form(page).locator('#hint-value')).toHaveText('kgの最小単位0.1・上限562949953421311.9');
   await set(form(page).locator('[name=unit]'), '個');
-  await expect(form(page).locator('#hint-value')).toHaveText('個の最小単位1（整数）・上限9007199254740991');
+  await expect(form(page).locator('#hint-value')).toHaveText('個の最小単位1（整数）');
   await expect(form(page).getByLabel('数量（数が不明なら空欄。0は0と入力）')).toHaveAttribute('aria-describedby', 'hint-value');
 
   const need = { project: 'A-001', item: 'D', basis: 'counted', dueDate: '2026-10-10', source: '架空の必要部品一覧', revision: '初版' };

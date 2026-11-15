@@ -132,7 +132,7 @@ test('AT-30/46: 読取不能から名称検索・既存欄・同じ欄へのID�
   await fill(page, { newId: 'manual-id', project: 'A-001', location: 'S1', basis: 'counted', value: '0' }); await save(page);
   expect((await snapshot(page)).ledger.history.at(-1)?.scan?.raw).toBe('P_Q-02');
   await expect(cell(page, 'failed-raw', '品目')).toContainText('007');
-  await expect(cell(page, 'selected', '品目')).toHaveText('7');
+  await expect(cell(page, 'selected', '品目')).toHaveText('架空品7（7）');
 });
 
 test('AT-46: 未登録・中断の候補を適用せず検索へ進み、二つの保管単位を自動確定しない', async ({ page }) => {

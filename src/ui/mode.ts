@@ -22,7 +22,7 @@ export function writeMode(mode: Mode): void {
 
 // 簡単操作モードで入口から開ける操作。ここにない操作は二段選択（高度な操作モード）からだけ開く。
 export const simpleOps: ReadonlySet<string> = new Set([
-  'register', 'use', 'move', 'split', 'merge', 'recount', 'hold', 'release',
+  'register', 'use', 'move', 'split', 'splitMove', 'merge', 'recount', 'hold', 'release',
   'masterItem', 'masterLocation', 'masterRename', 'masterDeactivate', 'masterReactivate',
   'void', 'correctTime', 'resolve',
 ]);
@@ -31,6 +31,17 @@ export const simpleOps: ReadonlySet<string> = new Set([
 export function nextLotId(lots: Readonly<Record<string, unknown>>): string {
   for (let n = 1; ; n++) {
     const id = `L-${String(n).padStart(4, '0')}`;
+    if (!Object.hasOwn(lots, id)) return id;
+  }
+}
+
+export function nextSplitId(lots: Readonly<Record<string, unknown>>, source: string): string {
+  if (source === '' || /^L-(?:\d{4}|[1-9]\d{4,})$/.test(source)) return nextLotId(lots);
+  const parts = /^(.*?)(\d+)$/.exec(source);
+  if (parts === null) return '';
+  const prefix = parts[1]!, digits = parts[2]!;
+  for (let n = BigInt(digits) + 1n; ; n++) {
+    const id = `${prefix}${String(n).padStart(digits.length, '0')}`;
     if (!Object.hasOwn(lots, id)) return id;
   }
 }

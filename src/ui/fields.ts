@@ -1,5 +1,5 @@
-import { InclusionRequired, noStage, processUsed, register, type Ledger, type Lot, type Meta, type Process, type Project, type Stage } from '../domain/ledger.ts';
-import type { Basis } from '../domain/quantity.ts';
+import { decreased, inclusionOf, InclusionRequired, noStage, processUsed, register, type Ledger, type Lot, type Meta, type Process, type Project, type Stage } from '../domain/ledger.ts';
+import { observe, quantityOf, type Basis } from '../domain/quantity.ts';
 import { choiceField, h, textField, type Values } from './dom.ts';
 import { inScopeAt, own, processOf, processRef, quantityStepOf, unassignedCode, type Masters } from '../domain/masters.ts';
 import { parseSignedScalar, scalarLimitText, StepMismatch, type Step } from '../domain/scalar.ts';
@@ -52,13 +52,13 @@ export function stopProcessOptions(ledger: Ledger): [string, string][] {
 // 場所の選択肢のうち、その時点で記録の対象外のものを選べなくする（要件7.3・7.4）。選ぶ欄は、選んでいたものが外れたら選び直させる。
 // 不明を選べる欄（仮の記録）は、選んでいた場所を黙って不明にしないよう、選んだままにして台帳に断らせる。
 // 判断の時点が入力中の実際の日時でない欄（data-place-time=fixed。仮の記録からの登録は仮の記録の時点で判断する）は絞らない。
-export function restrictPlaces(form: HTMLFormElement, masters: Masters, at: string): void {
+export function restrictPlaces(form: HTMLFormElement, masters: Masters, at: string, excludedLocation?: string): void {
   for (const select of form.querySelectorAll<HTMLSelectElement>('select[name=location]')) {
     if (select.dataset['placeTime'] === 'fixed') continue;
     const choosing = select.dataset['required'] !== undefined;
     for (const option of select.options) {
       const place = option.value === '' ? undefined : own(masters.locations, option.value);
-      const outside = place !== undefined && !inScopeAt(place, at);
+      const outside = place !== undefined && (!inScopeAt(place, at) || place.id === excludedLocation);
       option.disabled = option.hidden = outside && (choosing || !option.selected);
     }
     if (choosing && select.selectedOptions[0]?.disabled) select.value = '';
@@ -140,10 +140,88 @@ export function quantityStepFor(masters: Masters, target: QuantityTarget): Step 
 }
 
 export function hintText(masters: Masters, target: QuantityTarget): string {
-  if (target === null) return '最小単位と上限は、対象（品目と単位、または保管単位・依頼）を選ぶと示す';
-  if (target === 'unitless') return '最小単位1（単位を持たない仮の記録は整数だけ）・上限' + scalarLimitText(1);
+  if (target === null) return '最小単位は、対象（品目と単位、または保管単位・依頼）を選ぶと示す';
+  if (target === 'unitless') return '最小単位1（単位を持たない仮の記録は整数だけ）';
   const step = quantityStepOf(masters, target.item, target.unit);
-  return `${target.unit}の最小単位${step}${step === 1 ? '（整数）' : ''}・上限${scalarLimitText(step)}`;
+  return `${target.unit}の最小単位${step}${step === 1 ? '（整数）' : `・上限${scalarLimitText(step)}`}`;
+}
+
+// shortcut: 台帳の decrease を呼ぶ画面の操作を手で列挙している。減算する操作を足したらここにも足す。
+const quantityWarningOps: ReadonlySet<string> = new Set([
+  'use', 'handover', 'split', 'splitMove', 'finish', 'inspect', 'toNext', 'stageFix', 'surplusAllocate', 'spareSwap', 'reworkReplace',
+  'start', 'recipeStart',
+]);
+
+export type WarningRow = { lot: string; basis: string; value: string; inclusion: string | null };
+
+// 行を実行順に差し引き、負数になる行には差し引く前の保管単位を返す。未反映になる超過は残数を減らさない。
+// 数が不明・だいたい・包含済み・包含不明の行と、未入力・回答待ち・精度外の値は注意しない（記録時の検査で案内する）。
+export function overdrawnLots(ledger: Ledger, rows: readonly WarningRow[], occurredAt: string | null): (Lot | null)[] {
+  let preview = ledger;
+  return rows.map(row => {
+    const lot = own(preview.lots, row.lot);
+    if (!lot || (row.value.trim() === '' && row.basis !== 'unknown')) return null;
+    try {
+      const answer = row.inclusion === 'included' || row.inclusion === 'notIncluded' || row.inclusion === 'unknown' ? row.inclusion : undefined;
+      const inclusion = inclusionOf(preview, lot, occurredAt, answer);
+      if (inclusion === 'included' || inclusion === 'unknown') return null;
+      const step = quantityStepOf(ledger.masters, lot.item, lot.unit);
+      const { basis, value } = amount({ text: name => name === 'basis' ? row.basis : name === 'value' ? row.value : '', checked: () => false, step: () => step });
+      const remaining = decreased(preview, lot, quantityOf(observe('preview', basis, value, step)));
+      if (remaining !== null) {
+        preview = { ...preview, lots: { ...preview.lots, [lot.id]: remaining } };
+        return null;
+      }
+      return lot.quantity.kind === 'known' && !lot.quantity.numeric.approximate ? lot : null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+function warningRows(form: HTMLFormElement, op: string): { input: HTMLInputElement; row: WarningRow }[] {
+  const valueOf = formValue(form);
+  const prefixes = op === 'start' || op === 'recipeStart' ? [...form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[name$=lot]')]
+    .map(node => node.name.slice(0, -3)).filter(prefix => /^(m[1-3]|e\d+u\d+)$/.test(prefix)) : [''];
+  const fixedBasis = op === 'spareSwap' || op === 'reworkReplace' ? 'counted' : null;
+  return prefixes.flatMap(prefix => {
+    const estimate = /^(e\d+)u(\d+)$/.exec(prefix);
+    if (estimate && (valueOf(`${estimate[1]}decision`) !== 'use' || Number(estimate[2]) >= Number(valueOf(`${estimate[1]}count`)))) return [];
+    const input = form.elements.namedItem(`${prefix}value`);
+    if (!(input instanceof HTMLInputElement)) return [];
+    return [{ input, row: { lot: valueOf(`${prefix}lot`) ?? '', basis: fixedBasis ?? valueOf(`${prefix}basis`) ?? '', value: input.value, inclusion: valueOf(`${prefix}inclusion`) } }];
+  });
+}
+
+function showQuantityWarning(form: HTMLFormElement, input: HTMLInputElement, text: string): void {
+  const id = `quantity-warning-${input.name}`;
+  let warning = form.querySelector<HTMLElement>(`#${id}`);
+  if (warning === null) {
+    warning = h('p', { id, class: 'warn', 'aria-live': 'polite', 'data-quantity-warning': '' });
+    input.closest('label')!.after(warning);
+    input.setAttribute('aria-describedby', [input.getAttribute('aria-describedby'), id].filter(Boolean).join(' '));
+  }
+  warning.textContent = text;
+  warning.hidden = false;
+}
+
+export function quantityWarnings(form: HTMLFormElement, ledger: Ledger, op: string, occurredAt: () => string | null): void {
+  if (!quantityWarningOps.has(op)) return;
+  const sync = () => {
+    for (const note of form.querySelectorAll<HTMLElement>('[data-quantity-warning]')) {
+      note.hidden = true;
+      note.textContent = '';
+    }
+    const rows = warningRows(form, op);
+    overdrawnLots(ledger, rows.map(r => r.row), occurredAt()).forEach((lot, index) => {
+      if (lot === null || lot.quantity.kind !== 'known') return;
+      const source = lot === ledger.lots[lot.id] ? '記録上の数' : '先の材料入力を差し引いた残り';
+      showQuantityWarning(form, rows[index]!.input, `${source}${lot.quantity.numeric.value}${lot.unit}を超える。この数量を差し引くと負数になるため、入力内容と現物を確認する`);
+    });
+  };
+  form.addEventListener('input', sync);
+  form.addEventListener('change', sync);
+  sync();
 }
 
 export function formValue(form: HTMLFormElement): (name: string) => string | null {
@@ -153,7 +231,7 @@ export function formValue(form: HTMLFormElement): (name: string) => string | nul
   };
 }
 
-// 数量の欄の下に、対象の単位の最小単位と上限を示す。ブラウザーの妥当性検査には頼らず、記録するときに同じ対象の精度で検査する。
+// 数量の欄の下に最小単位を示し、小数の単位だけ上限も添える。ブラウザーの妥当性検査には頼らず、記録するときに同じ対象の精度で検査する。
 export function precisionHints(form: HTMLFormElement, ledger: Ledger, supply: Supply): void {
   const value = formValue(form);
   const targetOf = (name: string) => quantityTargetOf(value, ledger, supply, name);

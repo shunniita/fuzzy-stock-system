@@ -35,7 +35,7 @@ test('FH-B01・AT-48: SCN-01を最初から操作し、誤使用の訂正後にP
   await expect(production(page)).toContainText('工程内 記録上の数12台（作業中 記録上の数10台、確認待ち 記録上の数2台）／完成（渡す前） 18台・数えた／工程完了累計 18台');
 
   await recorded(page, 'toNext', { lot: 'R3', childId: 'R4', basis: 'counted', value: '10', location: 'N' }, '11:20');
-  await expect(cell(page, 'R4', '場所')).toHaveText('N');
+  await expect(cell(page, 'R4', '場所')).toHaveText('次工程N（N）');
   await expect(cell(page, 'R4', '作業の状態')).toHaveText('作業なし');
   await expect(production(page)).toContainText('工程内 記録上の数12台');
   await expect(production(page)).toContainText('完成（渡す前） 記録上の数8台／工程完了累計 18台／やり直し・修理開始累計 0台（現在の現物数には足さない）／引渡済み累計 10台');
@@ -215,7 +215,7 @@ test('AT-15: 配膳だけの品目10個を次工程へ移しても品目と部�
   await startEmpty(page);
   await recorded(page, 'register', lot('K', 'P', 'T', 'counted', '10'), '09:00');
   await recorded(page, 'move', { lot: 'K', location: 'N' }, '10:00');
-  await expect(cell(page, 'K', '場所')).toHaveText('N');
+  await expect(cell(page, 'K', '場所')).toHaveText('次工程N（N）');
   await expect(cell(page, 'K', '作業の状態')).toHaveText('作業なし');
   await expect(totals(page)).toHaveText('品目P（個）：在庫 10個・数えた／使用可能 10個・数えた／取り分け 記録上の数0個');
   await goTo(page, 'issues');

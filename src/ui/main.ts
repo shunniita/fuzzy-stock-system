@@ -17,6 +17,7 @@ import {
   holdReasons,
   ConfirmationRequired,
   InclusionRequired,
+  NegativeOnApply,
   isUsable,
   merge,
   move,
@@ -74,7 +75,7 @@ import {
   caseRef,
   itemNameText,
   itemRef,
-  locationRef,
+  placeName,
   quantityText,
   reworkHistoryOf,
   stageLabel,
@@ -92,11 +93,11 @@ import type { AlternativeOperation } from '../domain/alternative-record.ts';
 import { nextProcessOf, own, processOf, processRef, type Masters } from '../domain/masters.ts';
 import { emptySupply } from '../domain/supply.ts';
 import { requireQuantityTotals } from '../domain/shortage.ts';
-import { processOptions, stopProcessOptions, amount, amountFields, countOrUnknown, MaterialInclusionRequired, formValue, precisionHints, quantityStepFor, quantityTargetOf, quantityValue, basisOptions, codeTarget, itemFields, itemOptions, lotOptions as lotChoices, placeOptions as placeChoices, projectField, projectKey, projectOf, registerFromValues, restrictPlaces } from './fields.ts';
+import { processOptions, stopProcessOptions, amount, amountFields, countOrUnknown, MaterialInclusionRequired, formValue, precisionHints, quantityWarnings, quantityStepFor, quantityTargetOf, quantityValue, basisOptions, codeTarget, itemFields, itemOptions, lotOptions as lotChoices, placeOptions as placeChoices, projectField, projectKey, projectOf, registerFromValues, restrictPlaces } from './fields.ts';
 import { codeInput, type CodeHolds, type CodeInput } from './code-input.ts';
 import { recountWithReceiptChoice, renderConsumables, renderSupply, supplyAsOf, supplyOps, type Ctx, type UiOp, type UiSubject } from './supply-ui.ts';
 import { fixSubject, otherOperations, type OperationTarget } from './subject-actions.ts';
-import { nextLotId, readMode, simpleOps, writeMode, type Mode } from './mode.ts';
+import { nextLotId, nextSplitId, readMode, simpleOps, writeMode, type Mode } from './mode.ts';
 import { opNotes } from './op-notes.ts';
 import { seedLedger, seedScn02 } from './seed.ts';
 import { browserStore, fingerprintOf, initial, nextOpIdOf, sameSnapshot, targetsOf, unknownSinceOf, type CommitResult, type Pending, type RecordContents, type SettleResult, type Snapshot, type UnitState } from './storage.ts';
@@ -327,6 +328,8 @@ type Op = {
   fields: () => HTMLElement[];
   run: (l: Ledger, m: Meta, v: Values, inclusion: Inclusion | undefined) => Ledger;
 };
+
+const resolveCloseLabel = '閉じる（数量に反映済み・適用しない）';
 
 const ops = {
   register: {
@@ -620,12 +623,17 @@ const ops = {
     fields: () => [
       choiceField('issue', '確認事項', openIssues(ledger).map((i) => [i.id, `${i.id}：${issueLabel[i.reason]}（${i.lotId ?? '対象なし'}）`])),
       choiceField('outcome', '解消の仕方', [
-        ['close', '閉じる（数量に反映済み・適用しない）'],
-        ['apply', '適用する（保留した操作を親へ反映）'],
+        ['close', resolveCloseLabel],
+        ['apply', '適用する（保留した操作をこの保管単位の数量へ反映）'],
       ]),
     ],
     run: (l, m, v, inc) => {
-      return resolveIssue(l, m, v.text('issue'), v.text('outcome') === 'apply' ? 'apply' : 'close', inc);
+      try {
+        return resolveIssue(l, m, v.text('issue'), v.text('outcome') === 'apply' ? 'apply' : 'close', inc);
+      } catch (error) {
+        if (!(error instanceof NegativeOnApply)) throw error;
+        throw new Error(`${error.message}。先に「数えて確認・訂正」で今の数を記録する。保留した操作がその数に含まれていれば「${resolveCloseLabel}」を選ぶ`);
+      }
     },
   },
 } satisfies Record<string, Op>;
@@ -653,7 +661,7 @@ const allOps: Record<string, UiOp> = {
 // 受け入れた現物の数え直しでは、実際に受け取った数の扱いを必須で選ばせる（直し忘れを防ぐ）。
 allOps['recount'] = recountWithReceiptChoice(allOps['recount']!, ctx);
 
-let message: { kind: 'ok' | 'error'; text: string } | null = null;
+let message: { kind: 'ok' | 'error' | 'prompt'; text: string } | null = null;
 
 function switchBlockedReason(): string | null {
   if (conflict !== null && conflict.kind !== 'resolved') return '未解消の更新競合があるため、操作を切り替えられません。上の更新競合の照合を先に終えてください。';
@@ -677,6 +685,7 @@ function switchOperation(key: string, target?: OperationTarget | null): void {
   }
   if (key === currentOp && (target === undefined || (target === null ? currentTarget === undefined : target.kind === currentTarget?.kind && target.id === currentTarget.id))) return;
   if (hasEditedLiveInput() && !window.confirm('未保存の入力を破棄して、操作を切り替えますか。')) return;
+  clearInputFeedback();
   currentOp = key;
   currentTarget = target ?? undefined;
   message = null;
@@ -686,9 +695,10 @@ function switchOperation(key: string, target?: OperationTarget | null): void {
 
 // 簡単操作モードでは操作の選択欄を隠すので、最初に入力する欄へ移す。
 function focusInput(): void {
-  const first = mode === 'simple' ? '#input form :is(input, select, textarea):not([type=hidden]):not(:disabled):not([name=op])' : '#input [name=op]';
+  const first = mode === 'simple' || currentOp === 'register' ? '#input form :is(input, select, textarea):not([type=hidden]):not(:disabled):not([name=op])' : '#input [name=op]';
   const focusable = [...document.querySelectorAll<HTMLElement>(first)].find((node) => node.offsetParent !== null);
   focusable?.focus();
+  focusable?.scrollIntoView({ block: 'center' });
 }
 
 // 簡単操作モードでは、入口に出す操作を公開計画の範囲に絞る。二段選択とその入力は絞らない。
@@ -761,6 +771,7 @@ function renderInput(): void {
   );
   try {
     if (currentTarget !== undefined) fixTarget(form, capture.op, currentTarget);
+    if (currentOp === 'split' || currentOp === 'splitMove') suggestSplitId(form);
     if (mode === 'simple' && currentOp === 'register' && currentTarget === undefined) simpleRegister(form);
   }
   catch (error) {
@@ -776,14 +787,19 @@ function renderInput(): void {
     confirmBox.checked = false;
     confirm.hidden = true;
   };
+  // 確認欄は確認を求める文に応える欄なので、入力の修正として扱わない。
+  const clearFeedback = (event: Event) => { if (event.target !== confirmBox) clearInputFeedback(); };
+  form.addEventListener('input', clearFeedback);
+  form.addEventListener('change', clearFeedback);
   form.addEventListener('input', resetConfirm);
   form.addEventListener('change', resetConfirm);
   // 実際の日時が不明なら、台帳が判断に使う記録の時点（今）で絞る。
-  const syncPlaces = () => restrictPlaces(form, ledger.masters, enteredTime(form));
+  const syncPlaces = () => restrictPlaces(form, ledger.masters, enteredTime(form), currentOp === 'move' || currentOp === 'splitMove' ? own(ledger.lots, formValue(form)('lot') ?? '')?.location : undefined);
   form.addEventListener('input', syncPlaces);
   form.addEventListener('change', syncPlaces);
   syncPlaces();
   precisionHints(form, ledger, supply);
+  quantityWarnings(form, ledger, currentOp, () => occurredOf(form));
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     void guarded(() => submit(form, !inclusion.hidden, capture));
@@ -792,7 +808,7 @@ function renderInput(): void {
   if (note !== undefined) choice.after(h('p', { class: 'op-note' }, note));
   capture.code = codeInput(form, ledger, capture.op.label, codeHolds);
   root.append(capture.code.node, picker.browsing, ...(mode === 'simple' ? [h('p', { class: 'simple-op' }, capture.op.label)] : []), form);
-  if (message) root.append(h('p', { class: message.kind === 'ok' ? '' : 'error', role: 'status' }, message.text));
+  if (message) root.append(h('p', { class: message.kind === 'error' ? 'error' : '', role: 'status' }, message.text));
   liveInput = { form, capture, initial: fieldsOf(controlsOf(form, capture.code)), initialActor: actorSelect.value, initialOccurredAt: occurredOf(form), baseLastWriter: snapshot.lastWriter, generation: generationOf(snapshot) };
 }
 
@@ -840,6 +856,7 @@ async function guarded(action: () => Promise<void>): Promise<void> {
         : document.getElementById(focusOrigin === 'save' ? 'save-h' : navigation.current === 'management' ? 'management-feedback-h' : `nav-${navigation.current}`);
       target?.focus();
     }
+    if (focusOrigin === 'input' && message?.kind === 'ok') document.querySelector<HTMLElement>('#input > [role=status]')?.scrollIntoView({ block: 'center' });
     if (sharedChangePending) void checkSharedChanges();
   }
 }
@@ -873,12 +890,42 @@ function inputValues(form: HTMLFormElement): { raw: Record<string, string | bool
   return { raw, readable };
 }
 
-function showInputError(form: HTMLFormElement, text: string): void {
+function clearInputFeedback(): void {
+  if (saveView.kind !== 'rejected' && saveView.kind !== 'prompt') return;
+  saveView = { kind: 'ready' };
+  message = null;
+  document.querySelector('#input > [role=status]')?.remove();
+  renderSave();
+}
+
+function showInputError(form: HTMLFormElement, text: string, kind: 'error' | 'prompt' = 'error'): void {
   const root = document.getElementById('input')!;
   root.querySelector('[role=status]')?.remove();
-  message = { kind: 'error', text };
-  if (form.isConnected) form.after(h('p', { class: 'error', role: 'status' }, text));
-  else root.append(h('p', { class: 'error', role: 'status' }, text));
+  message = { kind, text };
+  const status = h('p', { class: kind === 'error' ? 'error' : '', role: 'status' }, text);
+  if (form.isConnected) form.after(status);
+  else root.append(status);
+}
+
+function showSubmissionError(form: HTMLFormElement, err: unknown): void {
+  const text = err instanceof Error ? err.message : String(err);
+  const prompt = err instanceof InclusionRequired || err instanceof ConfirmationRequired;
+  let rejection = `記録していない：${text}`;
+  form.parentElement?.querySelector('[role=status]')?.remove();
+  if (err instanceof InclusionRequired) {
+    const field = err instanceof MaterialInclusionRequired ? err.field : 'inclusion';
+    (form.querySelector(`[name=${field}]`)!.parentElement as HTMLElement).hidden = false;
+    rejection = `回答が必要：${text}。選んでからもう一度「記録する」を押す。`;
+  } else if (err instanceof ConfirmationRequired) {
+    (form.querySelector('[name=confirmed]')!.parentElement as HTMLElement).hidden = false;
+    rejection = `確認が必要：${text}${err.kind === 'code' ? supplyRefsText(supply, ledger.masters, err.master) : candidatesText(ledger, err.lots)}。何も保存していない。内容を確かめ、「確認した」に印を付けてからもう一度「記録する」を押す。`;
+  }
+  showInputError(form, rejection, prompt ? 'prompt' : 'error');
+  if (pending === null && !stale && saveView.kind !== 'unreadable' && saveView.kind !== 'replaceUncertain') {
+    saveView = { kind: prompt ? 'prompt' : 'rejected', reason: rejection };
+    saveError = null;
+  }
+  renderSave();
 }
 
 async function submit(form: HTMLFormElement, answered: boolean, capture: FormCapture): Promise<void> {
@@ -952,8 +999,8 @@ async function submit(form: HTMLFormElement, answered: boolean, capture: FormCap
     });
     // 保存層でも拒否するが、そこでは保存の失敗として出るので、入力の誤りとして保存前に知らせる。
     for (const unit of units) requireQuantityTotals(unit.ledger, unit.supply);
-    saveView = { kind: 'ready' };
-    saveError = '保存中';
+    saveView = { kind: 'saving' };
+    saveError = null;
     renderSave();
     const saved = await commit(browserStore, snapshot, { opId: eventId, opLabel: capture.op.label, fingerprint, values: { ...values.readable, '記録する人': actor }, actor, startedAt: meta.recordedAt, savingSince: meta.recordedAt }, units);
     const heldBefore = conflict;
@@ -970,18 +1017,7 @@ async function submit(form: HTMLFormElement, answered: boolean, capture: FormCap
     capture.units = units;
     notice = result.notice ?? null;
   } catch (err) {
-    const text = err instanceof Error ? err.message : String(err);
-    form.parentElement?.querySelector('[role=status]')?.remove();
-    if (err instanceof InclusionRequired) {
-      const field = err instanceof MaterialInclusionRequired ? err.field : 'inclusion';
-      (form.querySelector(`[name=${field}]`)!.parentElement as HTMLElement).hidden = false;
-      showInputError(form, `回答が必要：${text}。選んでからもう一度「記録する」を押す。`);
-    } else if (err instanceof ConfirmationRequired) {
-      (form.querySelector('[name=confirmed]')!.parentElement as HTMLElement).hidden = false;
-      showInputError(form, `確認が必要：${text}${err.kind === 'code' ? supplyRefsText(supply, ledger.masters, err.master) : candidatesText(ledger, err.lots)}。何も保存していない。内容を確かめ、「確認した」に印を付けてからもう一度「記録する」を押す。`);
-    } else {
-      showInputError(form, `記録していない：${text}`);
-    }
+    showSubmissionError(form, err);
     return;
   }
   // 負数や後入力で未反映になった操作があっても記録は成功と出るので、確認事項が開いたことをその場で知らせる（REC-05・UI-06）。
@@ -994,6 +1030,19 @@ async function submit(form: HTMLFormElement, answered: boolean, capture: FormCap
 }
 
 const targetOrigin = { lot: '詳細', template: 'セット', master: '登録情報', request: '選んだ依頼', event: '選んだ記録', issue: '選んだ確認事項', case: '案件・用途の詳細', need: '案件・用途の詳細' } as const;
+
+function suggestSplitId(form: HTMLFormElement): void {
+  const child = form.elements.namedItem('childId');
+  const source = form.elements.namedItem('lot');
+  if (!(child instanceof HTMLInputElement) || !(source instanceof HTMLInputElement || source instanceof HTMLSelectElement)) return;
+  let suggested = nextSplitId(ledger.lots, source.value);
+  child.value = suggested;
+  source.addEventListener('change', () => {
+    if (child.value !== suggested) return;
+    suggested = nextSplitId(ledger.lots, source.value);
+    child.value = suggested;
+  });
+}
 
 // 「入れる」：IDは採番して隠し、所属は共通在庫に固定し、作業の状態と工程は出さない（作業なしになる）。
 function simpleRegister(form: HTMLFormElement): void {
@@ -1103,9 +1152,9 @@ function renderList(): void {
         'tr',
         { class: lot.id === selectedLot ? 'selected' : '', 'data-lot': lot.id },
         h('td', {}, lotButton(lot.id)),
-        h('td', {}, itemRef(ledger.masters, lot.item)),
+        h('td', {}, `${itemNameText(ledger.masters, lot.item)}（${itemRef(ledger.masters, lot.item)}）`),
         ...simple ? [] : [h('td', {}, projectText(ledger.masters, lot.project))],
-        h('td', {}, locationRef(ledger.masters, lot.location)),
+        h('td', {}, placeName(ledger.masters, lot.location)),
         h('td', {}, quantityText(lot.quantity, lot.unit)),
         h('td', {}, holdsText(lot)),
         ...simple ? [] : [h('td', {}, stageText(lot.stage, id => processRef(ledger.masters, id)))],
@@ -1174,7 +1223,7 @@ function renderDetail(): void {
       ...row('ID', lot.id),
       ...row('品目・単位', `${itemNameText(ledger.masters, lot.item)}（${itemRef(ledger.masters, lot.item)}）・${lot.unit}`),
       ...row('案件・用途', projectText(ledger.masters, lot.project)),
-      ...row('場所', locationRef(ledger.masters, lot.location)),
+      ...row('場所', placeName(ledger.masters, lot.location)),
       ...row('現在の記録上の数', quantityText(lot.quantity, lot.unit)),
       ...row('最後に数えた数', lastCountText(ledger, lot)),
       ...row('取り分けた理由', holdsText(lot)),
@@ -1996,7 +2045,9 @@ async function applyCommit(result: CommitResult, opId: string): Promise<void> {
         invalidateConfirmation();
         saveView = { kind: 'conflict' };
       }
-      saveError = result.reason;
+      if (pending === null && !stale) {
+        saveView = { kind: 'rejected', reason: `記録していない：${result.reason}` };
+      } else saveError = result.reason;
       break;
     }
     case 'conflict': markStale('保存の応答で外部の更新を検出した'); saveView = result; break;

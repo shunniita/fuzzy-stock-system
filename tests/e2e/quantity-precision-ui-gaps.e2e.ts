@@ -56,13 +56,13 @@ test('1.3: 名称・表示コード・試行対象・利用停止の変更と再
   await recorded(page, 'masterRename', { target: 'item:D', name: '架空小数材料D改', reason: '架空の名称変更' }, '09:00');
   await stillDecimal('架空小数材料D改', 1, 0.8);
   await recorded(page, 'masterCode', { target: 'item:D', code: 'D7', reason: '架空の表示コード変更' }, '09:10');
-  await expect(cell(page, 'D1', '品目')).toHaveText('D7');
+  await expect(cell(page, 'D1', '品目')).toHaveText('架空小数材料D改（D7）');
   await stillDecimal('架空小数材料D改', 2, 0.7);
   await installSnapshot(page, withLegacyTrial(await savedSnapshot(page), 'legacy-decimal-trial', 'D', false));
   expect((await savedSnapshot(page)).ledger.masters.items['D']?.trial).toBe(false);
   await stillDecimal('架空小数材料D改', 3, 0.6);
   await recorded(page, 'masterDeactivate', { target: 'item:D', reason: '架空の廃番' }, '09:30');
-  await expect(cell(page, 'D1', '品目')).toHaveText('D7（利用停止）');
+  await expect(cell(page, 'D1', '品目')).toHaveText('架空小数材料D改（利用停止）（D7（利用停止））');
   await stillDecimal('架空小数材料D改', 4, 0.5);
   await page.reload();
   await waitForApp(page);

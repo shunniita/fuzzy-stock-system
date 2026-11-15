@@ -61,7 +61,7 @@ test('在庫一覧: 品目の集計から保管単位に絞り込み、詳細か
   await expect(list.locator('tr[data-lot="L-0001"]')).toHaveCount(0);
   await list.locator('tr[data-lot="L-0002"]').getByRole('button', { name: 'L-0002', exact: true }).click();
   const keys = await page.locator('#detail [data-op]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-op')));
-  expect(keys.sort()).toEqual(['hold', 'merge', 'move', 'recount', 'release', 'split', 'use']);
+  expect(keys.sort()).toEqual(['hold', 'merge', 'move', 'recount', 'release', 'split', 'splitMove', 'use']);
   await page.locator('#detail').getByRole('button', { name: '使用', exact: true }).click();
   await expect(form(page).locator('input[type=hidden][name=lot]')).toHaveValue('L-0002');
   await expect(form(page).locator('[name=basis]')).toBeFocused();
@@ -164,4 +164,52 @@ test('モードの切替: 前のモードの絞り込みを残さず、書きか
   await expect(page.locator('#mode-choice')).toContainText('書きかけの入力があります');
   await goTo(page, 'stock');
   await expect(form(page).locator('[name=value]')).toHaveValue('7');
+});
+
+for (const mode of ['simple', 'advanced']) for (const op of ['split', 'splitMove']) {
+  test('UX必須1・2: ' + mode + 'の' + op + 'はIDを採番し、無編集では確認せず、変更したIDでも記録できる', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-09-29T08:00:00+09:00'));
+    await start(page);
+    await put(page, 'P', '50');
+    await page.clock.setFixedTime(new Date('2026-09-29T09:00:00+09:00'));
+    if (mode === 'advanced') {
+      await goTo(page, 'management');
+      await page.getByLabel('操作モード').selectOption(mode);
+    }
+    await goTo(page, 'stock');
+    await page.locator('#list tr[data-lot="L-0001"]').getByRole('button').click();
+    const detail = page.locator('#detail');
+    if (op === 'splitMove') await detail.getByText('その他の操作', { exact: true }).click();
+    await detail.locator('[data-op=' + op + ']').click();
+    const childId = form(page).getByLabel('分けた分の新しいID', { exact: true });
+    await expect(childId).toBeVisible();
+    await expect(childId).toHaveValue('L-0002');
+    const dialogs: string[] = [];
+    page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); });
+    await detail.locator('[data-op=move]').click();
+    await expect(form(page).locator('[name=op]')).toHaveValue('move');
+    expect(dialogs).toEqual([]);
+    await detail.locator('[data-op=' + op + ']').click();
+    for (const id of ['L-0002', 'custom-child']) {
+      await expect(childId).toHaveValue(id === 'L-0002' ? id : 'L-0003');
+      if (id === 'custom-child') await childId.fill(id);
+      await form(page).locator('[name=basis]').selectOption('counted');
+      await form(page).locator('[name=value]').fill('5');
+      if (op === 'splitMove') await form(page).locator('[name=location]').selectOption('S2');
+      await form(page).getByRole('button', { name: '記録する', exact: true }).click();
+      await expect(page.locator('#input > [role=status]')).toContainText('記録した');
+      expect((await snapshotOf(page)).ledger.lots[id]).toMatchObject({ id, splitFrom: 'L-0001', location: op === 'splitMove' ? 'S2' : 'S1', quantity: { numeric: { value: 5 } } });
+    }
+    expect(dialogs).toEqual([]);
+  });
+}
+
+for (const width of [1366, 390]) test('UX必須5: ' + width + 'pxの一覧に呼び名とコードを表示し、ページ幅を広げない', async ({ page }) => {
+  await page.setViewportSize({ width, height: 768 });
+  await start(page);
+  await put(page, 'P', '50');
+  const row = page.locator('#list tr[data-lot="L-0001"]');
+  await expect(row.locator('td').nth(1)).toHaveText('架空部品P（P）');
+  await expect(row.locator('td').nth(2)).toHaveText('棚S1（S1）');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });

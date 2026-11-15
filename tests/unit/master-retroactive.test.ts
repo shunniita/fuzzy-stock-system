@@ -425,3 +425,94 @@ describe('記録の対象外の場所の検査は、遅れて入力した記録�
     expect(move(stuckResident, meta('mv2', '11:30'), 'X-1', 'S2').lots['X-1']?.location).toBe('S2');
   });
 });
+
+test('取消: 仮の記録から登録した保管単位の使用を、統合の後に取り消すと統合先の数量へ戻す', () => {
+  let l: Ledger = recordProvisional(practiceLedger, meta('p1', '08:00'), { direction: 'found', item: null, location: 'T', basis: 'counted', value: 10, note: '架空' });
+  l = adoptProvisional(l, meta('a1', '09:00'), 'p1', lotOf('S-found', 'S', '箱', 'T'));
+  l = register(l, meta('r1', '09:30'), lotOf('S-main', 'S', '箱', 'T'), 'counted', 5);
+  l = use(l, meta('u1', '10:00'), 'S-found', 'counted', 3, '架空の誤り');
+  l = merge(l, meta('m1', '11:00'), 'S-found', 'S-main');
+  l = voidRecord(l, meta('v1', '12:00'), 'u1', '架空の誤記');
+  expect(l.lots['S-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 15 } });
+  expect(l.history.at(-1)).toMatchObject({ kind: 'void', applied: true });
+});
+
+test('取消: 統合先のだいたいの誤りを取り消すと、仮の記録から登録した統合元があっても約を残さない', () => {
+  let l: Ledger = recordProvisional(practiceLedger, meta('p1', '08:00'), { direction: 'found', item: null, location: 'T', basis: 'counted', value: 10, note: '架空' });
+  l = adoptProvisional(l, meta('a1', '09:00'), 'p1', lotOf('S-found', 'S', '箱', 'T'));
+  l = register(l, meta('r1', '09:30'), lotOf('S-main', 'S', '箱', 'T'), 'counted', 5);
+  l = use(l, meta('u1', '10:00'), 'S-main', 'approximate', 2, '架空の誤り');
+  l = merge(l, meta('m1', '11:00'), 'S-found', 'S-main');
+  l = voidRecord(l, meta('v1', '12:00'), 'u1', '架空の誤記');
+  expect(l.lots['S-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 15, approximate: false } });
+});
+
+test('取消: 統合元の取消の後に統合先の誤りを取り消しても、統合元の取消を数量から落とさない', () => {
+  let l: Ledger = recordProvisional(practiceLedger, meta('p1', '08:00'), { direction: 'found', item: null, location: 'T', basis: 'counted', value: 10, note: '架空' });
+  l = adoptProvisional(l, meta('a1', '09:00'), 'p1', lotOf('S-found', 'S', '箱', 'T'));
+  l = register(l, meta('r1', '09:30'), lotOf('S-main', 'S', '箱', 'T'), 'counted', 5);
+  l = use(l, meta('u1', '10:00'), 'S-found', 'counted', 3, '架空の誤り');
+  l = use(l, meta('u2', '10:30'), 'S-main', 'counted', 2, '架空の誤り');
+  l = merge(l, meta('m1', '11:00'), 'S-found', 'S-main');
+  l = voidRecord(l, meta('v1', '12:00'), 'u1', '架空の誤記');
+  l = voidRecord(l, meta('v2', '12:30'), 'u2', '架空の誤記');
+  expect(l.lots['S-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 15 } });
+});
+
+test('取消: 2段の統合をたどった先の仮の記録から登録した保管単位の誤りも戻す', () => {
+  let l: Ledger = recordProvisional(practiceLedger, meta('p1', '08:00'), { direction: 'found', item: null, location: 'T', basis: 'counted', value: 10, note: '架空' });
+  l = adoptProvisional(l, meta('a1', '09:00'), 'p1', lotOf('S-found', 'S', '箱', 'T'));
+  l = register(l, meta('r1', '09:10'), lotOf('S-mid', 'S', '箱', 'T'), 'counted', 4);
+  l = register(l, meta('r2', '09:20'), lotOf('S-main', 'S', '箱', 'T'), 'counted', 5);
+  l = use(l, meta('u1', '10:00'), 'S-found', 'counted', 3, '架空の誤り');
+  l = merge(l, meta('m1', '10:30'), 'S-found', 'S-mid');
+  l = merge(l, meta('m2', '11:00'), 'S-mid', 'S-main');
+  l = voidRecord(l, meta('v1', '12:00'), 'u1', '架空の誤記');
+  expect(l.lots['S-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 19 } });
+});
+
+test('取消: 保存して読み戻した後も、統合元の誤使用を統合先の数量へ戻す', () => {
+  let l = recordProvisional(practiceLedger, meta('p1', '08:00'), { direction: 'found', item: null, location: 'T', basis: 'counted', value: 10, note: '架空' });
+  l = adoptProvisional(l, meta('a1', '09:00'), 'p1', lotOf('S-found', 'S', '箱', 'T'));
+  l = register(l, meta('r1', '09:30'), lotOf('S-main', 'S', '箱', 'T'), 'counted', 5);
+  l = use(l, meta('u1', '10:00'), 'S-found', 'counted', 3, '架空の誤り');
+  l = merge(l, meta('m1', '11:00'), 'S-found', 'S-main');
+  l = parse(serialize(initial(l, emptySupply))).ledger;
+  l = voidRecord(l, meta('v1', '12:00'), 'u1', '架空の誤記');
+  l = parse(serialize(initial(l, emptySupply))).ledger;
+  expect(l.lots['S-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 15, approximate: false, unconfirmed: 'none' } });
+  expect(l.lots['S-found']?.mergedInto).toBe('S-main');
+  expect(l.history.at(-1)).toMatchObject({ kind: 'void', targetEventId: 'u1', applied: true });
+});
+
+test('取消: 小数の統合先の誤使用を保存後に取り消すと0.3へ戻り、約を残さない', () => {
+  let l = changeMasters(practiceLedger, meta('d1', '07:00'), { action: 'register', master: { type: 'item', code: 'D', name: '架空小数材料', source: null, units: ['kg'], unitSteps: { kg: 0.1 }, trial: true } });
+  l = recordProvisional(l, meta('p1', '08:00'), { direction: 'found', item: 'D', location: 'T', basis: 'counted', value: 1, note: '架空' });
+  l = adoptProvisional(l, meta('a1', '09:00'), 'p1', lotOf('D-found', 'D', 'kg', 'T'));
+  l = use(l, meta('u0', '09:10'), 'D-found', 'counted', 0.9, '架空の作業');
+  l = register(l, meta('r1', '09:30'), lotOf('D-main', 'D', 'kg', 'T'), 'counted', 0.2);
+  l = use(l, meta('u1', '10:00'), 'D-main', 'approximate', 0.1, '架空の誤り');
+  l = merge(l, meta('m1', '11:00'), 'D-found', 'D-main');
+  l = parse(serialize(initial(l, emptySupply))).ledger;
+  l = voidRecord(l, meta('v1', '12:00'), 'u1', '架空の誤記');
+  l = parse(serialize(initial(l, emptySupply))).ledger;
+  expect(l.lots['D-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 0.3, approximate: false, unconfirmed: 'none' } });
+  expect(l.history.at(-1)).toMatchObject({ kind: 'void', targetEventId: 'u1', applied: true });
+});
+
+test('取消: 統合元の引渡しを二段の統合と保存の後に取り消すと数量へ戻す', () => {
+  let l = recordProvisional(practiceLedger, meta('p1', '08:00'), { direction: 'found', item: null, location: 'T', basis: 'counted', value: 10, note: '架空' });
+  l = adoptProvisional(l, meta('a1', '09:00'), 'p1', lotOf('S-found', 'S', '箱', 'T'));
+  l = register(l, meta('r1', '09:10'), lotOf('S-mid', 'S', '箱', 'T'), 'counted', 4);
+  l = register(l, meta('r2', '09:20'), lotOf('S-main', 'S', '箱', 'T'), 'counted', 5);
+  l = handOver(l, meta('h1', '10:00'), 'S-found', 'counted', 3, '架空の引渡先');
+  l = merge(l, meta('m1', '10:30'), 'S-found', 'S-mid');
+  l = merge(l, meta('m2', '11:00'), 'S-mid', 'S-main');
+  l = parse(serialize(initial(l, emptySupply))).ledger;
+  l = voidRecord(l, meta('v1', '12:00'), 'h1', '架空の誤記');
+  l = parse(serialize(initial(l, emptySupply))).ledger;
+  expect(l.lots['S-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 19, approximate: false, unconfirmed: 'none' } });
+  expect(l.lots['S-found']?.mergedInto).toBe('S-mid');
+  expect(l.lots['S-mid']?.mergedInto).toBe('S-main');
+  expect(l.history.at(-1)).toMatchObject({ kind: 'void', targetEventId: 'h1', applied: true });
+});

@@ -87,7 +87,7 @@ test('AR01/02/04-07/10: assembled欠品→正式化・改名・子削除→後�
   expect(final.supply.requests[request.id]).toMatchObject({ item: x, quantity: 3, arrivals: [{ receiptLotId: 'later-X', arrived: 3, good: 3 }] });
   expect(final.supply.log.find(event => event.eventId === batch.eventId)).toEqual(batch);
   expect(final.supply.log.find(event => event.kind === 'requestRecord' && event.request.id === request.id)).toHaveProperty(`itemLabels.items.${x}`, { name: '架空組立X', code: null });
-  await expect(cell(page, xLot, '品目')).toHaveText('0007'); await row(page, xLot).getByRole('button', { name: xLot, exact: true }).click();
+  await expect(cell(page, xLot, '品目')).toHaveText('架空正式X（0007）'); await row(page, xLot).getByRole('button', { name: xLot, exact: true }).click();
   await expect(page.locator('#detail dl').first()).toContainText('架空正式X（0007）');
   await goTo(page, 'supply');
   const oldBatch = supplyHistory(page).locator('li').filter({ hasText: `まとめて受け取り ${batch.eventId}：` });

@@ -59,10 +59,9 @@ test('FH-A01・UI-08a: 確認が必要は色を使わず文字で読める', asy
 
 test('FH-A03: 一部を分けて移す途中で移動に失敗すると、分割も含めて何も適用しない', async ({ page }) => {
   await startEmpty(page);
-  await recorded(page, 'register', lot('X', 'P', 'S1', 'counted', '100'), '09:00');
-  // 同じ棚への移動は拒否されるので、分割のあとの移動で失敗する。
-  await expect(await record(page, 'splitMove', { lot: 'X', childId: 'C', basis: 'counted', value: '30', location: 'S1' }, '10:00')).toContainText(
-    '記録していない：移動元と移動先が同じ',
+  await recorded(page, 'register', lot('X', 'P', 'S1', 'counted', '100', { stage: 'working', process: 'R組立' }), '09:00');
+  await expect(await record(page, 'splitMove', { lot: 'X', childId: 'C', basis: 'counted', value: '30', location: 'N' }, '10:00')).toContainText(
+    '記録していない：保管単位 C は製造中・完成（渡す前）になるので、次工程Nには置けない',
   );
   await expect(row(page, 'C')).toHaveCount(0);
   await expect(cell(page, 'X', '記録上の数と根拠')).toHaveText('100個・数えた');
@@ -73,7 +72,7 @@ test('FH-A03: 一部を分けて移す途中で移動に失敗すると、分割
   await form.locator('[name=location]').selectOption('T');
   await form.getByRole('button', { name: '記録する' }).click();
   await goTo(page, 'stock');
-  await expect(cell(page, 'C', '場所')).toHaveText('T');
+  await expect(cell(page, 'C', '場所')).toHaveText('作業台T（T）');
 });
 
 test('FH-A04: 案件・用途・共通・所属不明を分け、不良と返却待ちの重複を二重に数えず、先頭ゼロと入力文字列をそのまま扱う', async ({ page }) => {

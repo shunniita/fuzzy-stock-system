@@ -8,6 +8,9 @@ import { faults, settlementOutcome, unknownSinceOf, type CommitResult, type Pend
 export type Inquiry = ReturnType<typeof inquire>;
 export type SaveView =
   | { kind: 'ready' }
+  | { kind: 'saving' }
+  | { kind: 'rejected'; reason: string }
+  | { kind: 'prompt'; reason: string }
   | { kind: 'saved'; opId: string }
   | { kind: 'duplicate'; opId: string; remainder?: Extract<CommitResult, { kind: 'duplicate' }>['remainder'] }
   | (Extract<CommitResult, { kind: 'partial' }> & { inquiry: Inquiry | null })
@@ -28,12 +31,12 @@ export type SaveTone = 'success' | 'error' | 'warning' | 'info';
 export function saveTone(view: SaveView, errorNotice: string | null): SaveTone {
   if (errorNotice !== null) return 'error';
   switch (view.kind) {
-    case 'unknown': case 'unreadable': case 'replaceUncertain': case 'failed': return 'error';
+    case 'unknown': case 'unreadable': case 'replaceUncertain': case 'failed': case 'rejected': return 'error';
     case 'partial': return unknownSinceOf(view.pending) !== null ? 'error' : 'warning';
     case 'conflict': return 'warning';
     case 'duplicate': return view.remainder === undefined ? 'success' : 'warning';
     case 'saved': return 'success';
-    case 'ready': return 'info';
+    case 'ready': case 'saving': case 'prompt': return 'info';
     case 'recovered': return view.check.resolution.outcome === 'saved' || view.check.resolution.outcome === 'retried' ? 'success' : 'info';
     case 'settled': {
       const saved = view.snapshot.ops[view.pending.opId]?.units.length ?? 0;
@@ -117,6 +120,12 @@ export function savePresentation(view: SaveView, errorNotice: string | null = nu
   switch (view.kind) {
     case 'ready':
       lines = ['記録を入力できます。'];
+      break;
+    case 'saving':
+      lines = ['保存中です。完了までお待ちください。'];
+      break;
+    case 'rejected': case 'prompt':
+      lines = [view.reason];
       break;
     case 'saved':
       lines = [`保存した（操作ID：${view.opId}）`];

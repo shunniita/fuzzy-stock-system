@@ -223,7 +223,7 @@ export function masterOps(ctx: Ctx): Record<string, UiOp> {
         const unitSteps = Object.fromEntries(units.map((u): [string, Step] => [u, v.text(unitStepName(u)) === '0.1' ? 0.1 : 1]));
         return { type: 'item', code: codeOf(v), name: v.text('name'), units, unitSteps, trial: true, source: sourceOf(v) };
       }), ctx),
-    masterLocation: masterOp('場所の登録', () => [textField('code', '品番・コード（文字列のまま保存）'), textField('name', '名称'), choiceField('inScope', '記録の対象', [['true', '記録の対象'], ['false', '記録の対象外']])],
+    masterLocation: masterOp('場所の登録', () => [textField('code', 'コード'), textField('name', '名称'), choiceField('inScope', '記録の対象', [['true', '記録の対象'], ['false', '記録の対象外']])],
       register((v) => ({ type: 'location', code: v.text('code'), name: v.text('name'), trial: true, inScope: v.text('inScope') === 'true' })), ctx),
     masterCase: masterOp('案件・用途の登録', () => [...codeFields('品番・コード（文字列のまま保存）'), textField('name', '呼び名（品番・コードがあれば空欄でもよい）'), ...sourceFields()],
       register((v) => ({ type: 'case', code: codeOf(v), name: v.text('name') === '' ? null : v.text('name'), source: sourceOf(v) })), ctx),

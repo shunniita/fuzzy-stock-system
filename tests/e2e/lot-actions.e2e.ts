@@ -66,6 +66,7 @@ test('操作切替: 二段選択の取消では確認チェックを失効させ
   await record(page, 'masterCode', { target: '品目（仮）架空の仮品目「架空の仮品目」', code: 'Q', reason: '架空の正式ID判明' }, '09:00');
   const form = page.getByRole('form', { name: '操作の入力' });
   await form.locator('[name=confirmed]').check();
+  await expect(page.locator('#input > [role=status]')).toContainText('確認が必要');
   await page.getByLabel('作業の種類', { exact: true }).selectOption('stock');
   page.once('dialog', dialog => dialog.dismiss());
   await form.locator('[name=op]').selectOption('move');

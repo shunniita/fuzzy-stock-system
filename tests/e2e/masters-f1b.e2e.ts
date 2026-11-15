@@ -139,14 +139,14 @@ test('AT-35: 登録・名称の変更・利用停止、ネジSの1箱あたり�
   await expect(renamed).toContainText('理由「型番の変更」');
   await expect(renamed).toContainText('架空担当A');
   await goTo(page, 'stock');
-  await expect(cell(page, 'P9-1', '品目')).toHaveText('P9');
+  await expect(cell(page, 'P9-1', '品目')).toHaveText('架空部品P9改（P9）');
 
   // 3.1・3.2・3.3: 利用停止で新しい記録の選択肢から消え、既存の保管単位は印付きで表示・訂正できる
   await recorded(page, 'masterDeactivate', { target: 'item:P9', reason: '廃番' }, '08:30');
   await selectOperation(form(page).locator('[name=op]'), { label: opLabels.register });
   await expect(form(page).locator('[name=item] option[value="P9"]')).toHaveCount(0);
   await expect(page.locator('#list [name=f-item] option', { hasText: '架空部品P9改（利用停止）' })).toHaveCount(1);
-  await expect(cell(page, 'P9-1', '品目')).toHaveText('P9（利用停止）');
+  await expect(cell(page, 'P9-1', '品目')).toHaveText('架空部品P9改（利用停止）（P9（利用停止））');
   await recorded(page, 'recount', { lot: 'P9-1', value: '4', causeUnknown: true }, '08:40');
   await expect(cell(page, 'P9-1', '記録上の数と根拠')).toContainText('4個');
 
@@ -263,7 +263,7 @@ test('AT-28・AT-44の回帰: 登録情報を変えた記録は、バックア�
   await expect(masters(page, '品目の登録情報')).not.toContainText('架空部品P改');
   await expect(masters(page, '品目の登録情報')).toContainText('品目不明の試作部品');
   await goTo(page, 'stock');
-  await expect(cell(page, 'M-1', '品目')).toHaveText('0012');
+  await expect(cell(page, 'M-1', '品目')).toHaveText('架空部品P（0012）');
   expect(await storedLedger(page)).toEqual(original);
   await expect(await historyOf(page, '品目0012「架空部品P」')).toContainText('品番・コード P → 0012');
 
