@@ -1,4 +1,4 @@
-const destinations = ['stock', 'supply', 'issues', 'masters', 'management'] as const;
+const destinations = ['stock', 'sets', 'supply', 'issues', 'masters', 'management'] as const;
 export type Destination = (typeof destinations)[number];
 export type NavigationTarget =
   | { kind: 'destination'; destination: Destination }

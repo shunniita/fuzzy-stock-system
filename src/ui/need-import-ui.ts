@@ -57,7 +57,7 @@ function confirmedToken(v: Values): string {
 export function needImportOps(ctx: Ctx): Record<string, UiOp> {
   return {
     needImportResolve: {
-      label: '必要明細取込の照合（保留の適用・見送り）', fields: () => resolutionFields(ctx),
+      label: '必要明細取込の照合', fields: () => resolutionFields(ctx),
       run: (s, m, v) => ({ state: { ...s, supply: resolveNeedImport(s.supply, s.ledger.masters, m, v.text('needHeld'), resolutionAction(v.text('needAction')), v.text('needTarget'), v.text('needReason'), confirmedToken(v)) } }),
     },
   };

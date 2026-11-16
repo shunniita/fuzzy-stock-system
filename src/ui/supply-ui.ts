@@ -1,4 +1,5 @@
-import { hold, release, split, voidOf, type Inclusion, type Ledger, type Lot, type Meta, type Project } from '../domain/ledger.ts';
+import { hold, release, split, voidOf, type Inclusion, type Issue, type Ledger, type LedgerEvent, type Lot, type Meta, type Project } from '../domain/ledger.ts';
+import type { CaseMaster, Master } from '../domain/masters.ts';
 import {
   acknowledgeReturn,
   allocateArrival,
@@ -7,6 +8,7 @@ import {
   confirmOrder,
   declareShortage,
   linkDeclaration,
+  needOfGroup,
   receiveLot,
   recordRemainder,
   returnStatusOf,
@@ -25,12 +27,14 @@ import {
   reviseNeed,
   reviseReceipt,
   type CaseProject,
+  type Need,
   type Reply,
   type Request,
   type Supply,
 } from '../domain/supply.ts';
 import { checkField, choiceField, h, section, selectField, textField, type Values } from './dom.ts';
-import { amount, amountFields, countOrUnknown, quantityValue, codeTarget, itemFields, placeOptions, projectField, projectOf } from './fields.ts';
+import { fixSubject, otherOperations } from './subject-actions.ts';
+import { amount, amountFields, countOrUnknown, quantityValue, codeTarget, itemFields, placeOptions, projectField, projectKey, projectOf } from './fields.ts';
 import { caseRef, itemNameText, itemRef, jst, locationRef, projectText, quantityText, tokyoText } from './format.ts';
 import type { Masters } from '../domain/masters.ts';
 import { own, requireActive } from '../domain/masters.ts';
@@ -38,14 +42,31 @@ import { consumablesOf, replenishmentOf, stockOf } from '../domain/packaging.ts'
 import { dateStatusOf, groupsOf, requestSummaryOf, shortageOf, stopsOf, type GroupKey } from '../domain/shortage.ts';
 import { consumableLinesText, needQuantityText, receivedText, requestDateText, remainderText, replyText, requestStateText, shortageLinesText, stateTriadText, stopLineText, supplyEventText, supplyOccurredText } from './supply-format.ts';
 import { createHistoryTargetCollector } from '../domain/history-targets.ts';
+import { templateNeedContextOf, templateNeedInfo } from '../domain/template-needs.ts';
+import { templateNeedOriginText, templateNeedVersionText } from './template-needs-format.ts';
 
 // 画面の状態。台帳と供給を、一回の入力のどちらも更新できるよう一組で持つ。どれかで例外になれば、どちらも代入しない（DAT-04）。
 export type State = { ledger: Ledger; supply: Supply };
 
+export type UiSubject =
+  | { kind: 'lot'; field: string; accepts: (lot: Lot) => boolean }
+  | { kind: 'template'; field: string; prepare?: (form: HTMLFormElement, id: string) => void }
+  | { kind: 'master'; field: string; accepts: (master: Master) => boolean }
+  | { kind: 'request'; field: string; accepts: (request: Request) => boolean; prepare?: (form: HTMLFormElement, id: string) => void }
+  | { kind: 'event'; field: string; accepts: (event: LedgerEvent) => boolean }
+  | { kind: 'need'; field: string; accepts: (need: Need) => boolean }
+  | { kind: 'issue'; field: string; accepts: (issue: Issue) => boolean };
+
+export type CaseSubject = { field: string; accepts: (c: CaseMaster) => boolean };
+
 // notice は成功した記録に添える注意の文。受け取りは記録したが割り当ては拒否した、という部分成功を伝える。
+// caseSubject は subject と別に持つ。受け取りのように依頼を主な対象にする操作も、案件・用途の詳細からは案件を固定して開くため。
 export type UiOp = {
   label: string;
+  subject?: UiSubject;
+  caseSubject?: CaseSubject;
   fields: () => HTMLElement[];
+  validateBeforeSave?: (form: HTMLFormElement | null, state: State) => void;
   run: (s: State, m: Meta, v: Values, inclusion: Inclusion | undefined) => { state: State; notice?: string; units?: State[] };
 };
 
@@ -115,12 +136,29 @@ const requestField = (ctx: Ctx, where: (r: Request) => boolean = () => true) =>
   );
 
 const projectOfValue = (v: Values): Project => projectOf(v);
+// 条件は対象の欄（requestField・openRequestOptions）の候補と揃える。外れた依頼を固定すると候補になく開けない。
+const liveRequest = (field = 'request', extra: (r: Request) => boolean = () => true): Extract<UiSubject, { kind: 'request' }> => ({ kind: 'request', field, accepts: (r) => r.cancelled === null && extra(r) });
+
+// 案件・用途の欄は利用中の案件だけを候補にするので、固定できるのも利用中だけ。
+export const activeCase: CaseSubject = { field: 'project', accepts: (c) => c.active };
 
 export function supplyOps(ctx: Ctx): Record<string, UiOp> {
   const withSupply = (s: State, supply: Supply) => ({ state: { ...s, supply } });
+  // 対象の欄の候補と保管単位の詳細の入口が同じ条件になるよう、条件は一度だけ書く。
+  const lotSubject = (field: string, where: (l: Lot) => boolean): UiSubject => ({ kind: 'lot', field, accepts: (l) => l.mergedInto === null && where(l) });
+  const unstaged = (l: Lot) => l.stage.kind === 'none';
+  const caseSpare = (l: Lot) => l.holds.includes('spare') && l.project.kind === 'case';
+  const openedUnknown = (l: Lot) => {
+    const item = own(ctx.ledger().masters.items, l.item);
+    const pieceUnit = item?.consumable?.pieceUnit ?? item?.packaging?.pieceUnit;
+    return l.quantity.kind === 'unknown' && (pieceUnit === undefined || l.unit === pieceUnit);
+  };
+  const acknowledgeable = (e: LedgerEvent) => e.kind === 'handover' && returnStatusOf(ctx.ledger(), e.eventId).ok && ctx.supply().acks[e.eventId] === undefined;
   return {
     needRegister: {
-      label: '必要な数の登録（案件・用途ごとの必要品目・必要な数）',
+      // 生成済みの案件は登録・改訂を断るので（checkLegacyNeedEdit）、入口も出さない。
+      caseSubject: { field: 'project', accepts: (c) => c.active && own(ctx.supply().templateNeeds, c.id) === undefined },
+      label: '必要な数の登録',
       fields: () => [caseField(ctx.ledger().masters), ...itemFields(ctx.ledger().masters), ...amountFields(), dateField('dueDate', '必要日（なければ空欄）'), textField('source', '元の資料'), textField('revision', '改訂（初版など）')],
       run: (s, m, v) => {
         // 供給の台帳は登録情報を持たないので、利用停止の品目・案件・用途を新しい記録に使わないことは、ここで確かめる（要件3.4）。
@@ -129,7 +167,8 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     needRevise: {
-      label: '必要な数の改訂（改訂前後を履歴に残す）',
+      subject: { kind: 'need', field: 'need', accepts: (n) => own(ctx.supply().templateNeeds, n.project.id) === undefined },
+      label: '必要な数の改訂',
       fields: () => [
         choiceField(
           'need',
@@ -145,7 +184,8 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
         withSupply(s, reviseNeed(s.supply, s.ledger.masters, m, v.text('need'), { required: amount(v), dueDate: dateOrNull(v, 'dueDate'), source: v.text('source'), revision: v.text('revision') })),
     },
     declareShortage: {
-      label: '足りない分の記録（手動。確認事項は作らない）',
+      caseSubject: activeCase,
+      label: '足りない分の記録',
       fields: () => [projectField(ctx.ledger().masters), ...itemFields(ctx.ledger().masters), textField('value', '不足数', 'number'), checkField('valueUnknown', '不足数は不明'), textField('reason', '理由')],
       run: (s, m, v) => {
         requireActive(s.ledger.masters, { item: v.text('item'), project: projectOfValue(v) });
@@ -153,7 +193,7 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     linkDeclaration: {
-      label: '足りない分の記録の対応付け（自動の不足候補と同じ不足）',
+      label: '足りない分の記録の対応付け',
       fields: () => [
         choiceField(
           'declaration',
@@ -168,7 +208,8 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       run: (s, m, v) => withSupply(s, linkDeclaration(s.supply, s.ledger.masters, m, v.text('declaration'), v.text('link') === 'yes')),
     },
     requestRecord: {
-      label: '注文・購入予定の記録（依頼しただけでは在庫に数えない）',
+      caseSubject: activeCase,
+      label: '注文・購入予定の記録',
       fields: () => [projectField(ctx.ledger().masters), ...itemFields(ctx.ledger().masters, 'quantity'), textField('quantity', '依頼数量', 'number'), textField('vendor', '依頼先'), dateField('requestedOn', '依頼日'), ...replyFields()],
       run: (s, m, v) => {
         const raw = v.text('quantity').trim();
@@ -181,22 +222,37 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     orderConfirm: {
-      label: '注文の確定（依頼とは別の記録）',
+      subject: liveRequest('request', (r) => r.orderConfirmedBy === null),
+      label: '注文の確定',
       fields: () => [requestField(ctx, (r) => r.orderConfirmedBy === null)],
       run: (s, m, v) => withSupply(s, confirmOrder(s.supply, s.ledger.masters, m, v.text('request'))),
     },
     replyRecord: {
+      subject: liveRequest(),
       label: '返事・届く予定日の更新',
       fields: () => [requestField(ctx), ...replyFields()],
       run: (s, m, v) => withSupply(s, recordReply(s.supply, s.ledger.masters, m, v.text('request'), replyOf(v))),
     },
     requestCancel: {
-      label: '依頼の取消（元の依頼は残る）',
+      subject: liveRequest(),
+      label: '依頼の取消',
       fields: () => [requestField(ctx), textField('reason', '取り消す理由')],
       run: (s, m, v) => withSupply(s, cancelRequest(s.supply, s.ledger.masters, m, v.text('request'), v.text('reason'))),
     },
     receive: {
-      label: '受け取り（届いた数を記録。依頼への割り当てつき）',
+      caseSubject: activeCase,
+      // 依頼と品目・単位・案件・用途が違うと割り当てを拒否するので、依頼から引き継いで固定する。
+      subject: { ...liveRequest('r1request', (r) => {
+        const masters = ctx.ledger().masters;
+        return own(masters.items, r.item)?.active === true && (r.project.kind !== 'case' || own(masters.cases, r.project.id)?.active === true);
+      }), prepare: (form, id) => {
+        const r = own(ctx.supply().requests, id);
+        if (r === undefined) throw new Error(`依頼 ${id} は現在の候補にありません`);
+        fixSubject(form, 'item', r.item);
+        fixSubject(form, 'unit', r.unit);
+        fixSubject(form, 'project', projectKey(r.project));
+      } },
+      label: '受け取り',
       fields: () => [
         textField('newId', '新しい保管単位のID（文字列のまま保存）'),
         ...itemFields(ctx.ledger().masters),
@@ -240,7 +296,8 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     allocate: {
-      label: '受け取った現物への割り当て（拒否のあとの再割り当てなど）',
+      subject: liveRequest(),
+      label: '受け取った現物への割り当て',
       fields: () => [receiptField(ctx), requestField(ctx), textField('arrived', '届いた数', 'number'), textField('good', '不足の解消に充てた使える数', 'number')],
       run: (s, m, v) => {
         const arrived = v.text('arrived').trim();
@@ -251,7 +308,8 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     receiptRevise: {
-      label: '実際に受け取った数の訂正（届いた数の訂正。理由が必要）',
+      subject: lotSubject('receipt', (l) => own(ctx.supply().receipts, l.id) !== undefined),
+      label: '実際に受け取った数の訂正',
       fields: () => [receiptField(ctx), textField('received', '訂正後の実際に受け取った数', 'number'), textField('reason', '訂正する理由')],
       run: (s, m, v) => {
         const raw = v.text('received').trim();
@@ -260,9 +318,10 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     surplusAllocate: {
-      label: '余った分の振り分け（受け取りの一部を予備・返却待ちにする）',
+      subject: lotSubject('lot', unstaged),
+      label: '余った分の振り分け',
       fields: () => [
-        codeTarget(lotChoice(ctx, 'lot', '対象の保管単位（受け入れた現物など）', (l) => l.stage.kind === 'none'), 'lot', { quantity: 'value', basis: 'basis' }),
+        codeTarget(lotChoice(ctx, 'lot', '対象の保管単位（受け入れた現物など）', unstaged), 'lot', { quantity: 'value', basis: 'basis' }),
         textField('childId', '分けた分の新しいID'),
         ...amountFields(),
         choiceField('destination', '割当先', [
@@ -283,9 +342,10 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     spareSwap: {
-      label: '予備から案件・用途向けへ（交換。理由が必要）',
+      subject: lotSubject('lot', caseSpare),
+      label: '予備から案件・用途向けへ',
       fields: () => [
-        lotChoice(ctx, 'lot', '予備の保管単位（案件・用途に属するもの）', (l) => l.holds.includes('spare') && l.project.kind === 'case'),
+        lotChoice(ctx, 'lot', '予備の保管単位（案件・用途に属するもの）', caseSpare),
         textField('value', '交換する数（全部なら空欄）', 'number'),
         textField('childId', '分けた分の新しいID（一部だけ交換するとき）'),
         textField('note', '交換の理由（破損・紛失・不具合など）'),
@@ -304,33 +364,31 @@ export function supplyOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     returnAck: {
-      label: '返品の受付確認（実返却とは別の記録。在庫は減らさない）',
+      subject: { kind: 'event', field: 'handover', accepts: acknowledgeable },
+      label: '返品の受付確認',
       fields: () => [
         choiceField(
           'handover',
           '実返却（外への引渡し）',
           ctx
             .ledger()
-            .history.filter((e) => e.kind === 'handover' && returnStatusOf(ctx.ledger(), e.eventId).ok && ctx.supply().acks[e.eventId] === undefined)
+            .history.filter(acknowledgeable)
             .map((e) => [e.eventId, `${e.eventId}：保管単位${e.kind === 'handover' ? e.lotId : ''}から${e.kind === 'handover' ? (e.value ?? '数が不明') : ''}を${e.kind === 'handover' ? e.counterpart : ''}へ`]),
         ),
       ],
       run: (s, m, v) => withSupply(s, acknowledgeReturn(s.ledger, s.supply, m, v.text('handover'))),
     },
     remainder: {
-      label: '開けた物の残り具合（数が不明な開封分。数量へは換算しない）',
+      subject: lotSubject('lot', openedUnknown),
+      label: '開けた物の残り具合',
       fields: () => [
-        lotChoice(ctx, 'lot', '開封済みの保管単位（数が不明）', (l) => {
-          const item = own(ctx.ledger().masters.items, l.item);
-          const pieceUnit = item?.consumable?.pieceUnit ?? item?.packaging?.pieceUnit;
-          return l.quantity.kind === 'unknown' && (pieceUnit === undefined || l.unit === pieceUnit);
-        }),
+        lotChoice(ctx, 'lot', '開封済みの保管単位（数が不明）', openedUnknown),
         choiceField('level', '残量区分', remainderLevels.map((r): [string, string] => [r, remainderText[r]])),
       ],
       run: (s, m, v) => withSupply(s, recordRemainder(s.ledger, s.supply, m, v.text('lot'), v.text('level') as RemainderLevel)),
     },
     arrivalRevise: {
-      label: '割り当ての訂正（届いた数・使える数。取消済みの依頼の割り当ても）',
+      label: '割り当ての訂正',
       fields: () => [
         choiceField(
           'arrival',
@@ -413,7 +471,7 @@ function isReceiptLot(ctx: Ctx, lotId: string): boolean {
 // 届いた数の訂正と区別できないので、直し忘れを防ぐために記録のたびに選ぶ。分割の子・まとめ直しの先・初期登録には出さない。
 export function recountWithReceiptChoice(base: UiOp, ctx: Ctx): UiOp {
   return {
-    label: base.label,
+    ...base,
     fields: () => {
       const fields = base.fields();
       const choice = selectField('receiptEffect', '実際に受け取った数の扱い（この現物は受け取りとして記録されている）', [
@@ -476,18 +534,54 @@ function groupText(m: Masters, key: GroupKey): string {
 }
 
 // 不足・依頼の欄。案件・用途・品目・単位ごとに、必要な数・手元・不足・手配対象数・依頼の未着・納期・中断を別々の文で示す。
-export function renderSupply(ctx: Ctx): void {
+export type RequestRows = {
+  ops: Readonly<Record<string, UiOp>>;
+  selected: string;
+  select: (id: string, focus: string) => void;
+  open: (op: string, id: string) => void;
+  start: (op: string) => void;
+};
+
+function button(text: string, click: () => void, props: Record<string, string> = {}): HTMLButtonElement {
+  const node = h('button', { type: 'button', ...props }, text);
+  node.addEventListener('click', click);
+  return node;
+}
+
+function selectedRequestPanel(ctx: Ctx, rows: RequestRows): HTMLElement[] {
+  const requests = ctx.supply().requests, all = Object.values(requests);
+  const current = own(requests, rows.selected) ?? all[0];
+  if (current === undefined) return [];
+  const choice = selectField('selected-request', '対象', all.map((r) => [r.id, `${requestLabel(ctx.ledger().masters, r)}${r.cancelled ? '（取消済み）' : ''}`]), current.id);
+  choice.querySelector('select')!.id = 'selected-request';
+  choice.addEventListener('change', (event) => { if (event.target instanceof HTMLSelectElement) rows.select(event.target.value, 'selected-request'); });
+  const actions = Object.entries(rows.ops).filter(([, op]) => op.subject?.kind === 'request' && op.subject.accepts(current));
+  const actionButton = ([key, op]: [string, UiOp]) => button(op.label, () => rows.open(key, current.id), { 'data-op': key });
+  const primary = ['receive', 'replyRecord', 'orderConfirm'];
+  return [
+    h('h3', { id: 'request-selected-h', tabindex: '-1' }, '選んだ依頼'), choice,
+    ...(actions.length === 0 ? [] : [h('div', { role: 'group', 'aria-label': 'この依頼にできる操作' },
+      ...primary.flatMap((key) => actions.filter(([candidate]) => candidate === key)).map(actionButton),
+      otherOperations(actions.filter(([key]) => !primary.includes(key)).map(actionButton)))]),
+  ];
+}
+
+export function renderSupply(ctx: Ctx, rows?: RequestRows): void {
   const root = section('supply');
   const ledger = ctx.ledger();
   const supply = ctx.supply();
+  const needContext = templateNeedContextOf(supply);
   const targets = createHistoryTargetCollector({ ledger, supply });
 
   const asOfInput = h('input', { type: 'date', name: 'asOf', value: asOf });
   asOfInput.addEventListener('change', () => {
     asOf = asOfInput.value === '' ? todayJst() : asOfInput.value;
-    renderSupply(ctx);
+    renderSupply(ctx, rows);
     ctx.asOfChanged?.();
   });
+  // 対象を持たない記録の入口。既にある依頼・案件への操作は、その行や詳細から始める。
+  if (rows !== undefined) root.append(h('div', { role: 'group', 'aria-label': '不足・依頼の記録' },
+    ...['receive', 'requestRecord', 'declareShortage'].map((key) => button(rows.ops[key]!.label, () => rows.start(key), { 'data-op': key }))));
   root.append(h('label', {}, '判定日（日本時間。納期の判定に使う）', asOfInput));
 
   const groups = groupsOf(ledger, supply);
@@ -496,18 +590,25 @@ export function renderSupply(ctx: Ctx): void {
     const view = shortageOf(ledger, supply, key);
     const summary = requestSummaryOf(ledger, supply, key);
     const stops = stopsOf(ledger, key);
-    const need = key.project.kind === 'case' ? Object.values(supply.needs).find((n) => n.project.id === (key.project as { id: string }).id && n.item === key.item && n.unit === key.unit) : undefined;
+    const need = needOfGroup(supply, key.project, key.item, key.unit);
     const lines: string[] = [
       need ? `必要明細 ${need.id}：必要な数 ${needQuantityText(need.required, need.unit)}、${need.dueDate ? `必要日 ${need.dueDate}` : '必要日なし'}、元の資料「${need.source}」・${need.revision}` : '必要明細は未登録（必要な数が分からないので、不足は判定不能）',
       ...shortageLinesText(view, key.unit),
       ...requestStateText(summary, key.unit),
       ...stateTriadText(view, summary, stops),
     ];
+    if (need) {
+      const generated = templateNeedInfo(ledger.masters, needContext, need);
+      if (generated) lines.push(templateNeedOriginText(ledger.masters, needContext, need),
+        `セット「${generated.version.template.name}」・${generated.plan.count}台・計算基準の版${templateNeedVersionText(supply, generated.version)}・初回版${generated.plan.initialVersion}`);
+    }
     for (const d of Object.values(supply.declarations).filter((x) => sameProject(x.project, key.project) && x.item === key.item && x.unit === key.unit)) {
       lines.push(`足りない分の記録 ${d.id}：${d.value === null ? '数が不明' : `${d.value}${d.unit}`}（${d.reason}）、${d.linked ? '自動の不足候補に対応付け済み' : '対応付けなし（別の不足として数える）'}`);
     }
+    const requestAt = new Map<number, string>();
     for (const r of Object.values(supply.requests).filter((x) => sameProject(x.project, key.project) && x.item === key.item && x.unit === key.unit)) {
       const { arrived, outstanding } = requestProgressOf(ledger.masters, r);
+      requestAt.set(lines.length, r.id);
       lines.push(
         r.cancelled
           ? `依頼 ${r.id}：取消済み（理由「${r.cancelled.reason}」）。${r.quantity}${r.unit}・${r.vendor}`
@@ -520,10 +621,15 @@ export function renderSupply(ctx: Ctx): void {
         'article',
         { class: 'group', 'data-group': `${key.project.kind === 'case' ? key.project.id : key.project.kind}/${key.item}/${key.unit}` },
         h('h3', {}, groupText(ledger.masters, key)),
-        h('ul', { 'aria-label': `${groupText(ledger.masters, key)}の状況` }, ...lines.map((text) => h('li', attention.test(text) ? { class: 'warn' } : {}, text))),
+        h('ul', { 'aria-label': `${groupText(ledger.masters, key)}の状況` }, ...lines.map((text, i) => {
+          const props = attention.test(text) ? { class: 'warn' } : {}, id = requestAt.get(i);
+          if (id === undefined || rows === undefined) return h('li', props, text);
+          return h('li', props, '依頼 ', button(id, () => rows.select(id, 'request-selected-h'), { class: 'link' }), text.slice(`依頼 ${id}`.length));
+        })),
       ),
     );
   }
+  if (rows !== undefined) root.append(...selectedRequestPanel(ctx, rows));
 
   const stale = staleAcksOf(ledger, supply);
   if (stale.length > 0) {
@@ -556,7 +662,7 @@ export function renderSupply(ctx: Ctx): void {
     const list = h('ol', { 'aria-label': '供給の記録の履歴' });
     for (const e of supply.log) {
       // 実際の日時と入力した日時は別。実際の日時が不明なら、入力した日時で埋めず「日時不明」と示す（NFR-08a）。
-      list.append(h('li', { 'data-event': e.eventId }, `発生 ${supplyOccurredText(ledger, e)}・記録 ${jst(e.recordedAt)}・${e.actor}・操作${e.eventId}：${supplyEventText(ledger.masters, e, targets.supplyEventItemIds(e))}`));
+      list.append(h('li', { 'data-event': e.eventId }, `発生 ${supplyOccurredText(ledger, e)}・記録 ${jst(e.recordedAt)}・${e.actor}・操作${e.eventId}：${supplyEventText(ledger.masters, e, targets.supplyEventItemIds(e), needContext.versions)}`));
     }
     root.append(h('h3', {}, '供給の記録の履歴'), list);
   }

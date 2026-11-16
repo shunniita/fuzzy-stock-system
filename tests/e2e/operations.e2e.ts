@@ -33,9 +33,9 @@ test('AT-11: 棚100から作業台へ30移すと棚70・作業台30で部署計1
   await goTo(page, 'stock');
   await recorded(page, 'register', lot('X', 'P', 'S1', 'counted', '100'), '10:00');
   await recorded(page, 'splitMove', { lot: 'X', childId: 'Y', basis: 'counted', value: '30', location: 'T' }, '11:00');
-  await expect(cell(page, 'X', '場所')).toHaveText('S1');
+  await expect(cell(page, 'X', '場所')).toHaveText('棚S1（S1）');
   await expect(cell(page, 'X', '記録上の数と根拠')).toHaveText('記録上の数70個');
-  await expect(cell(page, 'Y', '場所')).toHaveText('T');
+  await expect(cell(page, 'Y', '場所')).toHaveText('作業台T（T）');
   await expect(cell(page, 'Y', '記録上の数と根拠')).toHaveText('30個・数えた');
   await expect(totals(page)).toContainText('在庫 記録上の数100個');
   await recorded(page, 'handover', { lot: 'Y', basis: 'counted', value: '10', counterpart: '架空取引先OUT' }, '13:00');
@@ -76,7 +76,7 @@ test('AT-21・PR2-4: 原因不明のまま原因を書くと原因不明は外�
   await goTo(page, 'stock');
   await recorded(page, 'register', lot('X', 'P', 'S1', 'counted', '60'), '09:00');
   const form = page.getByRole('form', { name: '操作の入力' });
-  await selectOperation(form.locator('[name=op]'), { label: '数えて確認・訂正（原因不明でもよい）' });
+  await selectOperation(form.locator('[name=op]'), { label: '数えて確認・訂正' });
   await form.locator('[name=causeText]').fill('架空の記入漏れ');
   await expect(form.locator('[name=causeUnknown]')).not.toBeChecked();
   await form.locator('[name=causeUnknown]').check();
@@ -126,6 +126,6 @@ test('AT-34: 100を70と30に分け、30を移して統合すると、旧親を�
 
   await recorded(page, 'register', lot('B', 'P', 'S1', 'unknown', ''), '15:00');
   await recorded(page, 'move', { lot: 'B', location: 'S2' }, '15:10');
-  await expect(cell(page, 'B', '場所')).toHaveText('S2');
+  await expect(cell(page, 'B', '場所')).toHaveText('棚S2（S2）');
   await expect(cell(page, 'B', '記録上の数と根拠')).toHaveText('数が不明');
 });

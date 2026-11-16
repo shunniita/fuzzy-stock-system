@@ -62,6 +62,7 @@ const ledgerCases = {
   alternativeRecord: { event: event('alternative', { kind: 'alternativeRecord', operation: 'use', operationId: 'use-P', source: { source: '架空資料', entry: '001', originalActor: '架空担当A' } }), ids: ['P'] },
 } satisfies Record<LedgerTargetEvent['kind'], { event: LedgerTargetEvent; ids: string[] }>;
 const supplyCases = {
+  templateNeeds: { event: supplyEvent('generate', { kind: 'templateNeeds', action: 'generate', group: null, versions: [{ id: 'v1', template }], plansBefore: [null], plansAfter: [{ project: need.project.id, generationId: 'generate', initialVersion: 'v1', version: 'v1', count: 1, origins: [{ needId: need.id, item: need.item, unit: need.unit, origin: 'template' }] }], changes: [{ before: null, after: need }] }), ids: ['P', 'Q', 'R', 'S', 'X'] },
   receiptTemplateSave: { event: supplyEvent('template-save', { kind: 'receiptTemplateSave', before: { ...template, rows: [{ item: 'P', unit: '個', perSet: 1, location: 'S1' }] }, after: template }), ids: ['P', 'Q', 'R', 'S', 'X'] },
   receiptTemplateDelete: { event: supplyEvent('template-delete', { kind: 'receiptTemplateDelete', before: template }), ids: ['Q', 'R', 'S', 'X'] },
   templateReceipt: { event: supplyEvent('template-receipt', { kind: 'templateReceipt', template, project: { kind: 'common' }, sets: 1, vendor: null, rows: [{ lotId: 'q', quantity: 2, shortfall: 0 }, { lotId: null, quantity: 0, shortfall: 0 }], routes: ['assembled', 'assembled'] }), ids: ['Q', 'R', 'S', 'X'] },

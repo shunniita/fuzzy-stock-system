@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { goTo, lot, opLabels, record, recorded, selectOperation, startEmpty, storageBytes } from './helpers.ts';
+import { opNotes } from '../../src/ui/op-notes.ts';
+import { operationGroups } from '../../src/ui/operation-picker.ts';
 import { draftOf, twoPages, typeUse } from './conflict-helpers.ts';
 
 test('作業別操作: 全操作へ種類から到達でき、一つの候補列に詰め込まない', async ({ page }) => {
@@ -158,4 +160,18 @@ test('作業別操作: 分類を巡回してもコード候補・保持値・両
     await observer.evaluate(value => value.restore());
     await observer.dispose(); await original.dispose();
   }
+});
+
+test('作業別操作: 操作名から外した説明は、選んだ操作の補足文として入力欄の上に出る', async ({ page }) => {
+  await startEmpty(page);
+  const group = page.getByLabel('作業の種類', { exact: true });
+  const select = page.locator('[name=op]');
+  for (const [key, note] of Object.entries(opNotes)) {
+    await group.selectOption(operationGroups.find(g => g.keys.includes(key))!.id);
+    await select.selectOption(key);
+    await expect(page.locator('.op-note')).toHaveText(note);
+  }
+  await group.selectOption('stock');
+  await select.selectOption('use');
+  await expect(page.locator('.op-note')).toHaveCount(0);
 });

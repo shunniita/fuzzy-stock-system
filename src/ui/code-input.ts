@@ -4,7 +4,7 @@ import { own, type Masters } from '../domain/masters.ts';
 import { codeFormat, interpretationText } from './code-format.ts';
 import { field, h } from './dom.ts';
 import { projectKey } from './fields.ts';
-import { caseRef, locationRef, projectText } from './format.ts';
+import { caseRef, placeName, projectText } from './format.ts';
 
 export type CodeHolds = { project: string | null; location: string | null };
 // reference：送信の可否に関わらず、読取原文と採用済みの証拠（未確認を含む）を参照用に取り出す。送信にはevidenceを使う。
@@ -17,7 +17,6 @@ function projectName(masters: Masters, id: string): string {
   if (id === 'common' || id === 'unassigned') return projectText(masters, { kind: id });
   return `${own(masters.cases, id)?.name ?? '案件・用途'}（${caseRef(masters, id)}）`;
 }
-const placeName = (masters: Masters, id: string): string => `${own(masters.locations, id)?.name ?? '場所'}（${locationRef(masters, id)}）`;
 function targetText(target: HTMLSelectElement, value: string, text: string, ledger: Ledger): string {
   if (value === '') return '未選択';
   switch (target.dataset['codeTarget']) {
@@ -61,7 +60,7 @@ export function codeInput(form: HTMLFormElement, ledger: Ledger, operation: stri
   const raw = h('textarea', { rows: '2', autocomplete: 'off', spellcheck: 'false' });
   const result = h('div', { 'aria-live': 'polite', 'data-code-result': '' });
   const targetChoice = h('select');
-  targetChoice.append(h('option', { value: '' }, '入力先を選ぶ'));
+  targetChoice.append(h('option', { value: '' }, '入力先を選んでから検索'));
   for (const target of targets) targetChoice.append(h('option', { value: target.name }, labelOf(target)));
   const query = h('input', { type: 'search' });
   const options = h('div', { 'data-code-options': '' });
@@ -157,9 +156,17 @@ export function codeInput(form: HTMLFormElement, ledger: Ledger, operation: stri
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); interpret(); }
   });
   const parse = h('button', { type: 'button' }, '解釈'); parse.addEventListener('click', interpret);
-  const search = h('button', { type: 'button' }, '検索'); search.addEventListener('click', () => { searching = true; showOptions(); });
-  query.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); searching = true; showOptions(); } });
-  targetChoice.addEventListener('change', showOptions);
+  const search = h('button', { type: 'button' }, '検索'); search.disabled = true;
+  const searchOptions = () => { if (target() !== undefined) { searching = true; showOptions(); } };
+  search.addEventListener('click', searchOptions);
+  query.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); searchOptions(); } });
+  targetChoice.addEventListener('change', () => {
+    const selected = target();
+    search.disabled = selected === undefined;
+    query.placeholder = selected === undefined ? '' : `${labelOf(selected)}の名称・品番・コード`;
+    if (current !== undefined || searching) showOptions();
+    else options.replaceChildren();
+  });
   confirm.addEventListener('click', () => { confirmed = true; renderFinal(); });
   const holdsButtons = h('div');
   for (const key of ['project', 'location'] as const) {
@@ -182,7 +189,8 @@ export function codeInput(form: HTMLFormElement, ledger: Ledger, operation: stri
     }
     changed();
   });
-  node.append(held, holdsButtons, field('読取原文・品目ID', raw), parse, result, field('コードの入力先', targetChoice), field('名称・品番・コードで検索', query), search, options, final, confirm);
+  const searchGroup = h('fieldset', {}, h('legend', {}, '検索して入力する対象'), field('コードの入力先', targetChoice), field('名称・品番・コードで検索', query), search, options);
+  node.append(held, holdsButtons, field('読取原文・品目ID', raw), parse, result, searchGroup, final, confirm);
   changed();
   return { node, evidence: () => {
     if (adopted && !confirmed) throw new Error('読取後の最終対象を「この対象で続ける」で確認する');

@@ -85,7 +85,7 @@ describe('工程の設定 2.3・6.2・6.4・6.5: 保存途中と復元', () => {
 
     // v1.2.0の空の台帳で品番・コード「N」の場所を登録すると、版11では登録の写しから次工程として読む。
     const blank = changed(emptyLedger, 'n', { action: 'register', master: { type: 'location', code: 'N', name: '架空の次工程', trial: true, inScope: true } });
-    const legacyN = JSON.stringify({ ...JSON.parse(serialize(initial(blank, emptySupply))), version: 11 }, (k, v: unknown) => k === 'processes' || k === 'nextProcess' ? undefined : v);
+    const legacyN = JSON.stringify({ ...JSON.parse(serialize(initial(blank, emptySupply))), version: 11 }, (k, v: unknown) => k === 'templateNeeds' || k === 'processes' || k === 'nextProcess' ? undefined : v);
     expect(parse(legacyN)?.ledger.masters.locations.N?.nextProcess).toBe(true);
 
     const swapped = JSON.parse(serialize(initial(settled(), emptySupply)));
@@ -133,7 +133,7 @@ describe('工程の設定 2.3・6.2・6.4・6.5: 保存途中と復元', () => {
     // 版11のwriterが書いた形へ戻す。
     for (const [key, text] of store.data) if (text.startsWith('{')) {
       const value = JSON.parse(text);
-      if (value.version === 12) store.data.set(key, JSON.stringify({ ...value, version: 11 }, (k, v: unknown) => k === 'processes' || k === 'nextProcess' ? undefined : v));
+      if (value.version === 13) store.data.set(key, JSON.stringify({ ...value, version: 11 }, (k, v: unknown) => k === 'templateNeeds' || k === 'processes' || k === 'nextProcess' ? undefined : v));
     }
     const loaded = load(store);
     if (loaded.kind !== 'ok' || loaded.pending === null) throw new Error('旧版の保存途中を読めない');
@@ -159,7 +159,7 @@ describe('工程の設定 2.3・6.2・6.4・6.5: 保存途中と復元', () => {
     faults.failMidwayAt = null;
     for (const [key, text] of store.data) if (text.startsWith('{')) {
       const value = JSON.parse(text);
-      if (value.version === 12) store.data.set(key, JSON.stringify({ ...value, version: 11 }, (k, v: unknown) => k === 'processes' || k === 'nextProcess' ? undefined : v).replaceAll('架空工程B', '架空工程'));
+      if (value.version === 13) store.data.set(key, JSON.stringify({ ...value, version: 11 }, (k, v: unknown) => k === 'templateNeeds' || k === 'processes' || k === 'nextProcess' ? undefined : v).replaceAll('架空工程B', '架空工程'));
     }
     const loaded = load(store);
     if (loaded.kind !== 'ok' || loaded.pending === null) throw new Error('旧版の保存途中を読めない');
@@ -183,7 +183,7 @@ describe('工程の設定 2.3・6.2・6.4・6.5: 保存途中と復元', () => {
     faults.failMidwayAt = null;
     for (const [key, text] of store.data) if (text.startsWith('{')) {
       const value = JSON.parse(text);
-      if (value.version === 12) store.data.set(key, JSON.stringify({ ...value, version: 11 }, (k, v: unknown) => k === 'processes' || k === 'nextProcess' ? undefined : v).replaceAll('架空R', 'R組立'));
+      if (value.version === 13) store.data.set(key, JSON.stringify({ ...value, version: 11 }, (k, v: unknown) => k === 'templateNeeds' || k === 'processes' || k === 'nextProcess' ? undefined : v).replaceAll('架空R', 'R組立'));
     }
     const loaded = load(store);
     if (loaded.kind !== 'ok' || loaded.pending === null) throw new Error('旧版の保存途中を読めない');

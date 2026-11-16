@@ -69,7 +69,7 @@ function checkImportedRecipes(template: ReceiptTemplate, before: ReceiptTemplate
   checkImportedRecipeVersions(template, before, versions, masters);
 }
 
-function recipeVersion(template: ReceiptTemplate, masters: Masters): string {
+export function recipeVersion(template: ReceiptTemplate, masters: Masters): string {
   return JSON.stringify(normalizeAssemblyRecipe(template, masters, { allowLegacySelfReference: true }));
 }
 

@@ -93,3 +93,16 @@ test('AT-43: 同じ入力で推計と手入力に同じ材料を入れると重�
   await expect(other.locator('[data-recipe-status]')).toContainText('構成未登録');
   await expect(other.getByRole('button', { name: '使用候補を出す' })).toBeHidden();
 });
+
+test('UX再点検: セットの動的な使用内訳でも数量超過を示し、除外で消える', async ({ page }) => {
+  await prepare(page);
+  const form = await startForm(page, 'W1');
+  const before = await storageBytes(page);
+  await form.locator('[name=e1u0lot]').selectOption('P-1');
+  await form.locator('[name=e1u0basis]').selectOption('counted');
+  await form.locator('[name=e1u0value]').fill('60');
+  await expect(form.locator('#quantity-warning-e1u0value')).toContainText('記録上の数50個を超える');
+  await form.locator('[name=e1decision]').selectOption('exclude');
+  await expect(form.locator('#quantity-warning-e1u0value')).toBeHidden();
+  expect(await storageBytes(page)).toEqual(before);
+});

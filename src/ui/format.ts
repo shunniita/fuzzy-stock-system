@@ -29,6 +29,7 @@ import { historyItems, type HistoryTargetCollector, type ItemFormatter } from '.
 
 export const itemRef = (masters: Masters, id: string): string => refOf(masters.items, id);
 export const locationRef = (masters: Masters, id: string): string => refOf(masters.locations, id);
+export const placeName = (masters: Masters, id: string): string => `${own(masters.locations, id)?.name ?? '場所'}（${locationRef(masters, id)}）`;
 export const caseRef = (masters: Masters, id: string): string => refOf(masters.cases, id);
 
 // 保存済み対象キーの接頭辞だけを表示語へ直す。ID・入力原文・保存値は変えない。

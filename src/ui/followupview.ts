@@ -1,6 +1,6 @@
 import { openIssuesOf, type Ledger, type Lot } from '../domain/ledger.ts';
 import { dateStatusOf, groupsOf, requestSummaryOf, shortageOf, stopGroupsOf, stopsOf, type GroupKey } from '../domain/shortage.ts';
-import { checkDate, sameProject, type DateText, type Supply } from '../domain/supply.ts';
+import { checkDate, needOfGroup, sameProject, type DateText, type Supply } from '../domain/supply.ts';
 import { h } from './dom.ts';
 import { issueLabel, itemRef, projectText, quantityText } from './format.ts';
 import { judgementText, needQuantityText, replyText, requestDateText, requestHasConflict, requestStateText, stopLineText } from './supply-format.ts';
@@ -84,7 +84,7 @@ export function followupRowsOf(ledger: Ledger, supply: Supply, asOf: DateText): 
 
 function displayOf(row: FollowupRow, ledger: Ledger, supply: Supply, asOf: DateText) {
   const { key } = row;
-  const need = Object.values(supply.needs).find((n) => sameProject(n.project, key.project) && n.item === key.item && n.unit === key.unit);
+  const need = needOfGroup(supply, key.project, key.item, key.unit);
   const summary = requestSummaryOf(ledger, supply, key);
   const requests = Object.values(supply.requests).filter((r) => sameProject(r.project, key.project) && r.item === key.item && r.unit === key.unit);
   return {

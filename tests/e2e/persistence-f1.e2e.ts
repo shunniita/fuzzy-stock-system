@@ -15,7 +15,7 @@ for (const reload of [false, true]) {
     if (reload) await page.reload();
     await recorded(page, 'recount', { lot: 'X', value: '100', causeUnknown: true }, '10:00');
     await expect(cell(page, 'X', '記録上の数と根拠')).toHaveText('100個・数えた');
-    await expect(cell(page, 'X', '場所')).toHaveText('S2');
+    await expect(cell(page, 'X', '場所')).toHaveText('棚S2（S2）');
     await expect(cell(page, 'X', '確認が必要')).toHaveText('なし');
     await goTo(page, 'issues');
     await expect(page.locator('#history').getByRole('listitem')).toHaveCount(3);
@@ -31,7 +31,7 @@ for (const reload of [false, true]) {
       if (reload) await page.reload();
       await recorded(page, 'void', { target: 'op2', reason: '架空の記録誤り' }, '12:00');
       await expect(cell(page, 'X', '記録上の数と根拠')).toHaveText('100個・数えた');
-      await expect(cell(page, 'X', '場所')).toHaveText('S2');
+      await expect(cell(page, 'X', '場所')).toHaveText('棚S2（S2）');
       await goTo(page, 'issues');
       await expect(page.locator('#history')).toContainText('記録誤りとして取消済み');
       await expect(page.locator('#history').getByRole('listitem')).toHaveCount(4);
@@ -62,8 +62,8 @@ test('F1-0 要件3: 版1の写しを読み込んで表示し、次の保存か�
   await goTo(page, 'stock');
   const shown = await cell(page, 'X', '記録上の数と根拠').textContent() ?? '';
   const current = await slotOf();
-  expect(JSON.parse(current)).toMatchObject({ version: 12, conflictReviews: [], quantities: expect.any(Object) });
-  const v1 = JSON.stringify({ ...decodeSnapshot(JSON.parse(current)), version: 1 }, (key, value: unknown) => key === 'consumable' || key === 'processes' || key === 'nextProcess' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' || key === 'itemLabels' ? undefined : value);
+  expect(JSON.parse(current)).toMatchObject({ version: 13, conflictReviews: [], quantities: expect.any(Object) });
+  const v1 = JSON.stringify({ ...decodeSnapshot(JSON.parse(current)), version: 1 }, (key, value: unknown) => key === 'templateNeeds' || key === 'consumable' || key === 'processes' || key === 'nextProcess' || key === 'unitSteps' || key === 'conflictReviews' || key === 'receiptTemplates' || key === 'itemLabels' ? undefined : value);
   await page.evaluate(text => localStorage.setItem(`fuzzy-stock/slot-${localStorage.getItem('fuzzy-stock/head')}`, text), v1);
   await page.reload();
   await expect(cell(page, 'X', '記録上の数と根拠')).toHaveText(shown);
@@ -73,9 +73,9 @@ test('F1-0 要件3: 版1の写しを読み込んで表示し、次の保存か�
   expect(decodeSnapshot(JSON.parse(v1)).ledger.history.map(event => event.itemLabels)).toEqual([{ kind: 'legacy-unavailable' }, { kind: 'legacy-unavailable' }]);
   await recorded(page, 'move', { lot: 'X', location: 'S2' }, '11:00');
   await goTo(page, 'stock');
-  await expect(cell(page, 'X', '場所')).toHaveText('S2');
+  await expect(cell(page, 'X', '場所')).toHaveText('棚S2（S2）');
   const migrated = JSON.parse(await slotOf());
-  expect(migrated).toMatchObject({ version: 12, conflictReviews: [], quantities: expect.any(Object) });
+  expect(migrated).toMatchObject({ version: 13, conflictReviews: [], quantities: expect.any(Object) });
   const history = decodeSnapshot(migrated).ledger.history;
   expect(history).toHaveLength(3);
   expect(history.slice(0, 2).map(event => event.itemLabels)).toEqual([{ kind: 'legacy-unavailable' }, { kind: 'legacy-unavailable' }]);

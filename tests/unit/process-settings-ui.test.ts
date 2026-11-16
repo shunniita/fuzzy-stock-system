@@ -31,7 +31,7 @@ describe('工程の設定 3.1: 工程と次工程の設定の入力（1.1〜1.4�
     let state = { ledger: practiceLedger, supply: emptySupply };
     state = run(state, 'masterProcess', { name: '塗装', criterion: 'workEnd' }, 'p1', 8);
     expect(state.ledger.masters.processes['塗装']).toMatchObject({ name: '塗装', criterion: 'workEnd', active: true });
-    state = run(state, 'masterProcessCriterion', { target: '塗装', criterion: 'inspection', reason: '確認を入れる' }, 'p2', 9);
+    state = run(state, 'masterProcessCriterion', { target: 'process:塗装', criterion: 'inspection', reason: '確認を入れる' }, 'p2', 9);
     state = run(state, 'masterRename', { target: 'process:塗装', name: '塗装ライン', reason: '呼び方' }, 'p3', 10);
     state = run(state, 'masterDeactivate', { target: 'process:塗装', reason: '休止' }, 'p4', 11);
     state = run(state, 'masterReactivate', { target: 'process:塗装', reason: '再開' }, 'p5', 12);

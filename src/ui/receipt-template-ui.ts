@@ -5,7 +5,7 @@ import { subtractScalar } from '../domain/scalar.ts';
 import { checkField, choiceField, h, selectField, textField, type Values } from './dom.ts';
 import { placeOptions, projectField, projectKey, projectOf, quantityValue } from './fields.ts';
 import { basisLabel, itemRef, locationRef, projectText } from './format.ts';
-import type { Ctx, UiOp } from './supply-ui.ts';
+import { activeCase, type Ctx, type UiOp } from './supply-ui.ts';
 import { readPinnedRecipe, receiptPreviewSignature } from './receipt-template-draft.ts';
 
 type DraftRow = { item: string; unit: string; perSet: string; location: string; assembly: string };
@@ -160,10 +160,11 @@ function receiptFields(ctx: Ctx): HTMLElement[] {
   const vendor = textField('vendor', '欠品の手配先（不足があるときだけ必須。欠品リストの発行元など）');
   const confirm = checkField('templateConfirmed', '案件・用途・明細・不足数・今回受け取った数・根拠・場所を確認した');
   confirm.querySelector('input')!.dataset['receiptConfirm'] = '';
-  const clear = () => { root.replaceChildren(h('p', {}, '「予定数を展開」で今回の明細を表示してください。')); signature.value = ''; changed(root); };
+  const clear = () => { root.replaceChildren(h('p', {}, '「予定数を展開」で今回の明細を表示してください。展開しただけでは在庫は変わりません。')); signature.value = ''; changed(root); };
   selection.addEventListener('change', () => {
     const template = own(ctx.supply().receiptTemplates, selection.querySelector('select')!.value), p = project.querySelector('select')!;
-    if (template?.project && [...p.options].some(o => o.value === projectKey(template.project!))) p.value = projectKey(template.project);
+    // 案件・用途の詳細から固定した案件は、セットに登録した案件で上書きしない（記録時の照合は固定した値で行う）。
+    if (!p.disabled && template?.project && [...p.options].some(o => o.value === projectKey(template.project!))) p.value = projectKey(template.project);
     if (setsLabel) setsLabel.textContent = template?.productUnit ? `製作数量（${template.productUnit}・正の整数）` : '製作個数（正の整数）';
     references.replaceChildren();
     template?.rows.forEach((row, i) => {
@@ -195,6 +196,7 @@ function receiptFields(ctx: Ctx): HTMLElement[] {
 export function receiptTemplateOps(ctx: Ctx): Record<string, UiOp> {
   return {
     templateSave: {
+      subject: { kind: 'template', field: 'template' },
       label: 'セットの登録・変更', fields: () => editFields(ctx),
       run: (state, meta, v) => {
         const length = quantityValue(v.text('templateRows'), 1);
@@ -208,12 +210,15 @@ export function receiptTemplateOps(ctx: Ctx): Record<string, UiOp> {
       },
     },
     templateDelete: {
+      subject: { kind: 'template', field: 'template' },
       label: 'セットの削除',
       fields: () => [emptyHelp(ctx), templateChoice(ctx), h('p', {}, 'セットを削除しても過去の受け取りと履歴は残ります。')],
       run: (state, meta, v) => ({ state: { ...state, supply: deleteReceiptTemplate(state.supply, state.ledger.masters, meta, v.text('template')) } }),
     },
     templateReceive: {
-      label: 'セットからまとめて受け取り（欠品の入力）', fields: () => receiptFields(ctx),
+      subject: { kind: 'template', field: 'template' },
+      caseSubject: activeCase,
+      label: 'セットからまとめて受け取り', fields: () => receiptFields(ctx),
       run: (state, meta, v) => {
         const template = own(state.supply.receiptTemplates, v.text('template'));
         if (!template) throw new Error('現在のセットから予定数を展開してください');

@@ -156,7 +156,7 @@ test('AT-39・2.1〜2.3・2.6: 分割と棚から作業台への移動は保存�
   expect(failed.bytes['fuzzy-stock/head']).toBe(before.bytes['fuzzy-stock/head']);
   await goTo(page, 'stock');
   await expect(cell(page, 'source', '記録上の数と根拠')).toHaveText('10個・数えた');
-  await expect(cell(page, 'source', '場所')).toHaveText('S1');
+  await expect(cell(page, 'source', '場所')).toHaveText('棚S1（S1）');
   await expect(row(page, 'moved')).toHaveCount(0);
   await goTo(page, 'issues');
   expect(await page.locator('#history').innerText()).toBe(history);
@@ -169,7 +169,7 @@ test('AT-39・2.1〜2.3・2.6: 分割と棚から作業台への移動は保存�
   expect(saved.snapshot.ops['op2']?.units).toEqual([['op2', 'op2-m']]);
   await expect(cell(page, 'source', '記録上の数と根拠')).toHaveText('記録上の数7個');
   await expect(cell(page, 'moved', '記録上の数と根拠')).toHaveText('3個・数えた');
-  await expect(cell(page, 'moved', '場所')).toHaveText('T');
+  await expect(cell(page, 'moved', '場所')).toHaveText('作業台T（T）');
   await page.reload();
   expect(await stored(page)).toEqual(saved);
   expect(errors).toEqual([]);

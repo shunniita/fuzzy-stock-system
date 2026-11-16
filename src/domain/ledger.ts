@@ -1,5 +1,5 @@
 import { checkedConsumable, codeOwner, deepFreeze, nextProcessOf, practiceMasters, inScopeAt, inputStepOf, processRef, masterTypeDisplayLabel, own, perBoxAt, quantityStepOf, refOf, reservedCaseIds, unassignedCode, type ConsumableSetting, type LocationMaster, type Master, type Masters, type ProcessMaster, type Source } from './masters.ts';
-import { initialPackaging, checkTrialReview, effectiveFrom, masterOf, masterRef, processNameFree, registered, type NewMaster, type TrialReview } from './master-edit.ts';
+import { initialPackaging, checkCaseCode, checkTrialReview, effectiveFrom, masterOf, masterRef, processNameFree, registered, type NewMaster, type TrialReview } from './master-edit.ts';
 import { add, observe, quantityOf, sameQuantity, subtract, type Basis, type Observation, type Quantity } from './quantity.ts';
 import { sumScalarsFinal, validateScalar, type Step } from './scalar.ts';
 import type { Scan } from './code.ts';
@@ -231,6 +231,8 @@ export type Inclusion = 'included' | 'notIncluded' | 'unknown';
 
 // 画面が回答欄を出して同じ入力を再送できるよう、回答の不足を他の入力誤りと区別する。
 export class InclusionRequired extends Error {}
+// 次の手順の案内は画面の選択肢の語を使うので、画面側で添える。
+export class NegativeOnApply extends Error {}
 
 // 適用先のまとまりを特定できない増減・現物（REC-04a・07b）。適用済みの台帳には足さない。
 export type ProvisionalContent = {
@@ -504,7 +506,7 @@ function required(text: string, label: string): void {
 }
 
 // 親から減らした結果。負になるならnull。数が不明を含む計算は負と判定できないので、そのまま適用する。
-function decreased(ledger: Ledger, lot: Lot, taken: Quantity): Lot | null {
+export function decreased(ledger: Ledger, lot: Lot, taken: Quantity): Lot | null {
   const quantity = subtract(lot.quantity, taken, quantityStepOf(ledger.masters, lot.item, lot.unit));
   return quantity.kind === 'known' && quantity.numeric.value < 0 ? null : { ...lot, quantity };
 }
@@ -546,7 +548,7 @@ function notBeforeCreation(ledger: Ledger, lot: Lot, occurredAt: string | null):
 // 分割・位置の変更・作業の開始でできたまとまりは、その時の数えた記録が最後の確認なら、それより前の操作はあり得ない。
 // 同じ時刻の次の段階（作業終了20の直後の確認の完了18など）で回答を求めると、「20の中にいた」と読んで
 // 「含まれていた」と答えやすく、親を減らさずに子を作って現物を二重に数える。登録は既にある物を数えるので除く。
-function inclusionOf(ledger: Ledger, lot: Lot, occurredAt: string | null, answer: Inclusion | undefined): Inclusion | null {
+export function inclusionOf(ledger: Ledger, lot: Lot, occurredAt: string | null, answer: Inclusion | undefined): Inclusion | null {
   const creation = notBeforeCreation(ledger, lot, occurredAt);
   if (lot.lastCount === null || creation?.eventId === lot.lastCount.eventId) return null;
   if (isAfter(occurredAt, occurredAtOf(ledger, lot.lastCount.eventId))) return null;
@@ -865,7 +867,7 @@ export function resolveIssue(ledger: Ledger, meta: Meta, issueId: string, outcom
     if (inclusion === 'included') throw new Error('確認に含まれていたなら、適用せずに閉じる');
     if (inclusion === 'unknown') throw new Error('確認に含まれていたか分かるまで適用できない');
     const parent = decreased(ledger, lot, quantityOf(observeFor(ledger, lot, origin.eventId, origin.basis, origin.value)));
-    if (parent === null) throw new Error('適用すると負数になるため、まだ解消できない');
+    if (parent === null) throw new NegativeOnApply('適用すると負数になるため、まだ解消できない');
     lots = [parent];
   }
   const resolution: Resolution = { eventId: meta.eventId, outcome, actor: meta.actor };
@@ -1096,7 +1098,8 @@ export function voidRecord(ledger: Ledger, meta: Meta, targetEventId: string, re
 }
 
 // 最後に数えた数（なければ登録）の数量から、指定の操作と取り消し済みの操作（誤りの前後どちらも、取消と対で打ち消し合う）を
-// 除いて、減算とまとめ直しの加算だけを引き直した数量。まとめ直しの元も同じ規則で引き直す。引き直せなければundefined。
+// 除いて、減算とまとめ直しの加算だけを引き直した数量。まとめ直しの元も同じ規則で引き直し、引き直せなくても
+// 除く操作・取り消し済みの操作を含まなければ統合時の数量を使う。引き直せなければundefined。
 function rebuiltWithout(ledger: Ledger, lot: Lot, excludedOpId: string): Quantity | undefined {
   const chain = reflectedIn(ledger.history, lot);
   const first = chain[0];
@@ -1109,7 +1112,8 @@ function rebuiltWithout(ledger: Ledger, lot: Lot, excludedOpId: string): Quantit
       quantity = subtract(quantity, quantityOf(observeFor(ledger, lot, e.eventId, e.basis, e.value)), quantityStepOf(ledger.masters, lot.item, lot.unit));
     } else if (e.kind === 'merge') {
       const from = e.changes.find((c) => c.after.mergedInto === lot.id)?.after;
-      const merged = from && (rebuiltWithout(ledger, from, excludedOpId) ?? from.quantity);
+      // 除く操作・取り消し済みの操作を含む統合時の数量で代えると誤りが残るので、そのときは全体を足し戻しに任せる。
+      const merged = from && (rebuiltWithout(ledger, from, excludedOpId) ?? (keepsAll(ledger, from, excludedOpId) ? from.quantity : undefined));
       if (!merged) return undefined;
       quantity = add(quantity, merged, quantityStepOf(ledger.masters, lot.item, lot.unit));
     } else {
@@ -1117,6 +1121,12 @@ function rebuiltWithout(ledger: Ledger, lot: Lot, excludedOpId: string): Quantit
     }
   }
   return quantity;
+}
+
+// 今の数量に反映された操作（まとめ直しの元も含む）に、指定の操作も取り消し済みの操作もない。
+function keepsAll(ledger: Ledger, lot: Lot, excludedOpId: string): boolean {
+  return reflectedIn(ledger.history, lot).every((e) => opIdOf(e) !== excludedOpId && !isVoided(ledger, opIdOf(e))
+    && (e.kind !== 'merge' || e.changes.every((c) => c.after.mergedInto !== lot.id || keepsAll(ledger, c.after, excludedOpId))));
 }
 
 // まとめ直し済みなら、その数量を今持っているまとまり。まとめ直し先を後に数え直していれば、
@@ -1474,6 +1484,7 @@ function planActive(ledger: Ledger, meta: Meta, request: Request<'deactivate' | 
 function planCode(ledger: Ledger, request: Request<'code'>, confirmed: boolean): MasterPlan {
   const m = masterOf(ledger.masters, request.type, request.id);
   required(request.code, '品番・コード');
+  if (request.type === 'case') checkCaseCode(request.code);
   required(request.reason, '理由');
   if (m.type === 'actor' || m.type === 'process') throw new Error(`${masterTypeDisplayLabel[m.type]}には品番・コードがない`);
   if (m.code === request.code) throw new Error('今と同じ品番・コード');

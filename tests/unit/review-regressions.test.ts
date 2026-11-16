@@ -19,7 +19,7 @@ function found(location = 'T'): Ledger {
 function returned(location = 'T'): Ledger {
   return assignReturnedProvisional(found(location), meta('assign', 13), { kind: 'notIncluded', issueId: 'found', lot: { ...product, location }, reason: '現在数量に未包含', confirmed: true });
 }
-const pendingOf = (snapshot: Snapshot) => ({ format: 'fuzzy-stock-pending', version: 12, pending: {
+const pendingOf = (snapshot: Snapshot) => ({ format: 'fuzzy-stock-pending', version: 13, pending: {
   progress: 'saving', unknownSince: null, savingSince: at, baseRevision: 0, opId: 'op1', opLabel: '架空操作', fingerprint: 'f', values: {}, actor: '架空担当A', startedAt: at,
   units: [{ ledger: snapshot.ledger, supply: snapshot.supply, targets: [], conflictReviews: [] }],
 } });

@@ -5,7 +5,9 @@ import {
   processUsed,
   identifyProvisional,
   openIssues,
+  type Issue,
   type Ledger,
+  type Lot,
   type MasterRequest,
   type NewMaster,
   type Process,
@@ -13,13 +15,21 @@ import {
 import { masterTypeDisplayLabel, nextProcessOf, own, unassignedCode, type ItemMaster, type Master, type Masters, type Source } from '../domain/masters.ts';
 import type { Supply } from '../domain/supply.ts';
 import { requestProgressOf } from '../domain/supply.ts';
-import { checkField, choiceField, h, selectField, textField, type Values } from './dom.ts';
+import { checkField, choiceField, h, selectField, textField, type Child, type Values } from './dom.ts';
+import { otherOperations } from './subject-actions.ts';
 import { codeTarget, itemFields, lotOptions, placeOptions, projectField, projectKey, projectOf, projectsOf } from './fields.ts';
 import { parseScalar, type Step } from '../domain/scalar.ts';
 import { caseRef, consumableSettingText, criterionText, packagingSettingText, eventText, itemRef, jst, locationRef, projectText, quantityText } from './format.ts';
 import type { Ctx, UiOp } from './supply-ui.ts';
 
 // 確認が要る操作は、画面の「確認した」の欄を読む。
+
+export function masterOf(masters: Masters, key: string): Master | undefined {
+  const at = key.indexOf(':');
+  const groups = { item: masters.items, location: masters.locations, case: masters.cases, actor: masters.actors, process: masters.processes } as const;
+  const type = key.slice(0, at);
+  return at < 0 || !Object.hasOwn(groups, type) ? undefined : own(groups[type as keyof typeof groups] as Readonly<Record<string, Master>>, key.slice(at + 1));
+}
 
 function masterLabel(masters: Masters, m: Master): string {
   switch (m.type) {
@@ -57,8 +67,9 @@ function sourceOf(v: Values): Source | null {
   return name === '' && revision === '' ? null : { name, revision };
 }
 
-const masterOp = (label: string, fields: (masters: Masters) => HTMLElement[], request: (v: Values, masters: Masters) => MasterRequest, ctx: Ctx): UiOp => ({
-  label: `登録情報：${label}`,
+const masterOp = (label: string, fields: (masters: Masters) => HTMLElement[], request: (v: Values, masters: Masters) => MasterRequest, ctx: Ctx, accepts?: (m: Master) => boolean): UiOp => ({
+  label,
+  ...(accepts === undefined ? {} : { subject: { kind: 'master', field: 'target', accepts } }),
   fields: () => fields(ctx.ledger().masters),
   run: (s, m, v) => ({ state: { ...s, ledger: changeMasters(s.ledger, m, request(v, s.ledger.masters), v.checked('confirmed')) } }),
 });
@@ -156,11 +167,15 @@ function unitStepFields(): HTMLElement[] {
 const register = (master: (v: Values) => NewMaster) => (v: Values): MasterRequest => ({ action: 'register', master: master(v) });
 
 // 見つかった物の未解消の仮の記録だけが対応付けの対象（要件8.1・8.8）。
+function foundIssue(ledger: Ledger, i: Issue): boolean {
+  const origin = ledger.history.find((e) => e.eventId === i.id);
+  return i.resolution === null && i.reason === 'unassigned' && origin?.kind === 'provisional' && origin.direction === 'found';
+}
+
+const unassigned = (l: Lot): boolean => l.project.kind === 'unassigned';
+
 function foundIssueField(ledger: Ledger): HTMLLabelElement {
-  const options = openIssues(ledger).flatMap((i): [string, string][] => {
-    const origin = ledger.history.find((e) => e.eventId === i.id);
-    return i.reason === 'unassigned' && origin?.kind === 'provisional' && origin.direction === 'found' ? [[i.id, `${i.id}：${eventText(ledger, origin)}`]] : [];
-  });
+  const options = openIssues(ledger).flatMap((i): [string, string][] => foundIssue(ledger, i) ? [[i.id, `${i.id}：${eventText(ledger, ledger.history.find((e) => e.eventId === i.id)!)}`]] : []);
   return choiceField('issue', '見つかった物の仮の記録', options);
 }
 
@@ -182,6 +197,8 @@ function criterionOf(v: Values): Process['criterion'] {
   return criterion;
 }
 
+const is = (types: readonly Master['type'][], m: Master) => types.includes(m.type);
+
 export function masterOps(ctx: Ctx): Record<string, UiOp> {
   const all = ['item', 'location', 'case', 'actor', 'process'] as const;
   const coded = ['item', 'location', 'case'] as const;
@@ -189,13 +206,14 @@ export function masterOps(ctx: Ctx): Record<string, UiOp> {
   return {
     masterProcess: masterOp('工程の登録', () => [textField('name', '工程の名前'), criterionField()],
       register((v) => ({ type: 'process', name: v.text('name'), criterion: criterionOf(v) })), ctx),
-    masterProcessCriterion: masterOp('工程の完了基準の変更（作業や中断を記録していない工程だけ）',
+    masterProcessCriterion: masterOp('工程の完了基準の変更',
       (ms) => {
-        const unused = Object.values(ms.processes).filter((p) => !processUsed(ctx.ledger(), p.id)).map((p): [string, string] => [p.id, masterLabel(ms, p)]);
+        const unused = Object.values(ms.processes).filter((p) => !processUsed(ctx.ledger(), p.id)).map((p): [string, string] => [keyOf(p), masterLabel(ms, p)]);
         return [...(unused.length === 0 ? [h('p', { class: 'warn' }, '完了基準を変えられる工程がありません。作業や中断を記録した工程の完了基準は変えられません。別の工程を登録してください。')] : []),
           choiceField('target', '工程', unused), criterionField(), reasonField()];
       },
-      (v) => ({ action: 'criterion', id: v.text('target'), criterion: criterionOf(v), reason: v.text('reason') }), ctx),
+      (v) => ({ action: 'criterion', id: targetOf(v, ['process']).id, criterion: criterionOf(v), reason: v.text('reason') }), ctx,
+      m => m.type === 'process' && !processUsed(ctx.ledger(), m.id)),
     masterNextProcess: masterOp('次工程の場所の指定・解除',
       (ms) => [selectField('location', '次工程の場所', [['', '指定しない（解除する）'], ...Object.values(ms.locations).filter((l) => l.active).map((l): [string, string] => [l.id, `${l.name}（${l.code}）`])], nextProcessOf(ms)?.id ?? ''), reasonField()],
       (v) => ({ action: 'nextProcess', id: v.text('location') === '' ? null : v.text('location'), reason: v.text('reason') }), ctx),
@@ -205,48 +223,63 @@ export function masterOps(ctx: Ctx): Record<string, UiOp> {
         const unitSteps = Object.fromEntries(units.map((u): [string, Step] => [u, v.text(unitStepName(u)) === '0.1' ? 0.1 : 1]));
         return { type: 'item', code: codeOf(v), name: v.text('name'), units, unitSteps, trial: true, source: sourceOf(v) };
       }), ctx),
-    masterLocation: masterOp('場所の登録', () => [textField('code', '品番・コード（文字列のまま保存）'), textField('name', '名称'), choiceField('inScope', '記録の対象', [['true', '記録の対象'], ['false', '記録の対象外']])],
+    masterLocation: masterOp('場所の登録', () => [textField('code', 'コード'), textField('name', '名称'), choiceField('inScope', '記録の対象', [['true', '記録の対象'], ['false', '記録の対象外']])],
       register((v) => ({ type: 'location', code: v.text('code'), name: v.text('name'), trial: true, inScope: v.text('inScope') === 'true' })), ctx),
     masterCase: masterOp('案件・用途の登録', () => [...codeFields('品番・コード（文字列のまま保存）'), textField('name', '呼び名（品番・コードがあれば空欄でもよい）'), ...sourceFields()],
       register((v) => ({ type: 'case', code: codeOf(v), name: v.text('name') === '' ? null : v.text('name'), source: sourceOf(v) })), ctx),
     masterActor: masterOp('担当者の登録', () => [textField('name', '担当者の名前')], register((v) => ({ type: 'actor', name: v.text('name') })), ctx),
     masterRename: masterOp('名称の変更', (ms) => [targetField(ms, named), textField('name', '新しい名称'), reasonField()],
-      (v) => ({ action: 'rename', ...targetOf(v, named), name: v.text('name'), reason: v.text('reason') }), ctx),
-    masterDeactivate: masterOp('利用停止（過去の記録は消さない）', (ms) => [targetField(ms, all), reasonField()],
-      (v) => ({ action: 'deactivate', ...targetOf(v, all), reason: v.text('reason') }), ctx),
+      (v) => ({ action: 'rename', ...targetOf(v, named), name: v.text('name'), reason: v.text('reason') }), ctx, m => is(named, m)),
+    masterDeactivate: masterOp('利用停止', (ms) => [targetField(ms, all), reasonField()],
+      (v) => ({ action: 'deactivate', ...targetOf(v, all), reason: v.text('reason') }), ctx, m => m.active),
     masterReactivate: masterOp('利用の再開', (ms) => [targetField(ms, all), reasonField()],
-      (v) => ({ action: 'reactivate', ...targetOf(v, all), reason: v.text('reason') }), ctx),
-    masterCode: masterOp('品番・コードの変更・付与（仮の正式化を含む）', (ms) => [targetField(ms, coded), textField('code', '新しい品番・コード'), reasonField()],
-      (v) => ({ action: 'code', ...targetOf(v, coded), code: v.text('code'), reason: v.text('reason') }), ctx),
-    masterSource: masterOp('元の資料の更新（呼び名は変えない）', () => [choiceField('type', '種類', [['item', '品目'], ['case', '案件・用途']]), textField('code', '品番・コード'), textField('sourceName', '元の資料の名称'), textField('sourceRevision', '元の資料の版')],
+      (v) => ({ action: 'reactivate', ...targetOf(v, all), reason: v.text('reason') }), ctx, m => !m.active),
+    masterCode: masterOp('品番・コードの変更・付与', (ms) => [targetField(ms, coded), textField('code', '新しい品番・コード'), reasonField()],
+      (v) => ({ action: 'code', ...targetOf(v, coded), code: v.text('code'), reason: v.text('reason') }), ctx, m => is(coded, m)),
+    masterSource: masterOp('元の資料の更新', () => [choiceField('type', '種類', [['item', '品目'], ['case', '案件・用途']]), textField('code', '品番・コード'), textField('sourceName', '元の資料の名称'), textField('sourceRevision', '元の資料の版')],
       (v) => ({ action: 'source', type: v.text('type') === 'case' ? 'case' : 'item', code: v.text('code'), source: { name: v.text('sourceName'), revision: v.text('sourceRevision') } }), ctx),
-    masterPerBox: masterOp('包装・入り数の設定（実際の日時を適用時点にする）', ms => itemSettingFields(ms, packagingFields),
+    masterPerBox: masterOp('包装・入り数の設定', ms => itemSettingFields(ms, packagingFields),
       (v, ms) => {
         const item = selectedItem(ms, v), common = { id: item.id, value: perBoxOf(v.text('perBox')), reason: v.text('reason') };
         return item.packaging === null ? { action: 'packaging', ...common, boxUnit: v.text('boxUnit'), pieceUnit: v.text('pieceUnit') } : { action: 'perBox', ...common };
-      }, ctx),
-    masterConsumable: masterOp('共通消耗品・補充基準の設定', ms => itemSettingFields(ms, consumableFields), consumableRequest, ctx),
-    masterScope: masterOp('記録の対象の変更（実際の日時を適用時点にする）', (ms) => [targetField(ms, ['location']), choiceField('inScope', '変更後', [['false', '記録の対象外'], ['true', '記録の対象']]), reasonField()],
-      (v) => ({ action: 'scope', id: targetOf(v, ['location']).id, inScope: v.text('inScope') === 'true', reason: v.text('reason') }), ctx),
+      }, ctx, m => m.type === 'item'),
+    masterConsumable: masterOp('共通消耗品・補充基準の設定', ms => itemSettingFields(ms, consumableFields), consumableRequest, ctx, m => m.type === 'item'),
+    masterScope: masterOp('記録の対象の変更', (ms) => [targetField(ms, ['location']), choiceField('inScope', '変更後', [['false', '記録の対象外'], ['true', '記録の対象']]), reasonField()],
+      (v) => ({ action: 'scope', id: targetOf(v, ['location']).id, inScope: v.text('inScope') === 'true', reason: v.text('reason') }), ctx, m => m.type === 'location'),
     identify: {
-      label: '仮の記録を既存の保管単位と同じ現物として対応付ける（数量は足さない）',
+      subject: { kind: 'issue', field: 'issue', accepts: (i) => foundIssue(ctx.ledger(), i) },
+      label: '仮の記録を既存の保管単位に対応付ける',
       fields: () => [foundIssueField(ctx.ledger()), codeTarget(choiceField('lot', '同じ現物の保管単位', lotOptions(ctx.ledger())), 'lot'), reasonField()],
       run: (s, m, v) => ({ state: { ...s, ledger: identifyProvisional(s.ledger, m, v.text('issue'), v.text('lot'), v.text('reason'), v.checked('confirmed')) } }),
     },
     adopt: {
-      label: '仮の記録を新しい保管単位として登録する（数量は仮の記録のまま）',
+      subject: { kind: 'issue', field: 'issue', accepts: (i) => foundIssue(ctx.ledger(), i) },
+      label: '仮の記録を新しい保管単位にする',
       fields: () => {
         const masters = ctx.ledger().masters;
-        return [foundIssueField(ctx.ledger()), textField('newId', '新しい保管単位のID（文字列のまま保存）'), ...itemFields(masters),
-          projectField(masters), codeTarget(fixedPlaceTime(choiceField('location', '場所', placeOptions(masters))), 'location', { hold: 'location' })];
+        const issue = foundIssueField(ctx.ledger()), items = itemFields(masters);
+        const place = codeTarget(fixedPlaceTime(choiceField('location', '場所', placeOptions(masters))), 'location', { hold: 'location' });
+        // 仮の記録に書いた品目・場所で始める。選び直せる。
+        issue.querySelector('select')!.addEventListener('change', (event) => {
+          const origin = ctx.ledger().history.find((e) => e.eventId === (event.target as HTMLSelectElement).value);
+          if (origin?.kind !== 'provisional') return;
+          for (const [label, value] of [[items[0]!, origin.item], [place, origin.location]] as const) {
+            const select = label.querySelector('select')!;
+            if (value === null || ![...select.options].some((o) => o.value === value)) continue;
+            select.value = value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+        return [issue, textField('newId', '新しい保管単位のID（文字列のまま保存）'), ...items, projectField(masters), place];
       },
       run: (s, m, v) => ({ state: { ...s, ledger: adoptProvisional(s.ledger, m, v.text('issue'), { id: v.text('newId'), item: v.text('item'), unit: v.text('unit'), project: projectOf(v), location: v.text('location') }, v.checked('confirmed')) } }),
     },
     assignProject: {
-      label: '案件・用途が不明な保管単位を案件・用途・共通在庫へ結び付ける',
+      subject: { kind: 'lot', field: 'lot', accepts: (l) => l.mergedInto === null && unassigned(l) },
+      label: '所属が不明な保管単位の結び付け',
       fields: () => {
         const masters = ctx.ledger().masters;
-        return [codeTarget(choiceField('lot', '案件・用途が不明な保管単位', lotOptions(ctx.ledger(), (l) => l.project.kind === 'unassigned')), 'lot'),
+        return [codeTarget(choiceField('lot', '案件・用途が不明な保管単位', lotOptions(ctx.ledger(), unassigned)), 'lot'),
           codeTarget(choiceField('project', '結び付け先', projectsOf(masters).filter((p) => p.kind !== 'unassigned').map((p) => [projectKey(p), projectText(masters, p)])), 'project'), reasonField()];
       },
       run: (s, m, v) => ({ state: { ...s, ledger: assignProject(s.ledger, m, v.text('lot'), projectOf(v), v.text('reason'), v.checked('confirmed')) } }),
@@ -257,44 +290,91 @@ export function masterOps(ctx: Ctx): Record<string, UiOp> {
 const stateText = (m: Master): string => (m.active ? '利用中' : '利用停止');
 const sinceText = (from: string | null): string => (from === null ? '最初から' : `${jst(from)}から`);
 
-function table(label: string, header: readonly string[], rows: readonly (readonly string[])[]): HTMLElement {
+function table(label: string, header: readonly string[], rows: readonly (readonly Child[])[], keys: readonly string[] = []): HTMLTableElement {
   return h('table', { 'aria-label': label },
     h('thead', {}, h('tr', {}, ...header.map((t) => h('th', {}, t)))),
-    h('tbody', {}, ...rows.map((r) => h('tr', {}, ...r.map((t) => h('td', {}, t))))));
+    h('tbody', {}, ...rows.map((r, i) => h('tr', keys[i] === undefined ? {} : { 'data-master': keys[i] }, ...r.map((t) => h('td', {}, t))))));
 }
 
-// 登録情報の一覧と、選んだ登録情報の変更の履歴（要件10.1〜10.4）。値は利用者の入力なので文字としてだけ出す。
-export function mastersPanel(ledger: Ledger, selected: string, onSelect: (key: string) => void): HTMLElement[] {
+export type MastersPanelHandlers = {
+  select: (key: string, focus: string) => void;
+  open: (op: string, target?: string) => void;
+  openSets?: (item: string) => void;
+  query: string;
+  setQuery: (query: string) => void;
+};
+
+const keyOf = (m: Master) => `${m.type}:${m.id}`;
+// 全角・半角と大文字・小文字の違いで見落とさないよう、比べる前に揃える。
+const searchable = (text: string) => text.normalize('NFKC').toLowerCase();
+
+// 登録情報の一覧と、選んだ登録情報の操作・変更の履歴（要件10.1〜10.4）。値は利用者の入力なので文字としてだけ出す。
+export function mastersPanel(ledger: Ledger, ops: Readonly<Record<string, UiOp>>, selected: string, on: MastersPanelHandlers): HTMLElement[] {
   const ms = ledger.masters;
-  const items = Object.values(ms.items).map((i) => [
-    i.code ?? unassignedCode, i.code === null ? '仮' : '', i.name, stateText(i),
-    i.units.join('・'), i.units.map((u) => `${u}：${i.unitSteps[u]}`).join('、'), packagingSettingText(i.packaging), consumableSettingText(i.consumable),
-    i.source ? `${i.source.name}（版${i.source.revision}）` : 'なし',
-  ]);
-  const locations = Object.values(ms.locations).map((l) => [
-    l.code, l.name, stateText(l), l.scope.map((s) => `${sinceText(s.from)}${s.inScope ? '記録の対象' : '記録の対象外'}`).join('、'),
-  ]);
-  const cases = Object.values(ms.cases).map((c) => [
-    c.code ?? unassignedCode, c.code === null ? '仮' : '', c.name ?? 'なし', stateText(c), c.source ? `${c.source.name}（版${c.source.revision}）` : 'なし',
-  ]);
-  const actors = Object.values(ms.actors).map((a) => [a.id, stateText(a)]);
-  const processes = Object.values(ms.processes).map((p) => [p.name, p.id, criterionText(p.criterion), stateText(p)]);
+  const button = (text: string, click: () => void, props: Record<string, string> = {}) => {
+    const node = h('button', { type: 'button', ...props }, text);
+    node.addEventListener('click', click);
+    return node;
+  };
+  const pick = (m: Master, text: string) => button(text, () => on.select(keyOf(m), 'master-selected-h'), { class: 'link' });
+  const items = Object.values(ms.items), locations = Object.values(ms.locations), cases = Object.values(ms.cases), actors = Object.values(ms.actors), processes = Object.values(ms.processes);
   const next = nextProcessOf(ms);
-  const all: Master[] = [...Object.values(ms.items), ...Object.values(ms.locations), ...Object.values(ms.cases), ...Object.values(ms.actors), ...Object.values(ms.processes)];
-  const key = (m: Master) => `${m.type}:${m.id}`;
-  const current = all.find((m) => key(m) === selected) ?? all[0];
-  const choice = selectField('master-history', '変更の履歴を見る登録情報', all.map((m) => [key(m), masterLabel(ms, m)]), current ? key(current) : '');
-  choice.addEventListener('change', (event) => { if (event.target instanceof HTMLSelectElement) onSelect(event.target.value); });
+  const groups = [
+    { title: '品目', op: 'masterItem', header: ['品番・コード', '仮', '名称', '状態', '単位', '単位ごとの最小単位（登録後は変えない）', '包装・入り数', '共通消耗品・補充基準', '元の資料'], masters: items, rows: items.map((i) => [
+      pick(i, i.code ?? unassignedCode), i.code === null ? '仮' : '', i.name, stateText(i),
+      i.units.join('・'), i.units.map((u) => `${u}：${i.unitSteps[u]}`).join('、'), packagingSettingText(i.packaging), consumableSettingText(i.consumable),
+      i.source ? `${i.source.name}（版${i.source.revision}）` : 'なし',
+    ]) },
+    { title: '場所', op: 'masterLocation', header: ['品番・コード', '名称', '状態', '記録の対象'], masters: locations, rows: locations.map((l) => [
+      pick(l, l.code), l.name, stateText(l), l.scope.map((s) => `${sinceText(s.from)}${s.inScope ? '記録の対象' : '記録の対象外'}`).join('、'),
+    ]) },
+    { title: '案件・用途', op: 'masterCase', header: ['品番・コード', '仮', '名称', '状態', '元の資料'], masters: cases, rows: cases.map((c) => [
+      pick(c, c.code ?? unassignedCode), c.code === null ? '仮' : '', c.name ?? 'なし', stateText(c), c.source ? `${c.source.name}（版${c.source.revision}）` : 'なし',
+    ]) },
+    { title: '担当者', op: 'masterActor', header: ['名前', '状態'], masters: actors, rows: actors.map((a) => [pick(a, a.id), stateText(a)]) },
+    { title: '工程', op: 'masterProcess', header: ['名前', 'ID', '完了基準', '状態'], masters: processes, rows: processes.map((p) => [pick(p, p.name), p.id, criterionText(p.criterion), stateText(p)]) },
+  ].map((g) => {
+    const list = table(`${g.title}の登録情報`, g.header, g.rows, g.masters.map(keyOf));
+    return { ...g, list, box: h('div', {}, list), empty: h('p', {}, `${g.title}：該当なし`) };
+  });
+  const query = h('input', { type: 'search', name: 'master-query' });
+  query.value = on.query;
+  const filter = () => {
+    const needle = searchable(query.value.trim());
+    for (const g of groups) {
+      let shown = 0;
+      for (const row of g.list.tBodies[0]!.rows) {
+        row.hidden = needle !== '' && !searchable(row.textContent ?? '').includes(needle);
+        if (!row.hidden) shown++;
+      }
+      g.box.hidden = needle !== '' && shown === 0;
+      g.empty.hidden = !g.box.hidden;
+    }
+  };
+  query.addEventListener('input', () => { on.setQuery(query.value); filter(); });
+  filter();
+
+  const all: Master[] = [...items, ...locations, ...cases, ...actors, ...processes];
+  const current = all.find((m) => keyOf(m) === selected) ?? all[0];
+  const choice = selectField('master-history', '対象', all.map((m) => [keyOf(m), masterLabel(ms, m)]), current ? keyOf(current) : '');
+  choice.addEventListener('change', (event) => { if (event.target instanceof HTMLSelectElement) on.select(event.target.value, 'master-history'); });
+  choice.querySelector('select')!.id = 'master-history';
+  const actions = current === undefined ? [] : Object.entries(ops).filter(([, op]) => op.subject?.kind === 'master' && op.subject.accepts(current));
+  const actionButton = ([key, op]: [string, UiOp]) => button(op.label, () => on.open(key, keyOf(current!)), { 'data-op': key });
+  const primary = ['masterRename', 'masterCode', 'masterDeactivate', 'masterReactivate'];
   const events = current ? ledger.history.filter((e) => e.kind === 'master' && e.masters.some((c) => c.after.type === current.type && c.after.id === current.id)) : [];
   return [
-    h('p', {}, '品目・場所・案件・用途・担当者を登録・変更するときは、入力で作業の種類「登録情報の登録・変更」を選ぶ。工程と次工程の場所は「工程の登録・設定」で登録する。権限による制限はなく、画面を使える人は誰でも変えられる。変更は履歴に残り、過去の記録は消さない。'),
-    h('h3', {}, '品目'), table('品目の登録情報', ['品番・コード', '仮', '名称', '状態', '単位', '単位ごとの最小単位（登録後は変えない）', '包装・入り数', '共通消耗品・補充基準', '元の資料'], items),
-    h('h3', {}, '場所'), table('場所の登録情報', ['品番・コード', '名称', '状態', '記録の対象'], locations),
-    h('h3', {}, '案件・用途'), table('案件・用途の登録情報', ['品番・コード', '仮', '名称', '状態', '元の資料'], cases),
-    h('h3', {}, '担当者'), table('担当者の登録情報', ['名前', '状態'], actors),
-    h('h3', {}, '工程'), table('工程の登録情報', ['名前', 'ID', '完了基準', '状態'], processes),
-    h('p', {}, `次工程の場所：${next === null ? '指定なし' : `${next.name}（${next.code}）${next.active ? '' : '（利用停止）'}`}`),
-    h('h3', {}, '変更の履歴'), choice,
+    h('div', { class: 'filters' }, h('label', {}, '名称・品番・コードで絞り込み', query)),
+    ...groups.flatMap((g) => [
+      h('h3', {}, g.title), ...(Object.hasOwn(ops, g.op) ? [button(`${g.title}を登録`, () => on.open(g.op))] : []), g.box, g.empty,
+      ...(g.op === 'masterProcess' ? [h('p', {}, `次工程の場所：${next === null ? '指定なし' : `${next.name}（${next.code}）${next.active ? '' : '（利用停止）'}`}`, ...(Object.hasOwn(ops, 'masterNextProcess') ? [' ', button('次工程の場所を指定', () => on.open('masterNextProcess'))] : []))] : []),
+    ]),
+    h('h3', { id: 'master-selected-h', tabindex: '-1' }, '選んだ登録情報'), choice,
+    ...(actions.length === 0 ? [] : [h('div', { role: 'group', 'aria-label': 'この登録情報にできる操作' },
+      ...primary.flatMap((key) => actions.filter(([candidate]) => candidate === key)).map(actionButton),
+      otherOperations(actions.filter(([key]) => !primary.includes(key)).map(actionButton)))]),
+    ...(current?.type === 'item' && on.openSets !== undefined ? [button('この品目のセット', () => on.openSets!(current.id))] : []),
+    h('h4', {}, '変更の履歴'),
     events.length === 0
       ? h('p', {}, 'この登録情報の変更の記録はない（最初からの値のまま）')
       : table('登録情報の変更の履歴', ['操作ID', '前後', '実際の日時・適用時点', '入力した日時', '担当者'], events.map((e) => [e.eventId, eventText(ledger, e), jst(e.occurredAt), jst(e.recordedAt), e.actor])),

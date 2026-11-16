@@ -1,0 +1,244 @@
+{
+  "writerRevision": "f0043db707869a819085ab0ed0988278437b9251",
+  "snapshotVersion": 12,
+  "fictional": true,
+  "writerSources": {
+    "src/ui/storage.ts": "9679cbce3598c03341bc9fa9439780f4ee882d9694c9ccacac14ab335971bbbb",
+    "src/ui/storageparse.ts": "081777cea330b73a56f86b24d08bc385a31dc9573972ab1116d11cfd508f2892",
+    "src/ui/backup.ts": "876b572a83ec6046759c74aa03aa1dfc646f7c5eb394926dc29d4fe2deed93ad",
+    "src/domain/supply.ts": "5212c8164b7a337c26d9ec448e858201c599f346b0d349aefc4edf985f7216a1",
+    "src/ui/supply-format.ts": "914223b8eaa44542c3fea881735b7dc6725c6df1922f35c89979587f50176ed0",
+    "src/ui/conflictdraft.ts": "820ce55c7a4abd40477594924b04fff739daee71efb9bf6d6a667ef5d0a65399"
+  },
+  "sha256": "7504369e89cc4f72348656ee2232c79f6a67c8cdf07c86e6ab0d4c1c9bb0d7a6",
+  "snapshot": "{\"format\":\"fuzzy-stock-f0\",\"version\":12,\"revision\":0,\"lastWriter\":\"init\",\"opFloor\":1,\"ledger\":{\"lots\":{\"架空現物\":{\"id\":\"架空現物\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":null,\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}},\"history\":[{\"eventId\":\"r1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"架空現物\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":null,\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]}],\"issues\":{},\"stops\":{},\"masters\":{\"items\":{\"P\":{\"type\":\"item\",\"id\":\"P\",\"code\":\"P\",\"name\":\"架空部品P\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"Q\":{\"type\":\"item\",\"id\":\"Q\",\"code\":\"Q\",\"name\":\"架空部品Q\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"R\":{\"type\":\"item\",\"id\":\"R\",\"code\":\"R\",\"name\":\"架空半製品R\",\"source\":null,\"units\":[\"台\"],\"unitSteps\":{\"台\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"S\":{\"type\":\"item\",\"id\":\"S\",\"code\":\"S\",\"name\":\"架空共通ネジS\",\"source\":null,\"units\":[\"本\",\"箱\"],\"unitSteps\":{\"本\":1,\"箱\":1},\"trial\":true,\"active\":true,\"packaging\":{\"boxUnit\":\"箱\",\"pieceUnit\":\"本\",\"perBox\":[{\"from\":null,\"value\":1000}]},\"consumable\":{\"pieceUnit\":\"本\",\"rule\":{\"threshold\":3000,\"standardOrder\":{\"value\":1,\"unit\":\"箱\"}}}},\"V\":{\"type\":\"item\",\"id\":\"V\",\"code\":\"V\",\"name\":\"架空共通ワッシャV\",\"source\":null,\"units\":[\"本\"],\"unitSteps\":{\"本\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":{\"pieceUnit\":\"本\",\"rule\":null}},\"X\":{\"type\":\"item\",\"id\":\"X\",\"code\":\"X\",\"name\":\"架空対象外部品X\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":false,\"active\":true,\"packaging\":null,\"consumable\":null}},\"locations\":{\"S1\":{\"type\":\"location\",\"id\":\"S1\",\"code\":\"S1\",\"name\":\"棚S1\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"S2\":{\"type\":\"location\",\"id\":\"S2\",\"code\":\"S2\",\"name\":\"棚S2\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"T\":{\"type\":\"location\",\"id\":\"T\",\"code\":\"T\",\"name\":\"作業台T\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"N\":{\"type\":\"location\",\"id\":\"N\",\"code\":\"N\",\"name\":\"次工程N\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":true},\"O\":{\"type\":\"location\",\"id\":\"O\",\"code\":\"O\",\"name\":\"対象外の棚O\",\"trial\":false,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false}},\"cases\":{\"A-001\":{\"type\":\"case\",\"id\":\"A-001\",\"code\":\"A-001\",\"name\":null,\"source\":null,\"active\":true},\"A-002\":{\"type\":\"case\",\"id\":\"A-002\",\"code\":\"A-002\",\"name\":null,\"source\":null,\"active\":true},\"B-001\":{\"type\":\"case\",\"id\":\"B-001\",\"code\":\"B-001\",\"name\":null,\"source\":null,\"active\":true}},\"actors\":{\"架空担当A\":{\"type\":\"actor\",\"id\":\"架空担当A\",\"active\":true},\"架空担当B\":{\"type\":\"actor\",\"id\":\"架空担当B\",\"active\":true}},\"processes\":{\"R組立\":{\"type\":\"process\",\"id\":\"R組立\",\"name\":\"R組立\",\"criterion\":\"inspection\",\"active\":true}}}},\"supply\":{\"receiptTemplates\":{\"架空セット\":{\"id\":\"架空セット\",\"name\":\"架空組立用\",\"product\":\"R\",\"productUnit\":\"台\",\"project\":null,\"basis\":\"label\",\"rows\":[{\"item\":\"P\",\"unit\":\"個\",\"perSet\":2,\"location\":\"S1\"}]}},\"needs\":{\"n1\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":20},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"初版\"}},\"declarations\":{},\"requests\":{},\"levels\":{},\"acks\":{},\"receipts\":{},\"log\":[{\"eventId\":\"t1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"},\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"receiptTemplateSave\",\"before\":null,\"after\":{\"id\":\"架空セット\",\"name\":\"架空組立用\",\"product\":\"R\",\"productUnit\":\"台\",\"project\":null,\"basis\":\"label\",\"rows\":[{\"item\":\"P\",\"unit\":\"個\",\"perSet\":2,\"location\":\"S1\"}]}},{\"eventId\":\"n1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"needRegister\",\"need\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":20},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"初版\"}}]},\"ops\":{},\"saveChecks\":[],\"conflictReviews\":[],\"quantities\":{\"terms\":[[0,1,\"r1\",\"label\",18]],\"parts\":[],\"items\":[{\"kind\":\"known\",\"numeric\":{\"value\":18,\"approximate\":false,\"unconfirmed\":\"all\"},\"computed\":false,\"terms\":1}]}}",
+  "data": [
+    [
+      "fuzzy-stock/slot-A",
+      "{\"format\":\"fuzzy-stock-f0\",\"version\":12,\"revision\":0,\"lastWriter\":\"init\",\"opFloor\":1,\"ledger\":{\"lots\":{\"架空現物\":{\"id\":\"架空現物\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":null,\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}},\"history\":[{\"eventId\":\"r1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"架空現物\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":null,\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]}],\"issues\":{},\"stops\":{},\"masters\":{\"items\":{\"P\":{\"type\":\"item\",\"id\":\"P\",\"code\":\"P\",\"name\":\"架空部品P\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"Q\":{\"type\":\"item\",\"id\":\"Q\",\"code\":\"Q\",\"name\":\"架空部品Q\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"R\":{\"type\":\"item\",\"id\":\"R\",\"code\":\"R\",\"name\":\"架空半製品R\",\"source\":null,\"units\":[\"台\"],\"unitSteps\":{\"台\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"S\":{\"type\":\"item\",\"id\":\"S\",\"code\":\"S\",\"name\":\"架空共通ネジS\",\"source\":null,\"units\":[\"本\",\"箱\"],\"unitSteps\":{\"本\":1,\"箱\":1},\"trial\":true,\"active\":true,\"packaging\":{\"boxUnit\":\"箱\",\"pieceUnit\":\"本\",\"perBox\":[{\"from\":null,\"value\":1000}]},\"consumable\":{\"pieceUnit\":\"本\",\"rule\":{\"threshold\":3000,\"standardOrder\":{\"value\":1,\"unit\":\"箱\"}}}},\"V\":{\"type\":\"item\",\"id\":\"V\",\"code\":\"V\",\"name\":\"架空共通ワッシャV\",\"source\":null,\"units\":[\"本\"],\"unitSteps\":{\"本\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":{\"pieceUnit\":\"本\",\"rule\":null}},\"X\":{\"type\":\"item\",\"id\":\"X\",\"code\":\"X\",\"name\":\"架空対象外部品X\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":false,\"active\":true,\"packaging\":null,\"consumable\":null}},\"locations\":{\"S1\":{\"type\":\"location\",\"id\":\"S1\",\"code\":\"S1\",\"name\":\"棚S1\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"S2\":{\"type\":\"location\",\"id\":\"S2\",\"code\":\"S2\",\"name\":\"棚S2\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"T\":{\"type\":\"location\",\"id\":\"T\",\"code\":\"T\",\"name\":\"作業台T\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"N\":{\"type\":\"location\",\"id\":\"N\",\"code\":\"N\",\"name\":\"次工程N\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":true},\"O\":{\"type\":\"location\",\"id\":\"O\",\"code\":\"O\",\"name\":\"対象外の棚O\",\"trial\":false,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false}},\"cases\":{\"A-001\":{\"type\":\"case\",\"id\":\"A-001\",\"code\":\"A-001\",\"name\":null,\"source\":null,\"active\":true},\"A-002\":{\"type\":\"case\",\"id\":\"A-002\",\"code\":\"A-002\",\"name\":null,\"source\":null,\"active\":true},\"B-001\":{\"type\":\"case\",\"id\":\"B-001\",\"code\":\"B-001\",\"name\":null,\"source\":null,\"active\":true}},\"actors\":{\"架空担当A\":{\"type\":\"actor\",\"id\":\"架空担当A\",\"active\":true},\"架空担当B\":{\"type\":\"actor\",\"id\":\"架空担当B\",\"active\":true}},\"processes\":{\"R組立\":{\"type\":\"process\",\"id\":\"R組立\",\"name\":\"R組立\",\"criterion\":\"inspection\",\"active\":true}}}},\"supply\":{\"receiptTemplates\":{\"架空セット\":{\"id\":\"架空セット\",\"name\":\"架空組立用\",\"product\":\"R\",\"productUnit\":\"台\",\"project\":null,\"basis\":\"label\",\"rows\":[{\"item\":\"P\",\"unit\":\"個\",\"perSet\":2,\"location\":\"S1\"}]}},\"needs\":{\"n1\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":20},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"初版\"}},\"declarations\":{},\"requests\":{},\"levels\":{},\"acks\":{},\"receipts\":{},\"log\":[{\"eventId\":\"t1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"},\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"receiptTemplateSave\",\"before\":null,\"after\":{\"id\":\"架空セット\",\"name\":\"架空組立用\",\"product\":\"R\",\"productUnit\":\"台\",\"project\":null,\"basis\":\"label\",\"rows\":[{\"item\":\"P\",\"unit\":\"個\",\"perSet\":2,\"location\":\"S1\"}]}},{\"eventId\":\"n1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"needRegister\",\"need\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":20},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"初版\"}}]},\"ops\":{},\"saveChecks\":[],\"conflictReviews\":[],\"quantities\":{\"terms\":[[0,1,\"r1\",\"label\",18]],\"parts\":[],\"items\":[{\"kind\":\"known\",\"numeric\":{\"value\":18,\"approximate\":false,\"unconfirmed\":\"all\"},\"computed\":false,\"terms\":1}]}}"
+    ],
+    [
+      "fuzzy-stock/head",
+      "B"
+    ],
+    [
+      "fuzzy-stock/pending",
+      "{\"format\":\"fuzzy-stock-pending\",\"version\":12,\"pending\":{\"progress\":\"saving\",\"unknownSince\":null,\"savingSince\":\"2026-10-30T00:00:00+09:00\",\"baseRevision\":0,\"opId\":\"op9\",\"opLabel\":\"必要な数の改訂\",\"fingerprint\":\"架空原文\",\"values\":{\"need\":\"n1\"},\"actor\":\"架空担当\",\"startedAt\":\"2026-10-30T00:00:00+09:00\",\"units\":[{\"ledger\":{\"lots\":{\"架空現物\":{\"id\":\"架空現物\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":null,\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}},\"history\":[{\"eventId\":\"r1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"架空現物\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":null,\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]}],\"issues\":{},\"stops\":{},\"masters\":{\"items\":{\"P\":{\"type\":\"item\",\"id\":\"P\",\"code\":\"P\",\"name\":\"架空部品P\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"Q\":{\"type\":\"item\",\"id\":\"Q\",\"code\":\"Q\",\"name\":\"架空部品Q\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"R\":{\"type\":\"item\",\"id\":\"R\",\"code\":\"R\",\"name\":\"架空半製品R\",\"source\":null,\"units\":[\"台\"],\"unitSteps\":{\"台\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"S\":{\"type\":\"item\",\"id\":\"S\",\"code\":\"S\",\"name\":\"架空共通ネジS\",\"source\":null,\"units\":[\"本\",\"箱\"],\"unitSteps\":{\"本\":1,\"箱\":1},\"trial\":true,\"active\":true,\"packaging\":{\"boxUnit\":\"箱\",\"pieceUnit\":\"本\",\"perBox\":[{\"from\":null,\"value\":1000}]},\"consumable\":{\"pieceUnit\":\"本\",\"rule\":{\"threshold\":3000,\"standardOrder\":{\"value\":1,\"unit\":\"箱\"}}}},\"V\":{\"type\":\"item\",\"id\":\"V\",\"code\":\"V\",\"name\":\"架空共通ワッシャV\",\"source\":null,\"units\":[\"本\"],\"unitSteps\":{\"本\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":{\"pieceUnit\":\"本\",\"rule\":null}},\"X\":{\"type\":\"item\",\"id\":\"X\",\"code\":\"X\",\"name\":\"架空対象外部品X\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":false,\"active\":true,\"packaging\":null,\"consumable\":null}},\"locations\":{\"S1\":{\"type\":\"location\",\"id\":\"S1\",\"code\":\"S1\",\"name\":\"棚S1\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"S2\":{\"type\":\"location\",\"id\":\"S2\",\"code\":\"S2\",\"name\":\"棚S2\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"T\":{\"type\":\"location\",\"id\":\"T\",\"code\":\"T\",\"name\":\"作業台T\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"N\":{\"type\":\"location\",\"id\":\"N\",\"code\":\"N\",\"name\":\"次工程N\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":true},\"O\":{\"type\":\"location\",\"id\":\"O\",\"code\":\"O\",\"name\":\"対象外の棚O\",\"trial\":false,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false}},\"cases\":{\"A-001\":{\"type\":\"case\",\"id\":\"A-001\",\"code\":\"A-001\",\"name\":null,\"source\":null,\"active\":true},\"A-002\":{\"type\":\"case\",\"id\":\"A-002\",\"code\":\"A-002\",\"name\":null,\"source\":null,\"active\":true},\"B-001\":{\"type\":\"case\",\"id\":\"B-001\",\"code\":\"B-001\",\"name\":null,\"source\":null,\"active\":true}},\"actors\":{\"架空担当A\":{\"type\":\"actor\",\"id\":\"架空担当A\",\"active\":true},\"架空担当B\":{\"type\":\"actor\",\"id\":\"架空担当B\",\"active\":true}},\"processes\":{\"R組立\":{\"type\":\"process\",\"id\":\"R組立\",\"name\":\"R組立\",\"criterion\":\"inspection\",\"active\":true}}}},\"supply\":{\"receiptTemplates\":{\"架空セット\":{\"id\":\"架空セット\",\"name\":\"架空組立用\",\"product\":\"R\",\"productUnit\":\"台\",\"project\":null,\"basis\":\"label\",\"rows\":[{\"item\":\"P\",\"unit\":\"個\",\"perSet\":2,\"location\":\"S1\"}]}},\"needs\":{\"n1\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":22},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"第二版\"}},\"declarations\":{},\"requests\":{},\"levels\":{},\"acks\":{},\"receipts\":{},\"log\":[{\"eventId\":\"t1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"},\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"receiptTemplateSave\",\"before\":null,\"after\":{\"id\":\"架空セット\",\"name\":\"架空組立用\",\"product\":\"R\",\"productUnit\":\"台\",\"project\":null,\"basis\":\"label\",\"rows\":[{\"item\":\"P\",\"unit\":\"個\",\"perSet\":2,\"location\":\"S1\"}]}},{\"eventId\":\"n1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"needRegister\",\"need\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":20},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"初版\"}},{\"eventId\":\"n2\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"needRevise\",\"before\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":20},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"初版\"},\"after\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":22},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"第二版\"}}]},\"conflictReviews\":[],\"targets\":[\"架空必要明細\"]}]},\"quantities\":{\"terms\":[[0,1,\"r1\",\"label\",18]],\"parts\":[],\"items\":[{\"kind\":\"known\",\"numeric\":{\"value\":18,\"approximate\":false,\"unconfirmed\":\"all\"},\"computed\":false,\"terms\":1}]}}"
+    ],
+    [
+      "fuzzy-stock/slot-B",
+      "{\"format\":\"fuzzy-stock-f0\",\"version\":12,\"revision\":1,\"lastWriter\":\"op9\",\"opFloor\":10,\"ledger\":{\"lots\":{\"架空現物\":{\"id\":\"架空現物\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":null,\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}},\"history\":[{\"eventId\":\"r1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"register\",\"changes\":[{\"before\":null,\"after\":{\"id\":\"架空現物\",\"item\":\"P\",\"unit\":\"個\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"location\":\"S1\",\"quantity\":0,\"lastCount\":null,\"splitFrom\":null,\"mergedInto\":null,\"holds\":[],\"stage\":{\"kind\":\"none\"}}}]}],\"issues\":{},\"stops\":{},\"masters\":{\"items\":{\"P\":{\"type\":\"item\",\"id\":\"P\",\"code\":\"P\",\"name\":\"架空部品P\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"Q\":{\"type\":\"item\",\"id\":\"Q\",\"code\":\"Q\",\"name\":\"架空部品Q\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"R\":{\"type\":\"item\",\"id\":\"R\",\"code\":\"R\",\"name\":\"架空半製品R\",\"source\":null,\"units\":[\"台\"],\"unitSteps\":{\"台\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":null},\"S\":{\"type\":\"item\",\"id\":\"S\",\"code\":\"S\",\"name\":\"架空共通ネジS\",\"source\":null,\"units\":[\"本\",\"箱\"],\"unitSteps\":{\"本\":1,\"箱\":1},\"trial\":true,\"active\":true,\"packaging\":{\"boxUnit\":\"箱\",\"pieceUnit\":\"本\",\"perBox\":[{\"from\":null,\"value\":1000}]},\"consumable\":{\"pieceUnit\":\"本\",\"rule\":{\"threshold\":3000,\"standardOrder\":{\"value\":1,\"unit\":\"箱\"}}}},\"V\":{\"type\":\"item\",\"id\":\"V\",\"code\":\"V\",\"name\":\"架空共通ワッシャV\",\"source\":null,\"units\":[\"本\"],\"unitSteps\":{\"本\":1},\"trial\":true,\"active\":true,\"packaging\":null,\"consumable\":{\"pieceUnit\":\"本\",\"rule\":null}},\"X\":{\"type\":\"item\",\"id\":\"X\",\"code\":\"X\",\"name\":\"架空対象外部品X\",\"source\":null,\"units\":[\"個\"],\"unitSteps\":{\"個\":1},\"trial\":false,\"active\":true,\"packaging\":null,\"consumable\":null}},\"locations\":{\"S1\":{\"type\":\"location\",\"id\":\"S1\",\"code\":\"S1\",\"name\":\"棚S1\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"S2\":{\"type\":\"location\",\"id\":\"S2\",\"code\":\"S2\",\"name\":\"棚S2\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"T\":{\"type\":\"location\",\"id\":\"T\",\"code\":\"T\",\"name\":\"作業台T\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false},\"N\":{\"type\":\"location\",\"id\":\"N\",\"code\":\"N\",\"name\":\"次工程N\",\"trial\":true,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":true},\"O\":{\"type\":\"location\",\"id\":\"O\",\"code\":\"O\",\"name\":\"対象外の棚O\",\"trial\":false,\"active\":true,\"scope\":[{\"from\":null,\"inScope\":true}],\"nextProcess\":false}},\"cases\":{\"A-001\":{\"type\":\"case\",\"id\":\"A-001\",\"code\":\"A-001\",\"name\":null,\"source\":null,\"active\":true},\"A-002\":{\"type\":\"case\",\"id\":\"A-002\",\"code\":\"A-002\",\"name\":null,\"source\":null,\"active\":true},\"B-001\":{\"type\":\"case\",\"id\":\"B-001\",\"code\":\"B-001\",\"name\":null,\"source\":null,\"active\":true}},\"actors\":{\"架空担当A\":{\"type\":\"actor\",\"id\":\"架空担当A\",\"active\":true},\"架空担当B\":{\"type\":\"actor\",\"id\":\"架空担当B\",\"active\":true}},\"processes\":{\"R組立\":{\"type\":\"process\",\"id\":\"R組立\",\"name\":\"R組立\",\"criterion\":\"inspection\",\"active\":true}}}},\"supply\":{\"receiptTemplates\":{\"架空セット\":{\"id\":\"架空セット\",\"name\":\"架空組立用\",\"product\":\"R\",\"productUnit\":\"台\",\"project\":null,\"basis\":\"label\",\"rows\":[{\"item\":\"P\",\"unit\":\"個\",\"perSet\":2,\"location\":\"S1\"}]}},\"needs\":{\"n1\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":22},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"第二版\"}},\"declarations\":{},\"requests\":{},\"levels\":{},\"acks\":{},\"receipts\":{},\"log\":[{\"eventId\":\"t1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"},\"R\":{\"name\":\"架空半製品R\",\"code\":\"R\"}}},\"kind\":\"receiptTemplateSave\",\"before\":null,\"after\":{\"id\":\"架空セット\",\"name\":\"架空組立用\",\"product\":\"R\",\"productUnit\":\"台\",\"project\":null,\"basis\":\"label\",\"rows\":[{\"item\":\"P\",\"unit\":\"個\",\"perSet\":2,\"location\":\"S1\"}]}},{\"eventId\":\"n1\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"needRegister\",\"need\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":20},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"初版\"}},{\"eventId\":\"n2\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"recordedAt\":\"2026-10-30T00:00:00+09:00\",\"actor\":\"架空担当\",\"itemLabels\":{\"kind\":\"recorded\",\"items\":{\"P\":{\"name\":\"架空部品P\",\"code\":\"P\"}}},\"kind\":\"needRevise\",\"before\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":20},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"初版\"},\"after\":{\"id\":\"n1\",\"project\":{\"kind\":\"case\",\"id\":\"A-001\"},\"item\":\"P\",\"unit\":\"個\",\"required\":{\"basis\":\"label\",\"value\":22},\"dueDate\":null,\"source\":\"架空部品表\",\"revision\":\"第二版\"}}]},\"ops\":{\"op9\":{\"fingerprint\":\"架空原文\",\"units\":[[\"n2\"]]}},\"saveChecks\":[],\"conflictReviews\":[],\"quantities\":{\"terms\":[[0,1,\"r1\",\"label\",18]],\"parts\":[],\"items\":[{\"kind\":\"known\",\"numeric\":{\"value\":18,\"approximate\":false,\"unconfirmed\":\"all\"},\"computed\":false,\"terms\":1}]}}"
+    ]
+  ],
+  "backup": "{\"notice\":\"fuzzy-stock-system 復元用バックアップ。閲覧用ではない。表計算ソフトなどで開いて保存し直すと復元に使えなくなる。\",\"format\":\"fuzzy-stock-backup\",\"version\":1,\"createdAt\":\"2026-10-30T00:00:00+09:00\",\"crc32\":\"510cb6c5\",\"snapshot\":\"{\\\"format\\\":\\\"fuzzy-stock-f0\\\",\\\"version\\\":12,\\\"revision\\\":0,\\\"lastWriter\\\":\\\"init\\\",\\\"opFloor\\\":1,\\\"ledger\\\":{\\\"lots\\\":{\\\"架空現物\\\":{\\\"id\\\":\\\"架空現物\\\",\\\"item\\\":\\\"P\\\",\\\"unit\\\":\\\"個\\\",\\\"project\\\":{\\\"kind\\\":\\\"case\\\",\\\"id\\\":\\\"A-001\\\"},\\\"location\\\":\\\"S1\\\",\\\"quantity\\\":0,\\\"lastCount\\\":null,\\\"splitFrom\\\":null,\\\"mergedInto\\\":null,\\\"holds\\\":[],\\\"stage\\\":{\\\"kind\\\":\\\"none\\\"}}},\\\"history\\\":[{\\\"eventId\\\":\\\"r1\\\",\\\"occurredAt\\\":\\\"2026-10-30T00:00:00+09:00\\\",\\\"recordedAt\\\":\\\"2026-10-30T00:00:00+09:00\\\",\\\"actor\\\":\\\"架空担当\\\",\\\"itemLabels\\\":{\\\"kind\\\":\\\"recorded\\\",\\\"items\\\":{\\\"P\\\":{\\\"name\\\":\\\"架空部品P\\\",\\\"code\\\":\\\"P\\\"}}},\\\"kind\\\":\\\"register\\\",\\\"changes\\\":[{\\\"before\\\":null,\\\"after\\\":{\\\"id\\\":\\\"架空現物\\\",\\\"item\\\":\\\"P\\\",\\\"unit\\\":\\\"個\\\",\\\"project\\\":{\\\"kind\\\":\\\"case\\\",\\\"id\\\":\\\"A-001\\\"},\\\"location\\\":\\\"S1\\\",\\\"quantity\\\":0,\\\"lastCount\\\":null,\\\"splitFrom\\\":null,\\\"mergedInto\\\":null,\\\"holds\\\":[],\\\"stage\\\":{\\\"kind\\\":\\\"none\\\"}}}]}],\\\"issues\\\":{},\\\"stops\\\":{},\\\"masters\\\":{\\\"items\\\":{\\\"P\\\":{\\\"type\\\":\\\"item\\\",\\\"id\\\":\\\"P\\\",\\\"code\\\":\\\"P\\\",\\\"name\\\":\\\"架空部品P\\\",\\\"source\\\":null,\\\"units\\\":[\\\"個\\\"],\\\"unitSteps\\\":{\\\"個\\\":1},\\\"trial\\\":true,\\\"active\\\":true,\\\"packaging\\\":null,\\\"consumable\\\":null},\\\"Q\\\":{\\\"type\\\":\\\"item\\\",\\\"id\\\":\\\"Q\\\",\\\"code\\\":\\\"Q\\\",\\\"name\\\":\\\"架空部品Q\\\",\\\"source\\\":null,\\\"units\\\":[\\\"個\\\"],\\\"unitSteps\\\":{\\\"個\\\":1},\\\"trial\\\":true,\\\"active\\\":true,\\\"packaging\\\":null,\\\"consumable\\\":null},\\\"R\\\":{\\\"type\\\":\\\"item\\\",\\\"id\\\":\\\"R\\\",\\\"code\\\":\\\"R\\\",\\\"name\\\":\\\"架空半製品R\\\",\\\"source\\\":null,\\\"units\\\":[\\\"台\\\"],\\\"unitSteps\\\":{\\\"台\\\":1},\\\"trial\\\":true,\\\"active\\\":true,\\\"packaging\\\":null,\\\"consumable\\\":null},\\\"S\\\":{\\\"type\\\":\\\"item\\\",\\\"id\\\":\\\"S\\\",\\\"code\\\":\\\"S\\\",\\\"name\\\":\\\"架空共通ネジS\\\",\\\"source\\\":null,\\\"units\\\":[\\\"本\\\",\\\"箱\\\"],\\\"unitSteps\\\":{\\\"本\\\":1,\\\"箱\\\":1},\\\"trial\\\":true,\\\"active\\\":true,\\\"packaging\\\":{\\\"boxUnit\\\":\\\"箱\\\",\\\"pieceUnit\\\":\\\"本\\\",\\\"perBox\\\":[{\\\"from\\\":null,\\\"value\\\":1000}]},\\\"consumable\\\":{\\\"pieceUnit\\\":\\\"本\\\",\\\"rule\\\":{\\\"threshold\\\":3000,\\\"standardOrder\\\":{\\\"value\\\":1,\\\"unit\\\":\\\"箱\\\"}}}},\\\"V\\\":{\\\"type\\\":\\\"item\\\",\\\"id\\\":\\\"V\\\",\\\"code\\\":\\\"V\\\",\\\"name\\\":\\\"架空共通ワッシャV\\\",\\\"source\\\":null,\\\"units\\\":[\\\"本\\\"],\\\"unitSteps\\\":{\\\"本\\\":1},\\\"trial\\\":true,\\\"active\\\":true,\\\"packaging\\\":null,\\\"consumable\\\":{\\\"pieceUnit\\\":\\\"本\\\",\\\"rule\\\":null}},\\\"X\\\":{\\\"type\\\":\\\"item\\\",\\\"id\\\":\\\"X\\\",\\\"code\\\":\\\"X\\\",\\\"name\\\":\\\"架空対象外部品X\\\",\\\"source\\\":null,\\\"units\\\":[\\\"個\\\"],\\\"unitSteps\\\":{\\\"個\\\":1},\\\"trial\\\":false,\\\"active\\\":true,\\\"packaging\\\":null,\\\"consumable\\\":null}},\\\"locations\\\":{\\\"S1\\\":{\\\"type\\\":\\\"location\\\",\\\"id\\\":\\\"S1\\\",\\\"code\\\":\\\"S1\\\",\\\"name\\\":\\\"棚S1\\\",\\\"trial\\\":true,\\\"active\\\":true,\\\"scope\\\":[{\\\"from\\\":null,\\\"inScope\\\":true}],\\\"nextProcess\\\":false},\\\"S2\\\":{\\\"type\\\":\\\"location\\\",\\\"id\\\":\\\"S2\\\",\\\"code\\\":\\\"S2\\\",\\\"name\\\":\\\"棚S2\\\",\\\"trial\\\":true,\\\"active\\\":true,\\\"scope\\\":[{\\\"from\\\":null,\\\"inScope\\\":true}],\\\"nextProcess\\\":false},\\\"T\\\":{\\\"type\\\":\\\"location\\\",\\\"id\\\":\\\"T\\\",\\\"code\\\":\\\"T\\\",\\\"name\\\":\\\"作業台T\\\",\\\"trial\\\":true,\\\"active\\\":true,\\\"scope\\\":[{\\\"from\\\":null,\\\"inScope\\\":true}],\\\"nextProcess\\\":false},\\\"N\\\":{\\\"type\\\":\\\"location\\\",\\\"id\\\":\\\"N\\\",\\\"code\\\":\\\"N\\\",\\\"name\\\":\\\"次工程N\\\",\\\"trial\\\":true,\\\"active\\\":true,\\\"scope\\\":[{\\\"from\\\":null,\\\"inScope\\\":true}],\\\"nextProcess\\\":true},\\\"O\\\":{\\\"type\\\":\\\"location\\\",\\\"id\\\":\\\"O\\\",\\\"code\\\":\\\"O\\\",\\\"name\\\":\\\"対象外の棚O\\\",\\\"trial\\\":false,\\\"active\\\":true,\\\"scope\\\":[{\\\"from\\\":null,\\\"inScope\\\":true}],\\\"nextProcess\\\":false}},\\\"cases\\\":{\\\"A-001\\\":{\\\"type\\\":\\\"case\\\",\\\"id\\\":\\\"A-001\\\",\\\"code\\\":\\\"A-001\\\",\\\"name\\\":null,\\\"source\\\":null,\\\"active\\\":true},\\\"A-002\\\":{\\\"type\\\":\\\"case\\\",\\\"id\\\":\\\"A-002\\\",\\\"code\\\":\\\"A-002\\\",\\\"name\\\":null,\\\"source\\\":null,\\\"active\\\":true},\\\"B-001\\\":{\\\"type\\\":\\\"case\\\",\\\"id\\\":\\\"B-001\\\",\\\"code\\\":\\\"B-001\\\",\\\"name\\\":null,\\\"source\\\":null,\\\"active\\\":true}},\\\"actors\\\":{\\\"架空担当A\\\":{\\\"type\\\":\\\"actor\\\",\\\"id\\\":\\\"架空担当A\\\",\\\"active\\\":true},\\\"架空担当B\\\":{\\\"type\\\":\\\"actor\\\",\\\"id\\\":\\\"架空担当B\\\",\\\"active\\\":true}},\\\"processes\\\":{\\\"R組立\\\":{\\\"type\\\":\\\"process\\\",\\\"id\\\":\\\"R組立\\\",\\\"name\\\":\\\"R組立\\\",\\\"criterion\\\":\\\"inspection\\\",\\\"active\\\":true}}}},\\\"supply\\\":{\\\"receiptTemplates\\\":{\\\"架空セット\\\":{\\\"id\\\":\\\"架空セット\\\",\\\"name\\\":\\\"架空組立用\\\",\\\"product\\\":\\\"R\\\",\\\"productUnit\\\":\\\"台\\\",\\\"project\\\":null,\\\"basis\\\":\\\"label\\\",\\\"rows\\\":[{\\\"item\\\":\\\"P\\\",\\\"unit\\\":\\\"個\\\",\\\"perSet\\\":2,\\\"location\\\":\\\"S1\\\"}]}},\\\"needs\\\":{\\\"n1\\\":{\\\"id\\\":\\\"n1\\\",\\\"project\\\":{\\\"kind\\\":\\\"case\\\",\\\"id\\\":\\\"A-001\\\"},\\\"item\\\":\\\"P\\\",\\\"unit\\\":\\\"個\\\",\\\"required\\\":{\\\"basis\\\":\\\"label\\\",\\\"value\\\":20},\\\"dueDate\\\":null,\\\"source\\\":\\\"架空部品表\\\",\\\"revision\\\":\\\"初版\\\"}},\\\"declarations\\\":{},\\\"requests\\\":{},\\\"levels\\\":{},\\\"acks\\\":{},\\\"receipts\\\":{},\\\"log\\\":[{\\\"eventId\\\":\\\"t1\\\",\\\"occurredAt\\\":\\\"2026-10-30T00:00:00+09:00\\\",\\\"recordedAt\\\":\\\"2026-10-30T00:00:00+09:00\\\",\\\"actor\\\":\\\"架空担当\\\",\\\"itemLabels\\\":{\\\"kind\\\":\\\"recorded\\\",\\\"items\\\":{\\\"P\\\":{\\\"name\\\":\\\"架空部品P\\\",\\\"code\\\":\\\"P\\\"},\\\"R\\\":{\\\"name\\\":\\\"架空半製品R\\\",\\\"code\\\":\\\"R\\\"}}},\\\"kind\\\":\\\"receiptTemplateSave\\\",\\\"before\\\":null,\\\"after\\\":{\\\"id\\\":\\\"架空セット\\\",\\\"name\\\":\\\"架空組立用\\\",\\\"product\\\":\\\"R\\\",\\\"productUnit\\\":\\\"台\\\",\\\"project\\\":null,\\\"basis\\\":\\\"label\\\",\\\"rows\\\":[{\\\"item\\\":\\\"P\\\",\\\"unit\\\":\\\"個\\\",\\\"perSet\\\":2,\\\"location\\\":\\\"S1\\\"}]}},{\\\"eventId\\\":\\\"n1\\\",\\\"occurredAt\\\":\\\"2026-10-30T00:00:00+09:00\\\",\\\"recordedAt\\\":\\\"2026-10-30T00:00:00+09:00\\\",\\\"actor\\\":\\\"架空担当\\\",\\\"itemLabels\\\":{\\\"kind\\\":\\\"recorded\\\",\\\"items\\\":{\\\"P\\\":{\\\"name\\\":\\\"架空部品P\\\",\\\"code\\\":\\\"P\\\"}}},\\\"kind\\\":\\\"needRegister\\\",\\\"need\\\":{\\\"id\\\":\\\"n1\\\",\\\"project\\\":{\\\"kind\\\":\\\"case\\\",\\\"id\\\":\\\"A-001\\\"},\\\"item\\\":\\\"P\\\",\\\"unit\\\":\\\"個\\\",\\\"required\\\":{\\\"basis\\\":\\\"label\\\",\\\"value\\\":20},\\\"dueDate\\\":null,\\\"source\\\":\\\"架空部品表\\\",\\\"revision\\\":\\\"初版\\\"}}]},\\\"ops\\\":{},\\\"saveChecks\\\":[],\\\"conflictReviews\\\":[],\\\"quantities\\\":{\\\"terms\\\":[[0,1,\\\"r1\\\",\\\"label\\\",18]],\\\"parts\\\":[],\\\"items\\\":[{\\\"kind\\\":\\\"known\\\",\\\"numeric\\\":{\\\"value\\\":18,\\\"approximate\\\":false,\\\"unconfirmed\\\":\\\"all\\\"},\\\"computed\\\":false,\\\"terms\\\":1}]}}\"}",
+  "draftRaw": "{\"format\":\"fuzzy-stock-conflict-draft\",\"version\":2,\"draft\":{\"reviewId\":\"旧版架空退避\",\"origin\":{\"kind\":\"unsent\"},\"opKey\":\"needRegister\",\"opLabel\":\"必要な数の登録\",\"actor\":\"架空担当\",\"occurredAt\":\"2026-10-30T00:00:00+09:00\",\"baseRevision\":0,\"baseLastWriter\":\"init\",\"detectedAt\":\"2026-10-30T00:00:00+09:00\",\"detectedReason\":\"架空の競合\",\"fields\":[{\"kind\":\"text\",\"name\":\"value\",\"label\":\"数量\",\"value\":\"22\"}],\"readEvidence\":[],\"targets\":[],\"unapplied\":[]},\"generation\":\"架空世代\"}",
+  "expected": {
+    "before": {
+      "needs": {
+        "n1": {
+          "id": "n1",
+          "project": {
+            "kind": "case",
+            "id": "A-001"
+          },
+          "item": "P",
+          "unit": "個",
+          "required": {
+            "basis": "label",
+            "value": 20
+          },
+          "dueDate": null,
+          "source": "架空部品表",
+          "revision": "初版"
+        }
+      },
+      "shortage": {
+        "key": {
+          "project": {
+            "kind": "case",
+            "id": "A-001"
+          },
+          "item": "P",
+          "unit": "個"
+        },
+        "judgement": {
+          "kind": "confirm",
+          "approximate": false,
+          "unconfirmed": true
+        },
+        "shortage": 2,
+        "shortfall": 2,
+        "excludedShortage": 0,
+        "excluded": [],
+        "aux": {
+          "required": 20,
+          "used": 0,
+          "usable": 18,
+          "onHand": 18
+        },
+        "spare": {
+          "kind": "known",
+          "numeric": {
+            "value": 0,
+            "approximate": false,
+            "unconfirmed": "none"
+          },
+          "computed": true,
+          "terms": []
+        },
+        "spareCover": 0
+      },
+      "history": [
+        "セットの登録：「架空組立用」（架空セット）／製品R「架空半製品R」（製品単位台）／表示の数（ラベル・パッケージ）／明細1：P「架空部品P」 2個/台・S1",
+        "必要明細の登録：案件・用途A-001・品目P「架空部品P」・必要な数20個（表示の数（ラベル・パッケージ））、必要日なし、元の資料「架空部品表」・初版"
+      ]
+    },
+    "saved": {
+      "needs": {
+        "n1": {
+          "id": "n1",
+          "project": {
+            "kind": "case",
+            "id": "A-001"
+          },
+          "item": "P",
+          "unit": "個",
+          "required": {
+            "basis": "label",
+            "value": 22
+          },
+          "dueDate": null,
+          "source": "架空部品表",
+          "revision": "第二版"
+        }
+      },
+      "shortage": {
+        "key": {
+          "project": {
+            "kind": "case",
+            "id": "A-001"
+          },
+          "item": "P",
+          "unit": "個"
+        },
+        "judgement": {
+          "kind": "confirm",
+          "approximate": false,
+          "unconfirmed": true
+        },
+        "shortage": 4,
+        "shortfall": 4,
+        "excludedShortage": 0,
+        "excluded": [],
+        "aux": {
+          "required": 22,
+          "used": 0,
+          "usable": 18,
+          "onHand": 18
+        },
+        "spare": {
+          "kind": "known",
+          "numeric": {
+            "value": 0,
+            "approximate": false,
+            "unconfirmed": "none"
+          },
+          "computed": true,
+          "terms": []
+        },
+        "spareCover": 0
+      },
+      "history": [
+        "セットの登録：「架空組立用」（架空セット）／製品R「架空半製品R」（製品単位台）／表示の数（ラベル・パッケージ）／明細1：P「架空部品P」 2個/台・S1",
+        "必要明細の登録：案件・用途A-001・品目P「架空部品P」・必要な数20個（表示の数（ラベル・パッケージ））、必要日なし、元の資料「架空部品表」・初版",
+        "必要明細の改訂：案件・用途A-001・品目P「架空部品P」・必要な数20個（表示の数（ラベル・パッケージ））→22個（表示の数（ラベル・パッケージ））、必要日なし→なし、元の資料「架空部品表」、初版→第二版"
+      ]
+    },
+    "retried": {
+      "needs": {
+        "n1": {
+          "id": "n1",
+          "project": {
+            "kind": "case",
+            "id": "A-001"
+          },
+          "item": "P",
+          "unit": "個",
+          "required": {
+            "basis": "label",
+            "value": 22
+          },
+          "dueDate": null,
+          "source": "架空部品表",
+          "revision": "第二版"
+        }
+      },
+      "shortage": {
+        "key": {
+          "project": {
+            "kind": "case",
+            "id": "A-001"
+          },
+          "item": "P",
+          "unit": "個"
+        },
+        "judgement": {
+          "kind": "confirm",
+          "approximate": false,
+          "unconfirmed": true
+        },
+        "shortage": 4,
+        "shortfall": 4,
+        "excludedShortage": 0,
+        "excluded": [],
+        "aux": {
+          "required": 22,
+          "used": 0,
+          "usable": 18,
+          "onHand": 18
+        },
+        "spare": {
+          "kind": "known",
+          "numeric": {
+            "value": 0,
+            "approximate": false,
+            "unconfirmed": "none"
+          },
+          "computed": true,
+          "terms": []
+        },
+        "spareCover": 0
+      },
+      "history": [
+        "セットの登録：「架空組立用」（架空セット）／製品R「架空半製品R」（製品単位台）／表示の数（ラベル・パッケージ）／明細1：P「架空部品P」 2個/台・S1",
+        "必要明細の登録：案件・用途A-001・品目P「架空部品P」・必要な数20個（表示の数（ラベル・パッケージ））、必要日なし、元の資料「架空部品表」・初版",
+        "必要明細の改訂：案件・用途A-001・品目P「架空部品P」・必要な数20個（表示の数（ラベル・パッケージ））→22個（表示の数（ラベル・パッケージ））、必要日なし→なし、元の資料「架空部品表」、初版→第二版"
+      ]
+    },
+    "draft": {
+      "reviewId": "旧版架空退避",
+      "origin": {
+        "kind": "unsent"
+      },
+      "opKey": "needRegister",
+      "opLabel": "必要な数の登録",
+      "actor": "架空担当",
+      "occurredAt": "2026-10-30T00:00:00+09:00",
+      "baseRevision": 0,
+      "baseLastWriter": "init",
+      "detectedAt": "2026-10-30T00:00:00+09:00",
+      "detectedReason": "架空の競合",
+      "fields": [
+        {
+          "kind": "text",
+          "name": "value",
+          "label": "数量",
+          "value": "22"
+        }
+      ],
+      "readEvidence": [],
+      "targets": [],
+      "unapplied": []
+    }
+  }
+}

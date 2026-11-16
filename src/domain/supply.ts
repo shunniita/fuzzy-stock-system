@@ -8,6 +8,9 @@ import { addScalar, subtractScalar, sumScalars, validateScalar, type Step } from
 import { checkTime, createdAtOf, deepFreeze, occurredAtOf, register, voidOf, type HoldReason, type Ledger, type Lot, type Meta, type Project } from './ledger.ts';
 import { captureItemLabels, type EventItemLabels } from './history-labels.ts';
 import { supplyEventItemIds } from './history-targets.ts';
+import type { TemplateNeedDetail, TemplateNeedPlan } from './template-needs.ts';
+import { validateTemplateNeeds } from './template-needs-validation.ts';
+import { templateNeedPlanAfterEdit } from './template-needs-edit.ts';
 
 // 日付（必要日・依頼日・予定日）は日本時間の YYYY-MM-DD の文字列で持つ。発生・記録の日時は台帳と同じ時刻帯付き。
 export type DateText = string;
@@ -61,6 +64,7 @@ export const remainderLevels = ['plenty', 'half', 'few', 'nearEmpty'] as const;
 export type RemainderLevel = (typeof remainderLevels)[number];
 
 export type SupplyDetail =
+  | TemplateNeedDetail
   | { kind: 'receiptTemplateSave'; before: ReceiptTemplate | null; after: ReceiptTemplate }
   | { kind: 'receiptTemplateDelete'; before: ReceiptTemplate }
   | ({ kind: 'templateReceipt' } & TemplateReceipt)
@@ -85,6 +89,7 @@ export type SupplyEvent = Meta & SupplyDetail & { itemLabels: EventItemLabels };
 
 // 台帳と同じく、現在値と履歴を一組で持つ。台帳の現在値・履歴・確認事項・中断には触れない（要件3の4、7の2、12の3）。
 export type Supply = {
+  templateNeeds: Readonly<Record<string, TemplateNeedPlan>>;
   receiptTemplates: Readonly<Record<string, ReceiptTemplate>>;
   needs: Readonly<Record<string, Need>>;
   declarations: Readonly<Record<string, Declaration>>;
@@ -101,7 +106,25 @@ export type Supply = {
   log: readonly SupplyEvent[];
 };
 
-export const emptySupply: Supply = deepFreeze({ receiptTemplates: {}, needs: {}, declarations: {}, requests: {}, levels: {}, acks: {}, receipts: {}, log: [] });
+export const emptySupply: Supply = deepFreeze({ templateNeeds: {}, receiptTemplates: {}, needs: {}, declarations: {}, requests: {}, levels: {}, acks: {}, receipts: {}, log: [] });
+
+export function checkLegacyNeedEdit(supply: Supply, project: string): void {
+  if (own(supply.templateNeeds, project)) throw new Error('生成済み案件は「生成した必要明細の変更」で変更する');
+}
+
+export function recordTemplateNeeds(ledger: Ledger, supply: Supply, meta: Meta, detail: TemplateNeedDetail): Supply {
+  if (ledger.history.some(event => event.eventId === meta.eventId)) throw new Error(`操作ID ${meta.eventId} は使用済み`);
+  let plans: Record<string, TemplateNeedPlan>;
+  if (detail.action === 'edit' && detail.planFormat === 'delta') {
+    const project = detail.plansBefore[0].project, current = own(supply.templateNeeds, project);
+    if (!current) throw new Error('生成した必要明細を持つ案件を選ぶ');
+    plans = { [project]: templateNeedPlanAfterEdit(current, detail.editKind, detail.changes[0]) };
+  } else plans = Object.fromEntries(detail.plansAfter.map(plan => [plan.project, plan]));
+  const needs = Object.fromEntries(detail.changes.map(change => [change.after.id, change.after]));
+  const next = commit(supply, ledger.masters, detail, meta, { templateNeeds: { ...supply.templateNeeds, ...plans }, needs: { ...supply.needs, ...needs } }, ledger);
+  validateTemplateNeeds(ledger, next);
+  return next;
+}
 
 export function recordReceiptTemplate(supply: Supply, masters: Masters, meta: Meta, after: ReceiptTemplate): Supply {
   const before = Object.hasOwn(supply.receiptTemplates, after.id) ? supply.receiptTemplates[after.id] ?? null : null;
@@ -128,6 +151,7 @@ function commit(supply: Supply, masters: Masters, detail: SupplyDetail, meta: Me
   checkTime(meta.recordedAt, '記録');
   const state = { ...supply, ...next }, event = { ...meta, ...detail };
   const itemLabels = captureItemLabels(masters, supplyEventItemIds(event, { ledger, supply: state }));
+  if (detail.kind === 'templateNeeds' && new TextEncoder().encode(JSON.stringify({ ...event, itemLabels })).byteLength > 1024 * 1024) throw new Error('必要明細のイベントが1MiBを超える。入力を分けて記録する');
   return deepFreeze({ ...state, log: [...supply.log, { ...event, itemLabels }] });
 }
 
@@ -147,12 +171,12 @@ export function sameProject(a: Project, b: Project): boolean {
 }
 
 // 数量の根拠と値の組が正しいかは、台帳と同じ規則（observe）で確かめる。
-function checkNeedQuantity(masters: Masters, n: Pick<Need, 'item' | 'unit'>, q: NeedQuantity): NeedQuantity {
+export function checkNeedQuantity(masters: Masters, n: Pick<Need, 'item' | 'unit'>, q: NeedQuantity): NeedQuantity {
   observe('need', q.basis, q.value, inputStepOf(masters, n.item, n.unit, q.value));
   return { basis: q.basis, value: q.value };
 }
 
-function checkNeedFields(n: Pick<Need, 'item' | 'unit' | 'dueDate' | 'source' | 'revision'>): void {
+export function checkNeedFields(n: Pick<Need, 'item' | 'unit' | 'dueDate' | 'source' | 'revision'>): void {
   required(n.item, '品目');
   required(n.unit, '単位');
   required(n.source, '元の資料');
@@ -161,6 +185,7 @@ function checkNeedFields(n: Pick<Need, 'item' | 'unit' | 'dueDate' | 'source' | 
 }
 
 export function registerNeed(supply: Supply, masters: Masters, meta: Meta, need: Omit<Need, 'id'>): Supply {
+  checkLegacyNeedEdit(supply, need.project.id);
   checkNeedFields(need);
   const duplicate = Object.values(supply.needs).find((n) => n.project.id === need.project.id && n.item === need.item && n.unit === need.unit);
   if (duplicate) throw new Error(`案件・用途${need.project.id}・品目${need.item}（${need.unit}）の必要明細は登録済み（${duplicate.id}）。必要な数の変更は改訂で記録する`);
@@ -171,6 +196,7 @@ export function registerNeed(supply: Supply, masters: Masters, meta: Meta, need:
 export function reviseNeed(supply: Supply, masters: Masters, meta: Meta, needId: string, change: Pick<Need, 'required' | 'dueDate' | 'source' | 'revision'>): Supply {
   const before = supply.needs[needId];
   if (!before) throw new Error(`必要明細 ${needId} がない`);
+  checkLegacyNeedEdit(supply, before.project.id);
   checkNeedFields({ item: before.item, unit: before.unit, ...change });
   const after: Need = { ...before, required: checkNeedQuantity(masters, before, change.required), dueDate: change.dueDate, source: change.source, revision: change.revision };
   const same = after.required.basis === before.required.basis && after.required.value === before.required.value && after.dueDate === before.dueDate && after.source === before.source && after.revision === before.revision;
@@ -188,8 +214,16 @@ export function declareShortage(supply: Supply, masters: Masters, meta: Meta, d:
 }
 
 // 同じ群（案件・用途・品目・単位）の必要明細を探す。必要明細は案件・用途の組だけが持つので、案件・用途が案件・用途の申告だけが対象になる。
-function needOfGroup(supply: Supply, project: Project, item: string, unit: string): Need | undefined {
-  return project.kind === 'case' ? Object.values(supply.needs).find((n) => n.project.id === project.id && n.item === item && n.unit === unit) : undefined;
+// needsは操作ごとに置き換わる読み取り専用の組。確定後は凍結し、復号中も組の完成後は変更しない。
+const needIndexes = new WeakMap<Supply['needs'], ReadonlyMap<string, Need>>();
+export function needOfGroup(supply: Supply, project: Project, item: string, unit: string): Need | undefined {
+  if (project.kind !== 'case') return undefined;
+  let index = needIndexes.get(supply.needs);
+  if (!index) {
+    index = new Map(Object.values(supply.needs).map(need => [JSON.stringify([need.project.id, need.item, need.unit]), need]));
+    needIndexes.set(supply.needs, index);
+  }
+  return index.get(JSON.stringify([project.id, item, unit]));
 }
 
 // 対応付けた申告は群に一件まで。同じ不足を二度数えないため（NEED-03b）。別の足りない分の記録は対応付けずに残す。

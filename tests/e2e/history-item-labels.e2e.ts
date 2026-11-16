@@ -87,7 +87,7 @@ test('AR01/02/04-07/10: assembled欠品→正式化・改名・子削除→後�
   expect(final.supply.requests[request.id]).toMatchObject({ item: x, quantity: 3, arrivals: [{ receiptLotId: 'later-X', arrived: 3, good: 3 }] });
   expect(final.supply.log.find(event => event.eventId === batch.eventId)).toEqual(batch);
   expect(final.supply.log.find(event => event.kind === 'requestRecord' && event.request.id === request.id)).toHaveProperty(`itemLabels.items.${x}`, { name: '架空組立X', code: null });
-  await expect(cell(page, xLot, '品目')).toHaveText('0007'); await row(page, xLot).getByRole('button', { name: xLot, exact: true }).click();
+  await expect(cell(page, xLot, '品目')).toHaveText('架空正式X（0007）'); await row(page, xLot).getByRole('button', { name: xLot, exact: true }).click();
   await expect(page.locator('#detail dl').first()).toContainText('架空正式X（0007）');
   await goTo(page, 'supply');
   const oldBatch = supplyHistory(page).locator('li').filter({ hasText: `まとめて受け取り ${batch.eventId}：` });
@@ -170,7 +170,7 @@ test('履歴7/AR10: 真正schema8 flatのbootは非破壊、旧履歴の不明�
   const raw = JSON.parse(legacyJson(JSON.parse(serialize(initial(received.ledger, received.supply))))); raw.version = 8;
   for (const key of ['itemLabels', 'productUnit', 'assembly', 'routes']) expect(JSON.stringify(raw)).not.toContain(`"${key}"`);
   const text = JSON.stringify(raw);
-  await page.evaluate(value => { localStorage.clear(); localStorage.setItem('fuzzy-stock/head', 'A'); localStorage.setItem('fuzzy-stock/slot-A', value); }, text);
+  await page.evaluate(value => { localStorage.clear(); localStorage.setItem('fuzzy-stock-mode', 'advanced'); localStorage.setItem('fuzzy-stock/head', 'A'); localStorage.setItem('fuzzy-stock/slot-A', value); }, text);
   const original = await storageBytes(page); await page.reload(); await waitForApp(page); expect(await storageBytes(page)).toEqual(original);
   const oldId = Object.keys(received.ledger.lots)[0]!; await goTo(page, 'stock'); await row(page, oldId).getByRole('button', { name: oldId, exact: true }).click();
   await expect(page.locator('#detail dl').first()).toContainText('架空旧版の現在P');

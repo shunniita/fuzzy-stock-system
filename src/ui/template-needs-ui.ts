@@ -1,0 +1,56 @@
+import { buildTemplateNeedGeneration, generateTemplateNeeds, templateNeedContextOf, type TemplateNeedGenerationInput } from '../domain/template-needs.ts';
+import { recordTemplateNeeds } from '../domain/supply.ts';
+import { choiceField, checkField, h, textField, type Values } from './dom.ts';
+import { quantityValue } from './fields.ts';
+import type { Ctx, State, UiOp } from './supply-ui.ts';
+import { generationPreview, previewMeta, templateNeedOptions, templateNeedPreviewSignature } from './template-needs-preview.ts';
+export { templateNeedPreviewSignature } from './template-needs-preview.ts';
+import { templateNeedBatchOp } from './template-needs-batch-ui.ts';
+import { templateNeedEditOp } from './template-needs-edit-ui.ts';
+
+function generationInput(v: Values): TemplateNeedGenerationInput {
+  return { templateId: v.text('needTemplate'), caseCode: v.text('needCase'), count: quantityValue(v.text('needCount'), 1), dueDate: v.text('needDue') || null };
+}
+
+function generationFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFormElement | null, state: State) => void): HTMLElement[] {
+  const state = { ledger: ctx.ledger(), supply: ctx.supply() }, options = templateNeedOptions(state);
+  const fields = h('div', {}, choiceField('needTemplate', 'セット', options), textField('needCase', '案件ID'), textField('needCount', '台数', 'integer'), textField('needDue', '必要日（省略可）', 'date'));
+  const signature = h('input', { type: 'hidden', name: 'needPreview', value: '' });
+  const root = h('div', { 'data-need-preview': '', 'aria-live': 'polite' });
+  const confirm = checkField('needConfirmed', '案件ID・版・必要明細を確認した');
+  const confirmation = confirm.querySelector('input')!;
+  confirmation.dataset['receiptConfirm'] = ''; confirmation.disabled = true;
+  const clear = () => { signature.value = ''; root.replaceChildren(); confirmation.checked = false; confirmation.disabled = true; };
+  fields.addEventListener('input', clear); fields.addEventListener('change', clear);
+  const preview = h('button', { type: 'button' }, '必要明細をプレビュー');
+  preview.addEventListener('click', () => {
+    clear();
+    try {
+      const value: Values = { text: name => fields.querySelector<HTMLInputElement | HTMLSelectElement>(`[name=${name}]`)?.value ?? '', checked: () => false };
+      const input = generationInput(value), state = { ledger: ctx.ledger(), supply: ctx.supply() }, meta = previewMeta(preview.closest('form'), nextOpId());
+      const result = buildTemplateNeedGeneration(state, templateNeedContextOf(state.supply), meta, input);
+      preflight(preview.closest('form'), { ledger: result.ledger, supply: recordTemplateNeeds(result.ledger, state.supply, meta, result.event) });
+      root.append(generationPreview({ ...state, ledger: result.ledger }, result));
+      signature.value = templateNeedPreviewSignature(state, input);
+      confirmation.disabled = false;
+    } catch (error) { root.append(h('p', { role: 'status', class: 'error' }, error instanceof Error ? error.message : String(error))); }
+  });
+  return [...(options.length === 0 ? [h('p', {}, '「セットの登録・変更」で製品と部品を登録してください。')] : []), fields, preview, signature, root, confirm];
+}
+
+export function templateNeedsOps(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFormElement | null, state: State) => void): Record<string, UiOp> {
+  return {
+    templateNeedEdit: templateNeedEditOp(ctx, nextOpId, preflight),
+    templateNeedBatch: templateNeedBatchOp(ctx, nextOpId, preflight),
+    templateNeedGenerate: {
+      subject: { kind: 'template', field: 'needTemplate' },
+      label: 'セットから必要明細を生成', fields: () => generationFields(ctx, nextOpId, preflight), validateBeforeSave: preflight,
+      run: (state, meta, v) => {
+        const input = generationInput(v);
+        if (v.text('needPreview') !== templateNeedPreviewSignature(state, input)) throw new Error('現在の入力と記録から必要明細をプレビューし直してください');
+        if (!v.checked('needConfirmed')) throw new Error('案件ID・版・必要明細を確認してください');
+        return { state: generateTemplateNeeds(state, meta, input) };
+      },
+    },
+  };
+}

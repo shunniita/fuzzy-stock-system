@@ -1,7 +1,28 @@
 import { describe, expect, test } from 'vitest';
 import { practiceLedger, productionOf, type Meta } from '../../src/domain/ledger.ts';
 import type { Values } from '../../src/ui/dom.ts';
-import { registerFromValues } from '../../src/ui/fields.ts';
+import { overdrawnLots, registerFromValues, type WarningRow } from '../../src/ui/fields.ts';
+
+describe('数量の超過の注意', () => {
+  const at = '2026-10-05T10:00:00+09:00';
+  const stock = (basis: string) => registerFromValues(practiceLedger, meta, values({ value: '50', basis }));
+  const row = (value: string, basis = 'counted'): WarningRow => ({ lot: 'W1', basis, value, inclusion: null });
+  const shown = (result: ReturnType<typeof overdrawnLots>) => result.map(lot => lot?.quantity.kind === 'known' ? lot.quantity.numeric.value : null);
+
+  test('記録上の数を超える行だけに、差し引く前の数を返す', () => {
+    expect(shown(overdrawnLots(stock('counted'), [row('60')], at))).toEqual([50]);
+    expect(shown(overdrawnLots(stock('counted'), [row('50')], at))).toEqual([null]);
+  });
+
+  test('同じ保管単位の行は実行順に差し引き、超過した行は残数を減らさない', () => {
+    expect(shown(overdrawnLots(stock('counted'), [row('30'), row('30'), row('20')], at))).toEqual([null, 20, null]);
+  });
+
+  test('だいたいの数・未入力の行は注意しない', () => {
+    expect(shown(overdrawnLots(stock('approximate'), [row('60')], at))).toEqual([null]);
+    expect(shown(overdrawnLots(stock('counted'), [row('')], at))).toEqual([null]);
+  });
+});
 
 const meta: Meta = { eventId: 'initial', occurredAt: '2026-10-05T09:00:00+09:00', recordedAt: '2026-10-05T09:00:00+09:00', actor: '架空担当A' };
 const values = (extra: Record<string, string> = {}): Values => {

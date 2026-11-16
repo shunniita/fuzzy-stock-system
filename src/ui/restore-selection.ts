@@ -27,7 +27,7 @@ export interface RestoreState {
   restoreSelection: number;
   resetFailure: string | null;
   selectedLot: string | null;
-  message: { kind: 'ok' | 'error'; text: string } | null;
+  message: { kind: 'ok' | 'error' | 'prompt'; text: string } | null;
   // 未解消の更新競合の入力があるあいだ、通常の初期化・復元を止める理由。なければnull。保存先を読めない状態からの復元(unreadable)には適用しない。
   readonly conflictBlock: string | null;
 }

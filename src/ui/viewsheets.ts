@@ -1,4 +1,4 @@
-import { nextProcessOf } from '../domain/masters.ts';
+import { nextProcessOf, own } from '../domain/masters.ts';
 import { occurredAtOf, openIssuesOf, processNameAt, productionGroupsOf, productionIssuesOf, productionOf, voidOf, type Ledger, type LedgerEvent, type Lot } from '../domain/ledger.ts';
 import type { Quantity } from '../domain/quantity.ts';
 import type { Arrival, Need, SupplyEvent } from '../domain/supply.ts';
@@ -12,6 +12,8 @@ import { scanCells } from './code-format.ts';
 import { createHistoryTargetCollector } from '../domain/history-targets.ts';
 import { consumableSettingText, criterionText, packagingSettingText } from './format.ts';
 import type { HistoryTargetCollector } from './history-item-format.ts';
+import { templateNeedContextOf, templateNeedInfo } from '../domain/template-needs.ts';
+import { templateNeedOriginText, templateNeedVersionText } from './template-needs-format.ts';
 
 type State = Pick<Snapshot, 'ledger' | 'supply'>;
 type Column = { header: string; width: number; meaning: string };
@@ -229,7 +231,8 @@ function ledgerHistorySpec(state: State, targets: HistoryTargetCollector): Spec 
   };
 }
 
-const supplyKindLabel: Record<SupplyEvent['kind'], string> = {
+const templateNeedKindLabel = { generate: 'セットから必要明細を生成', edit: '生成した必要明細の変更', recalculate: '必要明細の台数再計算', follow: '必要明細の最新版への追従' };
+const supplyKindLabel: Record<Exclude<SupplyEvent['kind'], 'templateNeeds'>, string> = {
   receiptTemplateSave: 'セットの登録・変更',
   receiptTemplateDelete: 'セットの削除',
   templateReceipt: 'セットからまとめて受け取り（欠品の入力）',
@@ -257,6 +260,7 @@ const arrivalText = (a: Arrival): string => `到着${a.arrived}・良品${a.good
 
 function supplyCorrectionOf(e: SupplyEvent): Omit<Correction, 'applied'> {
   switch (e.kind) {
+    case 'templateNeeds': return { before: e.action !== 'generate' ? e.plansBefore.map(plan => `${plan.count}台・計算基準の版${plan.version}`).join('、') + '／' + (e.changes.map(change => change.before === null ? '明細なし' : needText(change.before)).join('、') || '必要数の変更なし') : '明細なし', after: e.plansAfter.map(plan => `${plan.count}台・計算基準の版${plan.version}`).join('、') + '／' + (e.changes.map(change => needText(change.after)).join('、') || '必要数の変更なし'), reason: e.action !== 'generate' ? e.reason : 'セットから生成' };
     case 'needImport': return e.decision.kind === 'hold' ? { before: '未反映', after: '未反映', reason: e.decision.reasons.join('、') } : { before: e.decision.before ? needText(e.decision.before) : '明細なし', after: needText(e.decision.after), reason: '取込差分を確認' };
     case 'needImportResolve': return e.resolution.kind === 'dismiss' ? { before: '未反映', after: '適用せず解消', reason: e.reason } : { before: needText(e.resolution.before), after: needText(e.resolution.after), reason: e.reason };
     case 'needRevise': return { before: needText(e.before), after: needText(e.after), reason: 'なし' };
@@ -268,9 +272,10 @@ function supplyCorrectionOf(e: SupplyEvent): Omit<Correction, 'applied'> {
 }
 
 function supplyHistorySpec(state: State, targets: HistoryTargetCollector): Spec {
+  const versions = templateNeedContextOf(state.supply).versions;
   const rows = state.supply.log.map(e => {
     const c = supplyCorrectionOf(e);
-    return [e.eventId, supplyKindLabel[e.kind], supplyOccurredText(state.ledger, e), jst(e.recordedAt), e.actor, supplyEventText(state.ledger.masters, e, targets.supplyEventItemIds(e)), c.before, c.after, c.reason, ...scanCells(e.scan)];
+    return [e.eventId, e.kind === 'templateNeeds' ? templateNeedKindLabel[e.action] : supplyKindLabel[e.kind], supplyOccurredText(state.ledger, e), jst(e.recordedAt), e.actor, supplyEventText(state.ledger.masters, e, targets.supplyEventItemIds(e), versions), c.before, c.after, c.reason, ...scanCells(e.scan)];
   });
   return {
     name: '供給の履歴',
@@ -282,9 +287,9 @@ function supplyHistorySpec(state: State, targets: HistoryTargetCollector): Spec 
       column('入力した日時', 24, '記録した日時（日本時間）'),
       column('担当', 12, '記録した担当者'),
       column('内容', 80, '画面の履歴と同じ操作の内容'),
-      column('訂正の前', 36, '訂正する前の値。必要な数の改訂・実際に受け取った数の訂正・割り当ての訂正・依頼の回答が対象で、それ以外は「なし」'),
-      column('訂正の後', 36, '訂正した後の値'),
-      column('訂正の理由', 24, '実際に受け取った数の訂正の理由。なければ「なし」'),
+      column('訂正の前', 36, '必要明細の生成・変更・再計算・追従、取込と照合、必要数・受取数・割当・依頼回答の変更前。新規明細は「明細なし」、未適用はその状態、それ以外は「なし」'),
+      column('訂正の後', 36, '対象操作の変更後の値、または未適用の状態'),
+      column('訂正の理由', 24, '必要明細の生成・変更・再計算・追従、取込と照合、受取数の訂正で記録した理由。理由を記録しない操作は「なし」'),
       ...scanColumns(),
     ],
     rows,
@@ -382,6 +387,19 @@ function processSettingsSpec(state: State): Spec {
   };
 }
 
+function needsSpec(state: State): Spec {
+  const context = templateNeedContextOf(state.supply), masters = state.ledger.masters;
+  return { name: '必要明細', purpose: '現在の案件別必要明細。生成元・標準値・手修正と現在の必要数を区別する',
+    columns: [column('案件ID', 24, '先頭のゼロも含め文字列で保持する案件の現在コード'), column('品目', 24, refMeaning), column('単位', 8, '必要数の単位'),
+      column('現在の必要数', 32, '必要数と数量の根拠'), column('必要日', 14, 'なければ「なし」'), column('由来と標準値', 56, 'セット由来・案件独自・手入力と標準値・手修正・元行'),
+      column('生成元のセット', 32, 'セット名。手入力なら「なし」'), column('台数', 12, '現在の計算に使う台数'), column('初回生成の版', 24, '初回生成の版ID'), column('計算基準の版', 56, '現在の版と保存日時・担当者')],
+    rows: Object.values(state.supply.needs).map(need => {
+      const info = templateNeedInfo(masters, context, need);
+      return [own(masters.cases, need.project.id)?.code ?? need.project.id, itemRef(masters, need.item), need.unit, needQuantityText(need.required, need.unit), need.dueDate ?? 'なし',
+        templateNeedOriginText(masters, context, need), info?.version.template.name ?? 'なし', info ? String(info.plan.count) : 'なし', info?.plan.initialVersion ?? 'なし', info ? templateNeedVersionText(state.supply, info.version) : 'なし'];
+    }) };
+}
+
 function explanation(specs: Spec[], createdAt: string): Spec {
   const rows: string[][] = [
     ['この出力', '閲覧用の出力（復元には使えない）。記録を戻すときは、復元用バックアップ（.json）を使う。この出力は取り込めない'],
@@ -398,6 +416,6 @@ function explanation(specs: Spec[], createdAt: string): Spec {
 // 閲覧用の出力のシート。説明を最初に置き、各シートの各列の意味を説明のシートから引けるようにする（要件4.12・5.3）。
 export function viewSheetsOf(state: State, createdAt: string): Sheet[] {
   const targets = createHistoryTargetCollector(state);
-  const specs = [totalsSpec(state), lotsSpec(state, targets), termsSpec(state), ledgerHistorySpec(state, targets), supplyHistorySpec(state, targets), requestsSpec(state), productionSpec(state), itemSettingsSpec(state), processSettingsSpec(state)];
+  const specs = [totalsSpec(state), lotsSpec(state, targets), termsSpec(state), ledgerHistorySpec(state, targets), supplyHistorySpec(state, targets), requestsSpec(state), productionSpec(state), itemSettingsSpec(state), processSettingsSpec(state), needsSpec(state)];
   return [explanation(specs, createdAt), ...specs].map(({ name, columns, rows }): Sheet => ({ name, columns: columns.map(({ header, width }) => ({ header, width })), rows }));
 }

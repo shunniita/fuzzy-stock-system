@@ -1,78 +1,88 @@
-import { expect, type Download, type Locator, type Page } from '@playwright/test';
+import { chromium, expect, type Dialog, type Download, type Locator, type Page } from '@playwright/test';
+
+// 設定のstorageStateが届かない専用profileでも、既存の試験は高度な操作モードの画面で動かす。利用者が選んだモードは上書きしない。
+export async function launchAdvanced(...args: Parameters<typeof chromium.launchPersistentContext>) {
+  const context = await chromium.launchPersistentContext(...args);
+  await context.addInitScript(() => { if (localStorage.getItem('fuzzy-stock-mode') === null) localStorage.setItem('fuzzy-stock-mode', 'advanced'); });
+  return context;
+}
 import type { Destination } from '../../src/ui/navigation.ts';
 import { operationGroups } from '../../src/ui/operation-picker.ts';
 
 export const opLabels = {
-  register: '登録（開始時点の現物・既にある物。依頼への受け取りは「受け取り」を使う）',
+  register: '現物の登録',
   use: '使用',
-  handover: '外へ出す（譲渡・持ち出し）',
-  move: '移動（保管単位全部）',
+  handover: '外へ出す',
+  move: '移動',
   splitMove: '一部を分けて移動',
-  split: '分割（同じ場所で分ける）',
+  split: '分割',
   merge: '統合',
-  recount: '数えて確認・訂正（原因不明でもよい）',
-  hold: '取り分ける（不良・使用可否確認待ち・返却待ち・予備）',
+  recount: '数えて確認・訂正',
+  hold: '取り分ける',
   release: '取り分けを戻す',
-  declare: '数の食い違いをメモする（数量は変えない）',
-  provisional: '仮の記録（適用先の保管単位が分からない）',
+  declare: '数の食い違いをメモする',
+  provisional: '仮の記録',
   correctTime: '実際の日時の訂正',
   resolve: '確認事項を片付ける',
-  start: '作業の開始（材料の使用とまとめて記録）',
-  recipeStart: 'セットで作業を開始（材料の使用を推計）',
+  start: '作業の開始',
+  recipeStart: 'セットで作業を開始',
   finish: '作業終了',
   inspect: '確認の完了',
   toNext: '次の作業へ渡す',
   stageFix: '作業の状態の訂正',
   stop: '作業の中断',
   stopUpdate: '中断した数の更新',
-  resume: '作業の再開（材料の受け取りとは別に記録）',
-  void: '間違えた記録の取り消し（使用・引渡し）',
-  needRegister: '必要な数の登録（案件・用途ごとの必要品目・必要な数）',
-  needRevise: '必要な数の改訂（改訂前後を履歴に残す）',
-  declareShortage: '足りない分の記録（手動。確認事項は作らない）',
-  linkDeclaration: '足りない分の記録の対応付け（自動の不足候補と同じ不足）',
-  requestRecord: '注文・購入予定の記録（依頼しただけでは在庫に数えない）',
-  orderConfirm: '注文の確定（依頼とは別の記録）',
+  resume: '作業の再開',
+  void: '間違えた記録の取り消し',
+  needRegister: '必要な数の登録',
+  needRevise: '必要な数の改訂',
+  declareShortage: '足りない分の記録',
+  linkDeclaration: '足りない分の記録の対応付け',
+  requestRecord: '注文・購入予定の記録',
+  orderConfirm: '注文の確定',
   replyRecord: '返事・届く予定日の更新',
-  requestCancel: '依頼の取消（元の依頼は残る）',
-  receive: '受け取り（届いた数を記録。依頼への割り当てつき）',
+  requestCancel: '依頼の取消',
+  receive: '受け取り',
+  templateNeedGenerate: 'セットから必要明細を生成',
+  templateNeedBatch: '組立用と検査用をまとめて生成',
+  templateNeedEdit: '生成した必要明細の変更',
   templateSave: 'セットの登録・変更',
   templateDelete: 'セットの削除',
-  templateReceive: 'セットからまとめて受け取り（欠品の入力）',
-  allocate: '受け取った現物への割り当て（拒否のあとの再割り当てなど）',
-  receiptRevise: '実際に受け取った数の訂正（届いた数の訂正。理由が必要）',
-  arrivalRevise: '割り当ての訂正（届いた数・使える数。取消済みの依頼の割り当ても）',
-  surplusAllocate: '余った分の振り分け（受け取りの一部を予備・返却待ちにする）',
-  spareSwap: '予備から案件・用途向けへ（交換。理由が必要）',
-  returnAck: '返品の受付確認（実返却とは別の記録。在庫は減らさない）',
-  remainder: '開けた物の残り具合（数が不明な開封分。数量へは換算しない）',
-  masterItem: '登録情報：品目の登録',
-  masterLocation: '登録情報：場所の登録',
-  masterCase: '登録情報：案件・用途の登録',
-  masterActor: '登録情報：担当者の登録',
-  masterRename: '登録情報：名称の変更',
-  masterDeactivate: '登録情報：利用停止（過去の記録は消さない）',
-  masterReactivate: '登録情報：利用の再開',
-  masterCode: '登録情報：品番・コードの変更・付与（仮の正式化を含む）',
-  masterSource: '登録情報：元の資料の更新（呼び名は変えない）',
-  masterPerBox: '登録情報：包装・入り数の設定（実際の日時を適用時点にする）',
-  masterConsumable: '登録情報：共通消耗品・補充基準の設定',
-  masterScope: '登録情報：記録の対象の変更（実際の日時を適用時点にする）',
-  masterProcess: '登録情報：工程の登録',
-  masterProcessCriterion: '登録情報：工程の完了基準の変更（作業や中断を記録していない工程だけ）',
-  masterNextProcess: '登録情報：次工程の場所の指定・解除',
-  identify: '仮の記録を既存の保管単位と同じ現物として対応付ける（数量は足さない）',
-  adopt: '仮の記録を新しい保管単位として登録する（数量は仮の記録のまま）',
-  assignProject: '案件・用途が不明な保管単位を案件・用途・共通在庫へ結び付ける',
-  transfer: '案件・用途の付け替え（場所は変えない）',
-  reworkBegin: 'やり直し・修理を開始（同じ現物を工程へ戻す）',
+  templateReceive: 'セットからまとめて受け取り',
+  allocate: '受け取った現物への割り当て',
+  receiptRevise: '実際に受け取った数の訂正',
+  arrivalRevise: '割り当ての訂正',
+  surplusAllocate: '余った分の振り分け',
+  spareSwap: '予備から案件・用途向けへ',
+  returnAck: '返品の受付確認',
+  remainder: '開けた物の残り具合',
+  masterItem: '品目の登録',
+  masterLocation: '場所の登録',
+  masterCase: '案件・用途の登録',
+  masterActor: '担当者の登録',
+  masterRename: '名称の変更',
+  masterDeactivate: '利用停止',
+  masterReactivate: '利用の再開',
+  masterCode: '品番・コードの変更・付与',
+  masterSource: '元の資料の更新',
+  masterPerBox: '包装・入り数の設定',
+  masterConsumable: '共通消耗品・補充基準の設定',
+  masterScope: '記録の対象の変更',
+  masterProcess: '工程の登録',
+  masterProcessCriterion: '工程の完了基準の変更',
+  masterNextProcess: '次工程の場所の指定・解除',
+  identify: '仮の記録を既存の保管単位に対応付ける',
+  adopt: '仮の記録を新しい保管単位にする',
+  assignProject: '所属が不明な保管単位の結び付け',
+  transfer: '案件・用途の付け替え',
+  reworkBegin: 'やり直し・修理を開始',
   reworkReplace: 'やり直し・修理の交換部品を使用',
   reworkDiscard: 'やり直し・修理で取り外した部品を廃棄',
   reworkRecover: 'やり直し・修理で取り外した部品を回収',
-  returnRecord: '返ってきた物を仮の記録に残す（まだ数量へ反映しない）',
-  returnAssign: '返ってきた物の仮の記録を割り当てる（現在数量への包含を確認）',
+  returnRecord: '返ってきた物の仮の記録',
+  returnAssign: '返ってきた物の仮の記録の割り当て',
   returnRework: '返ってきた物のやり直し・修理を開始',
-  needImportResolve: '必要明細取込の照合（保留の適用・見送り）',
+  needImportResolve: '必要明細取込の照合',
 } as const;
 
 export async function waitForApp(page: Page): Promise<void> {
@@ -87,7 +97,7 @@ export async function goTo(page: Page, destination: Destination): Promise<void> 
   await expect(button).toHaveAttribute('aria-current', 'page');
 }
 
-// 各試験は空の台帳から始め、別試験の数値を継ぎ足さない（F0_SCOPE）。
+// 架空の登録情報がある練習用台帳から始め、別試験の数値を継ぎ足さない。
 export async function startEmpty(page: Page): Promise<void> {
   await page.goto('/');
   await usePractice(page);
@@ -118,7 +128,10 @@ export async function selectOperation(control: Locator, selection: string | { la
   const group = operationGroups.find(item => key !== undefined && item.keys.includes(key));
   if (group === undefined) throw new Error(`操作の分類が見つかりません：${JSON.stringify(selection)}`);
   await control.page().getByLabel('作業の種類', { exact: true }).selectOption(group.id);
-  await control.selectOption(selection);
+  const discard = (dialog: Dialog) => dialog.message() === '未保存の入力を破棄して、操作を切り替えますか。' ? dialog.accept() : dialog.dismiss();
+  control.page().once('dialog', discard);
+  try { await control.selectOption(selection); }
+  finally { control.page().removeListener('dialog', discard); }
 }
 
 export async function allOperationLabels(page: Page): Promise<string[]> {

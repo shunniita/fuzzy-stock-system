@@ -147,7 +147,7 @@ describe('Task6 UI: 数量の欄が指す品目・単位と案内', () => {
     return { target, step: quantityStepFor(ledger.masters, target ?? null), hint: target === undefined ? undefined : hintText(ledger.masters, target) };
   };
   const kg = 'kgの最小単位0.1・上限562949953421311.9';
-  const piece = '個の最小単位1（整数）・上限9007199254740991';
+  const piece = '個の最小単位1（整数）';
 
   test.each([
     ['保管単位', { lot: 'H1' }, 'value', kg],
@@ -166,9 +166,9 @@ describe('Task6 UI: 数量の欄が指す品目・単位と案内', () => {
   });
 
   test('単位のない仮の記録は整数、未選択は選ぶよう促し、数量でない欄は案内しない', () => {
-    expect(resolve({ item: 'D' }, 'value')).toEqual({ target: 'unitless', step: 1, hint: '最小単位1（単位を持たない仮の記録は整数だけ）・上限9007199254740991' });
+    expect(resolve({ item: 'D' }, 'value')).toEqual({ target: 'unitless', step: 1, hint: '最小単位1（単位を持たない仮の記録は整数だけ）' });
     for (const fields of [{ lot: '' }, { item: 'D', unit: '' }, { request: '' }, {}]) {
-      expect(resolve(fields, 'value')).toMatchObject({ target: null, step: undefined, hint: '最小単位と上限は、対象（品目と単位、または保管単位・依頼）を選ぶと示す' });
+      expect(resolve(fields, 'value')).toMatchObject({ target: null, step: undefined, hint: '最小単位は、対象（品目と単位、または保管単位・依頼）を選ぶと示す' });
     }
     expect(resolve({ lot: 'H1' }, 'perBox').target).toBeUndefined();
     expect(resolve({ item: '未登録', unit: 'kg' }, 'value').step).toBeUndefined();

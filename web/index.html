@@ -34,6 +34,7 @@
       <section id="conflict" aria-labelledby="conflict-h" hidden><h2 id="conflict-h">更新競合の照合</h2></section>
       <nav aria-label="行き先" id="destinations">
         <button type="button" id="nav-stock">在庫と入力</button>
+        <button type="button" id="nav-sets">セット</button>
         <button type="button" id="nav-supply">不足・依頼・案件・用途</button>
         <button type="button" id="nav-issues">確認・履歴（<span id="issue-count">0件</span>）</button>
         <button type="button" id="nav-masters">登録情報</button>
@@ -48,6 +49,9 @@
         <section id="detail" aria-labelledby="detail-h"><h2 id="detail-h" tabindex="-1">保管単位の詳細</h2></section>
         <section id="production" aria-labelledby="production-h"><h2 id="production-h">製造（工程内・工程完了・中断）</h2></section>
       </div>
+      <div id="page-sets" class="destination">
+        <section id="sets" aria-labelledby="sets-h"><h2 id="sets-h" tabindex="-1">セット</h2></section>
+      </div>
       <div id="page-supply" class="destination">
         <section id="supply" aria-labelledby="supply-h"><h2 id="supply-h">不足・依頼（必要な数・申告・依頼・割り当て）</h2></section>
         <section id="case" aria-labelledby="case-h"><h2 id="case-h">案件・用途詳細</h2></section>
@@ -59,11 +63,14 @@
         <section id="history" aria-labelledby="history-h"><h2 id="history-h">履歴</h2></section>
       </div>
       <div id="page-masters" class="destination">
-        <section id="masters" aria-labelledby="masters-h"><h2 id="masters-h">登録情報（品目・場所・案件・用途・担当者）</h2></section>
+        <section id="masters" aria-labelledby="masters-h"><h2 id="masters-h">登録情報（品目・場所・案件・用途・担当者・工程）</h2></section>
       </div>
       <div id="page-management" class="destination">
         <section id="management-actions" aria-labelledby="management-h">
           <h2 id="management-h">管理</h2>
+          <div class="management-group" id="mode-choice">
+            <label>操作モード <select id="mode-select"><option value="simple">簡単操作モード</option><option value="advanced">高度な操作モード</option></select></label>
+          </div>
           <div class="management-group" role="group" aria-label="初期化">
             <button type="button" id="reset-seed">標準サンプルデータで初期化</button>
             <button type="button" id="reset-scn02">不足・補充サンプルデータで初期化</button>

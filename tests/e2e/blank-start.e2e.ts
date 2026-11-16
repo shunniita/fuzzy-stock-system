@@ -64,7 +64,18 @@ test('P1-BLANK: 空の台帳から担当者・場所・品目・現物を登録�
   const refused = await record(page, 'masterLocation', { code: 'K1', name: '台所の棚', inScope: 'true' });
   await expect(refused).toContainText('最初に担当者（自分の名前）を登録する');
 
-  await guide.getByRole('button', { name: '入力欄で開く' }).click();
+  const openInput = guide.getByRole('button', { name: '入力欄で開く' });
+  let choice = page.waitForEvent('dialog');
+  let opening = openInput.click();
+  let dialog = await choice;
+  expect(dialog.message()).toBe('未保存の入力を破棄して、操作を切り替えますか。');
+  await dialog.dismiss(); await opening;
+  await expect(page.locator('#input [name=op]')).toHaveValue('masterLocation');
+  await expect(page.locator('#input [name=code]')).toHaveValue('K1');
+  choice = page.waitForEvent('dialog');
+  opening = openInput.click();
+  dialog = await choice;
+  await dialog.accept(); await opening;
   await expect(page.locator('#input [name=op]')).toBeFocused();
   await recorded(page, 'masterActor', { name: '山田' });
   await expect(page.locator('#actor')).toHaveValue('山田');

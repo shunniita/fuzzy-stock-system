@@ -158,7 +158,7 @@ describe('供給の状態の共通の規則', () => {
 
   test('3.4: 足りない分の記録・対応付けは確認事項を作らず、台帳（確認事項・中断）に触れない（Supplyは台帳を持たない）', () => {
     const s = declareShortage(emptySupply, fixedMasters, meta('d1'), { project: b001, item: 'P', unit: '個', value: 5, reason: '足りない' });
-    expect(Object.keys(s).sort()).toEqual(['acks', 'declarations', 'levels', 'log', 'needs', 'receiptTemplates', 'receipts', 'requests']);
+    expect(Object.keys(s).sort()).toEqual(['acks', 'declarations', 'levels', 'log', 'needs', 'receiptTemplates', 'receipts', 'requests', 'templateNeeds']);
   });
 });
 
@@ -234,7 +234,7 @@ describe('要件4・6 依頼', () => {
 
   test('6.3・7.2: 依頼・取消のどれも、台帳の受け取り・中断・作業の再開を作らない（Supplyは台帳を持たない）。取消は未着から外すだけ', () => {
     const s = cancelRequest(confirmOrder(base(), fixedMasters, meta('q2', 11), 'q1'), fixedMasters, meta('q3', 12), 'q1', '不要');
-    expect(Object.keys(s).sort()).toEqual(['acks', 'declarations', 'levels', 'log', 'needs', 'receiptTemplates', 'receipts', 'requests']);
+    expect(Object.keys(s).sort()).toEqual(['acks', 'declarations', 'levels', 'log', 'needs', 'receiptTemplates', 'receipts', 'requests', 'templateNeeds']);
     expect(s.receipts).toEqual({});
   });
 });

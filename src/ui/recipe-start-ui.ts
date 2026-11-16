@@ -8,6 +8,7 @@ import { checkField, choiceField, h, selectField, textField, type Values } from 
 import { amount, amountFields, basisOptions, codeTarget, itemFields, lotOptions, MaterialInclusionRequired, placeOptions, processOptions, projectField, projectOf, quantityValue } from './fields.ts';
 import { inclusionLabel, itemRef } from './format.ts';
 import type { Ctx, UiOp } from './supply-ui.ts';
+import { fixSubject } from './subject-actions.ts';
 
 const changed = (node: HTMLElement) => node.dispatchEvent(new Event('input', { bubbles: true }));
 const estimateBasisOptions = [['approximate', 'だいたい（数えていない）'], ['counted', '数えた（今回の使用数全体）']] as const;
@@ -162,7 +163,13 @@ function manualInputs(v: Values): (ManualUse & { field: number })[] {
 export function recipeStartOps(ctx: Ctx): Record<string, UiOp> {
   return {
     recipeStart: {
-      label: 'セットで作業を開始（材料の使用を推計）', fields: () => recipeStartFields(ctx),
+      subject: { kind: 'template', field: 'recipe', prepare: (form, id) => {
+        const template = own(ctx.supply().receiptTemplates, id);
+        if (!template?.product || !template.productUnit) throw new Error('製品と単位を登録したセットを選んでください');
+        fixSubject(form, 'item', template.product);
+        fixSubject(form, 'unit', template.productUnit);
+      } },
+      label: 'セットで作業を開始', fields: () => recipeStartFields(ctx),
       run: (state, meta, v) => {
         const process = processOf(state.ledger.masters, v.text('process'));
         if (!process) throw new Error('工程を選ぶ');
@@ -171,7 +178,7 @@ export function recipeStartOps(ctx: Ctx): Record<string, UiOp> {
         const template = templateId === '' ? undefined : own(state.supply.receiptTemplates, templateId);
         if (templateId !== '' && (!template || previewSignature(template, v.text('item'), v.text('unit'), v.text('basis'), v.text('value')) !== v.text('estimateRevision'))) throw new Error('現在のセットと台数で使用候補を出してください');
         // この操作でセットを選ばずに記録できるのは、構成未登録の製品だけ（2.1）。
-        if (templateId === '' && recipesFor(ctx, v.text('item')).length > 0) throw new Error('セットを選んで使用候補を出す（推計しないなら「作業の開始（材料の使用とまとめて記録）」を使う）');
+        if (templateId === '' && recipesFor(ctx, v.text('item')).length > 0) throw new Error('セットを選んで使用候補を出す（推計しないなら「作業の開始」を使う）');
         if (template && !v.checked('estimateConfirmed')) throw new Error('台数・今回の使用数・根拠・保管単位を確認してください');
         const rows = template ? estimateInputs(state, template, v, value!) : [];
         const lot = { id: v.text('newId'), item: v.text('item'), unit: v.text('unit'), project: projectOf(v), location: v.text('location') };

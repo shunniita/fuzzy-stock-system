@@ -35,7 +35,7 @@ test('FH-B01・AT-48: SCN-01を最初から操作し、誤使用の訂正後にP
   await expect(production(page)).toContainText('工程内 記録上の数12台（作業中 記録上の数10台、確認待ち 記録上の数2台）／完成（渡す前） 18台・数えた／工程完了累計 18台');
 
   await recorded(page, 'toNext', { lot: 'R3', childId: 'R4', basis: 'counted', value: '10', location: 'N' }, '11:20');
-  await expect(cell(page, 'R4', '場所')).toHaveText('N');
+  await expect(cell(page, 'R4', '場所')).toHaveText('次工程N（N）');
   await expect(cell(page, 'R4', '作業の状態')).toHaveText('作業なし');
   await expect(production(page)).toContainText('工程内 記録上の数12台');
   await expect(production(page)).toContainText('完成（渡す前） 記録上の数8台／工程完了累計 18台／やり直し・修理開始累計 0台（現在の現物数には足さない）／引渡済み累計 10台');
@@ -45,7 +45,7 @@ test('FH-B01・AT-48: SCN-01を最初から操作し、誤使用の訂正後にP
   await expect(cell(page, 'PA', '記録上の数と根拠')).toHaveText('記録上の数60個');
   await page.locator('#actor').selectOption('架空担当B');
   const form = page.getByRole('form', { name: '操作の入力' });
-  await selectOperation(form.locator('[name=op]'), { label: '間違えた記録の取り消し（使用・引渡し）' });
+  await selectOperation(form.locator('[name=op]'), { label: '間違えた記録の取り消し' });
   const mistaken = await form.locator('[name=target] option', { hasText: 'R追加（誤り）' }).getAttribute('value');
   await recorded(page, 'void', { target: mistaken!, reason: '実際は使用していない' }, '17:30');
 
@@ -187,7 +187,7 @@ test('MFG-01b: 完成（渡す前）を工程内へ戻す訂正は、完了累�
 test('MFG-06: 作業の開始の作業の場所に次工程Nを選べない（工程に載った物はNに置かない）', async ({ page }) => {
   await startEmpty(page);
   const form = page.getByRole('form', { name: '操作の入力' });
-  await selectOperation(form.locator('[name=op]'), { label: '作業の開始（材料の使用とまとめて記録）' });
+  await selectOperation(form.locator('[name=op]'), { label: '作業の開始' });
   await expect(form.locator('[name=location] option')).toHaveText(['選ぶ', '棚S1（S1）', '棚S2（S2）', '作業台T（T）', '対象外の棚O（O）']);
 });
 
@@ -215,7 +215,7 @@ test('AT-15: 配膳だけの品目10個を次工程へ移しても品目と部�
   await startEmpty(page);
   await recorded(page, 'register', lot('K', 'P', 'T', 'counted', '10'), '09:00');
   await recorded(page, 'move', { lot: 'K', location: 'N' }, '10:00');
-  await expect(cell(page, 'K', '場所')).toHaveText('N');
+  await expect(cell(page, 'K', '場所')).toHaveText('次工程N（N）');
   await expect(cell(page, 'K', '作業の状態')).toHaveText('作業なし');
   await expect(totals(page)).toHaveText('品目P（個）：在庫 10個・数えた／使用可能 10個・数えた／取り分け 記録上の数0個');
   await goTo(page, 'issues');

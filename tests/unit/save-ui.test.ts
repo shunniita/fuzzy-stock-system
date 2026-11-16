@@ -29,6 +29,9 @@ describe('画面整理4.3・4.4: 保存通知の種類は既存の結果から�
   const { pending, snapshot } = fixture();
   const cases: [SaveView, SaveTone][] = [
     [{ kind: 'ready' }, 'info'],
+    [{ kind: 'saving' }, 'info'],
+    [{ kind: 'prompt', reason: '回答が必要：架空の確認' }, 'info'],
+    [{ kind: 'rejected', reason: '記録していない：架空の入力誤り' }, 'error'],
     [{ kind: 'saved', opId: 'op10' }, 'success'],
     [{ kind: 'duplicate', opId: 'op10' }, 'success'],
     [{ kind: 'duplicate', opId: 'op10', remainder: { savedTargets: ['まとまりR1'], unsavedTargets: ['依頼q2'] } }, 'warning'],
@@ -61,6 +64,8 @@ describe('画面整理4.3・4.4: 保存通知の種類は既存の結果から�
 describe('B3 3.2: 保存の状態の表示', () => {
   test.each([
     [{ kind: 'ready' }, '記録を入力できます'],
+    [{ kind: 'saving' }, '保存中です。完了までお待ちください。'],
+    [{ kind: 'rejected', reason: '記録していない：架空の入力誤り' }, '記録していない：架空の入力誤り'],
     [{ kind: 'saved', opId: 'op10' }, '保存した（操作ID：op10）'],
     [{ kind: 'duplicate', opId: 'op10' }, '保存済み。もう一度は記録しない（操作ID：op10）'],
     [{ kind: 'failed', reason: '容量不足' }, '保存できなかった（記録されていない）'],
