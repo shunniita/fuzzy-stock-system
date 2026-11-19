@@ -5,7 +5,8 @@ import { saveReceiptTemplate, type ReceiptTemplate } from '../../src/domain/rece
 import { emptySupply, type Supply } from '../../src/domain/supply.ts';
 import { startWithEstimate } from '../../src/domain/usage-estimate.ts';
 import { generateTemplateNeeds, recalculateTemplateNeeds } from '../../src/domain/template-needs.ts';
-import { progressOverflowsOf, templateNeedProgressOf } from '../../src/domain/template-needs-progress.ts';
+import { followTemplateNeeds } from '../../src/domain/template-needs-update.ts';
+import { progressOverflowsOf, templateNeedProgressOf, templateNeedProgressesOf } from '../../src/domain/template-needs-progress.ts';
 
 const at = '2026-10-30T09:00:00+09:00';
 const meta = (eventId: string): Meta => ({ eventId, actor: '架空担当A', occurredAt: at, recordedAt: at });
@@ -54,6 +55,14 @@ describe('総予定数・作業で使った台数・未使用の残り', () => {
     state = started(state, 'X3', 7, { unit: '個' });
     expect(templateNeedProgressOf(state, 'C1')).toMatchObject({ remaining: 3 });
     expect(usedValue(state)).toBe(7);
+  });
+
+  test('製品と同じ単位でも、別の品目の開始は足さない', () => {
+    expect(usedValue(started(generated(), 'X1', 8, { item: 'P' }))).toBe(0);
+  });
+
+  test('計画のない案件をまとめて求めると、その案件を示して止める', () => {
+    expect(() => templateNeedProgressesOf(generated(), ['A-001'])).toThrow('案件 A-001 の計画がない');
   });
 
   test('総予定数を超えた開始は残りが負になる', () => {
@@ -198,6 +207,14 @@ describe('記録の前後での総予定数の超過', () => {
     expect(templateNeedProgressOf(lowered, 'C1')).toMatchObject({ total: 4, remaining: -2 });
     expect(overflows(used, lowered)).toEqual([{ caseId: 'C1', over: 2 }]);
     expect(overflows(used, recalculateTemplateNeeds(used, meta('re2'), 'C1', 6, [], '架空の台数変更'))).toEqual([]);
+  });
+
+  test('最新版への追従で製品が変わり、それまで数えていなかった開始で超えると超過になる', () => {
+    const before = started(generated(), 'X1', 12, { item: 'P' });
+    const changed = { ...before, supply: saveReceiptTemplate(before.ledger, before.supply, meta('save2'), { ...template, product: 'P', rows: [{ item: 'R', unit: '個', perSet: 1, location: 'S1' }] }) };
+    const after = followTemplateNeeds(changed, meta('fol'), 'C1', []);
+    expect(templateNeedProgressOf(after, 'C1')).toMatchObject({ total: 10, remaining: -2 });
+    expect(overflows(changed, after)).toEqual([{ caseId: 'C1', over: 2 }]);
   });
 
   test('再計算は必要明細を今の規則で作り直し、総予定数が新しい台数になる', () => {
