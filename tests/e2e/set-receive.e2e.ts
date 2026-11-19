@@ -5,7 +5,7 @@ import { blockStorage, draftOf, gateStorageEvents, snapshotOf } from './conflict
 
 const formOf = (page: Page) => page.getByRole('form', { name: '操作の入力' });
 const detailOf = (page: Page) => page.locator('[data-set-detail]');
-const receiveLabel = 'この機種の部品を受け取る';
+const receiveLabel = 'このセットの部品を受け取る';
 type Part = { item: string; unit: string; quantity: string; child?: string };
 const pqs: Part[] = [{ item: 'P', unit: '個', quantity: '2' }, { item: 'Q', unit: '個', quantity: '1' }, { item: 'S', unit: '本', quantity: '4' }];
 

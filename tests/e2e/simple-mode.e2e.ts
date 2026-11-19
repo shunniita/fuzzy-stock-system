@@ -1,6 +1,6 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { browserZoomProfile } from './browser-zoom-profile.mjs';
-import { goTo, lot, recorded, usePractice, waitForApp } from './helpers.ts';
+import { goTo, lot, openMasterKind, recorded, usePractice, waitForApp } from './helpers.ts';
 import { snapshotOf } from './conflict-helpers.ts';
 
 // 初めて開いたブラウザーと同じく、モードを選んだことがない状態から始める。
@@ -91,12 +91,14 @@ test('登録情報: 簡単操作モードでは品目と場所の登録・名称
   await start(page);
   await goTo(page, 'masters');
   const masters = page.locator('#masters');
-  for (const name of ['品目を登録', '場所を登録']) await expect(masters.getByRole('button', { name, exact: true })).toBeVisible();
-  for (const name of ['案件・用途を登録', '担当者を登録', '工程を登録', '次工程の場所を指定']) await expect(masters.getByRole('button', { name, exact: true })).toHaveCount(0);
+  await expect(masters.getByRole('button', { name: '品目を登録', exact: true })).toBeVisible();
+  for (const name of ['案件・用途を登録', '担当者を登録', '工程を登録', '次工程の場所を指定']) await expect(masters.getByRole('button', { name, exact: true, includeHidden: true })).toHaveCount(0);
   await masters.locator('tr[data-master="item:P"]').getByRole('button').first().click();
   const keys = await masters.getByRole('group', { name: 'この登録情報にできる操作' }).locator('[data-op]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-op')));
   expect(keys.sort()).toEqual(['masterDeactivate', 'masterRename']);
   await expect(masters.getByRole('button', { name: 'この品目のセット', exact: true })).toHaveCount(0);
+  await openMasterKind(page, '場所');
+  await expect(masters.getByRole('button', { name: '場所を登録', exact: true })).toBeVisible();
 });
 
 for (const width of [1366, 390]) test(`入れる: ${width}pxでキーボードだけで記録し、横にはみ出さない`, async ({ page }) => {

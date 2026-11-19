@@ -99,7 +99,7 @@ function changeFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFo
         ])));
       }
       const related = result.relatedCounts;
-      if (related && related.difference !== '0') root.append(h('p', {}, `関連案件の台数：組立用${related.assembly}台・検査用合計${related.inspection}台・差${related.difference}台`));
+      if (related && related.difference !== '0') root.append(h('p', {}, `関連案件の台数：元${related.assembly}台・分け先合計${related.inspection}台・差${related.difference}台`));
       if (result.applicable) {
         preflight(root.closest('form'), result.state);
         signature.value = templateNeedPreviewSignature(current, input);

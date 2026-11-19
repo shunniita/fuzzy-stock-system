@@ -91,8 +91,9 @@ export function addScalar(a: number, b: number, step: Step): number {
   return numberFromTicks(checkedTicks(left + right, step));
 }
 
-export function subtractScalar(a: number, b: number, step: Step): number {
-  const left = checkedTicks(ticksFromNumber(a), step);
+// 引かれる数だけ精度が違う（整数の総予定数から0.1刻みの数量を引く）ときは leftStep で検査する。
+export function subtractScalar(a: number, b: number, step: Step, leftStep: Step = step): number {
+  const left = checkedTicks(ticksFromNumber(a), leftStep);
   const right = checkedTicks(ticksFromNumber(b), step);
   return numberFromTicks(checkedTicks(left - right, step));
 }

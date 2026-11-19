@@ -44,7 +44,6 @@ export const opLabels = {
   requestCancel: '依頼の取消',
   receive: '受け取り',
   templateNeedGenerate: 'セットから必要明細を生成',
-  templateNeedBatch: '組立用と検査用をまとめて生成',
   templateNeedEdit: '生成した必要明細の変更',
   templateSave: 'セットの登録・変更',
   templateDelete: 'セットの削除',
@@ -256,3 +255,10 @@ export function filePayload(name: string, mimeType: string, bytes: Uint8Array): 
 }
 
 export const jsonFile = (name: string, text: string): FilePayload => filePayload(name, 'application/json', new TextEncoder().encode(text));
+
+// 登録情報は種類ごとのサブメニューで切り替える。絞り込み中は名前に件数が付くので前方一致で探す。
+export async function openMasterKind(page: Page, kind: '品目' | '場所' | '案件・用途' | '担当者' | '工程'): Promise<void> {
+  const button = page.locator('#masters').getByRole('group', { name: '登録情報の種類' }).getByRole('button', { name: new RegExp(`^${kind}(（|$)`) });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-current', 'true');
+}

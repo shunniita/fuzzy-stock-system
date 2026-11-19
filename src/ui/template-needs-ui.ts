@@ -2,10 +2,10 @@ import { buildTemplateNeedGeneration, generateTemplateNeeds, templateNeedContext
 import { recordTemplateNeeds } from '../domain/supply.ts';
 import { choiceField, checkField, h, textField, type Values } from './dom.ts';
 import { quantityValue } from './fields.ts';
+import { attachRegisteredCaseNotice } from './registered-case-notice.ts';
 import type { Ctx, State, UiOp } from './supply-ui.ts';
 import { generationPreview, previewMeta, templateNeedOptions, templateNeedPreviewSignature } from './template-needs-preview.ts';
 export { templateNeedPreviewSignature } from './template-needs-preview.ts';
-import { templateNeedBatchOp } from './template-needs-batch-ui.ts';
 import { templateNeedEditOp } from './template-needs-edit-ui.ts';
 
 function generationInput(v: Values): TemplateNeedGenerationInput {
@@ -14,7 +14,8 @@ function generationInput(v: Values): TemplateNeedGenerationInput {
 
 function generationFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFormElement | null, state: State) => void): HTMLElement[] {
   const state = { ledger: ctx.ledger(), supply: ctx.supply() }, options = templateNeedOptions(state);
-  const fields = h('div', {}, choiceField('needTemplate', 'セット', options), textField('needCase', '案件ID'), textField('needCount', '台数', 'integer'), textField('needDue', '必要日（省略可）', 'date'));
+  const caseField = textField('needCase', '案件ID');
+  const fields = h('div', {}, choiceField('needTemplate', 'セット', options), caseField, attachRegisteredCaseNotice(caseField, ctx, 'generate'), textField('needCount', '台数', 'integer'), textField('needDue', '必要日（省略可）', 'date'));
   const signature = h('input', { type: 'hidden', name: 'needPreview', value: '' });
   const root = h('div', { 'data-need-preview': '', 'aria-live': 'polite' });
   const confirm = checkField('needConfirmed', '案件ID・版・必要明細を確認した');
@@ -41,7 +42,6 @@ function generationFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HT
 export function templateNeedsOps(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFormElement | null, state: State) => void): Record<string, UiOp> {
   return {
     templateNeedEdit: templateNeedEditOp(ctx, nextOpId, preflight),
-    templateNeedBatch: templateNeedBatchOp(ctx, nextOpId, preflight),
     templateNeedGenerate: {
       subject: { kind: 'template', field: 'needTemplate' },
       label: 'セットから必要明細を生成', fields: () => generationFields(ctx, nextOpId, preflight), validateBeforeSave: preflight,

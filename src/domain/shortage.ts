@@ -1,8 +1,9 @@
 import { createdAtOf, isUsable, openIssues, productionTallyOf, voidOf, type ProductionTally, type HoldReason, type Ledger, type Lot, type Project, type Stop } from './ledger.ts';
-import { add, observe, quantityOf, subtract, type Quantity } from './quantity.ts';
+import { observe, quantityOf, subtract, sumQuantities, type Quantity } from './quantity.ts';
 import { quantityStepOf, type Masters } from './masters.ts';
 import { addScalar, positivePartMinus, subtractScalar, sumScalars, sumScalarsFinal, type Step } from './scalar.ts';
 import { allocatedToReceipt, checkDate, chronological, orderContradicts, isStaleRevision, needOfGroup, receiptStatusOf, receivedOf, requestProgressOf, sameProject, type DateText, type Supply } from './supply.ts';
+import { templateNeedProgressesOf } from './template-needs-progress.ts';
 
 // 不足を求める単位。案件・用途・品目・単位ごとに独立に求める（別の案件・用途・共通・所属不明の現物や、違う単位を混ぜない）。
 export type GroupKey = { project: Project; item: string; unit: string };
@@ -56,12 +57,6 @@ export function groupsOf(_ledger: Ledger, supply: Supply): GroupKey[] {
   return [...found.values()];
 }
 
-// 0を初期値にして足すと、ラベルだけの合計が「中身未確認」から「未確認部分あり」へ変わってしまうので、空のときだけ0にする。
-function sum(quantities: Quantity[], step: Step): Quantity {
-  if (quantities.length === 0) return { kind: 'known', numeric: { value: 0, approximate: false, unconfirmed: 'none' }, computed: true, terms: [] };
-  return quantities.reduce((total, quantity) => add(total, quantity, step));
-}
-
 function numericValueOf(q: Quantity): number | null {
   return q.kind === 'known' ? q.numeric.value : q.kind === 'partlyUnknown' ? (q.numeric?.value ?? null) : null;
 }
@@ -83,7 +78,7 @@ function usedQuantity(ledger: Ledger, key: GroupKey, step: Step): Quantity {
     if (!lot || !group(lot) || voidOf(ledger, e.eventId)) continue;
     used.push(quantityOf(observe(e.eventId, e.basis, e.value, step)));
   }
-  return sum(used, step);
+  return sumQuantities(used, step);
 }
 
 export function shortageOf(ledger: Ledger, supply: Supply, key: GroupKey): ShortageView {
@@ -91,8 +86,8 @@ export function shortageOf(ledger: Ledger, supply: Supply, key: GroupKey): Short
   // まとめ直し済みの元は集計から外す（閉じたまとまりを重ねて数えない）。工程に載っている物は未使用の部品ではない。
   const unused = lots.filter((l) => l.mergedInto === null && l.stage.kind === 'none');
   const step = quantityStepOf(ledger.masters, key.item, key.unit);
-  const onHand = sum(unused.map((l) => l.quantity), step);
-  const usable = sum(unused.filter(isUsable).map((l) => l.quantity), step);
+  const onHand = sumQuantities(unused.map((l) => l.quantity), step);
+  const usable = sumQuantities(unused.filter(isUsable).map((l) => l.quantity), step);
   const used = usedQuantity(ledger, key, step);
   const need = needOfGroup(supply, key.project, key.item, key.unit);
   const required = need ? quantityOf(observe(need.id, need.required.basis, need.required.value, step)) : null;
@@ -114,8 +109,8 @@ export function shortageOf(ledger: Ledger, supply: Supply, key: GroupKey): Short
     entry.quantities.push(l.quantity);
     byReasons.set(id, entry);
   }
-  const excluded: ExcludedPart[] = [...byReasons.values()].map((e) => ({ reasons: e.reasons, quantity: sum(e.quantities, step) }));
-  const spare = sum(unused.filter((l) => l.holds.length === 1 && l.holds[0] === 'spare').map((l) => l.quantity), step);
+  const excluded: ExcludedPart[] = [...byReasons.values()].map((e) => ({ reasons: e.reasons, quantity: sumQuantities(e.quantities, step) }));
+  const spare = sumQuantities(unused.filter((l) => l.holds.length === 1 && l.holds[0] === 'spare').map((l) => l.quantity), step);
 
   const aux = {
     required: required ? numericValueOf(required) : null,
@@ -360,6 +355,8 @@ export function requireQuantityTotals(ledger: Ledger, supply: Supply): void {
       throw fail(`${projectText(key.project)}・品目${key.item}（${key.unit}）の不足と依頼`, error);
     }
   }
+  // 記録の操作は進み具合の確認でも止まるが、読込・復元・保存中の操作の再試行はそこを通らない。
+  templateNeedProgressesOf({ ledger, supply });
 }
 
 const tallyLabel: Record<ProductionTally, string> = { completed: '工程完了累計', reworkStarted: 'やり直し・修理開始累計', returned: '工程内へ戻した数', handedOver: '引渡済み累計' };

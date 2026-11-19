@@ -1,6 +1,6 @@
 import { checkedConsumable, codeOwner, deepFreeze, nextProcessOf, practiceMasters, inScopeAt, inputStepOf, processRef, masterTypeDisplayLabel, own, perBoxAt, quantityStepOf, refOf, reservedCaseIds, unassignedCode, type ConsumableSetting, type LocationMaster, type Master, type Masters, type ProcessMaster, type Source } from './masters.ts';
 import { initialPackaging, checkCaseCode, checkTrialReview, effectiveFrom, masterOf, masterRef, processNameFree, registered, type NewMaster, type TrialReview } from './master-edit.ts';
-import { add, observe, quantityOf, sameQuantity, subtract, type Basis, type Observation, type Quantity } from './quantity.ts';
+import { add, observe, quantityOf, sameQuantity, subtract, sumQuantities, type Basis, type Observation, type Quantity } from './quantity.ts';
 import { sumScalarsFinal, validateScalar, type Step } from './scalar.ts';
 import type { Scan } from './code.ts';
 import { checkAlternativeSource, type AlternativeOperation, type AlternativeRecord, type AlternativeSource } from './alternative-record.ts';
@@ -823,15 +823,7 @@ export function recount(ledger: Ledger, meta: Meta, lotId: string, value: number
 export function totalOf(ledger: Ledger, item: string, include: (lot: Lot) => boolean = () => true): Quantity {
   const lots = Object.values(ledger.lots).filter((lot) => lot.item === item && lot.mergedInto === null && include(lot));
   if (new Set(lots.map((lot) => lot.unit)).size > 1) throw new Error(`品目 ${item} の単位が違う保管単位は合計しない。単位を指定する`);
-  return sum(lots.map((lot) => lot.quantity), quantityStepOf(ledger.masters, item, lots[0]?.unit ?? ''));
-}
-
-// 0を初期値にして足すと、ラベルだけの合計が「中身未確認」から「未確認部分あり」へ変わってしまう。
-function sum(quantities: Quantity[], step: Step): Quantity {
-  if (quantities.length === 0) {
-    return { kind: 'known', numeric: { value: 0, approximate: false, unconfirmed: 'none' }, computed: true, terms: [] };
-  }
-  return quantities.reduce((total, quantity) => add(total, quantity, step));
+  return sumQuantities(lots.map((lot) => lot.quantity), quantityStepOf(ledger.masters, item, lots[0]?.unit ?? ''));
 }
 
 // apply は保留した操作を元の操作IDと実際の日時のまま親へ適用し、close は親から減らさずに閉じる。対象の事項だけを閉じる（CHK-04）。
@@ -1092,18 +1084,19 @@ export function voidRecord(ledger: Ledger, meta: Meta, targetEventId: string, re
   const detail = { kind: 'void', targetEventId, lotId: source.id, reason, applied: lot !== null } as const;
   if (lot === null) return commit(ledger, detail, meta, []);
   // 足し戻すと、表示の数（ラベル・パッケージ）やだいたいの誤りを取り消しても中身未確認・約が残り、根拠が劣化する。
-  // 最後に数えた数（なければ登録）の数量から、誤りを除いて引き直して戻す。引き直せない操作が間にあれば足し戻す。
+  // 最後に数えた数（なければ保管単位を作った記録）の数量から、誤りを除いて引き直して戻す。引き直せない操作が間にあれば足し戻す。
   const restored = rebuiltWithout(ledger, lot, targetEventId) ?? add(lot.quantity, quantityOf(observeFor(ledger, lot, meta.eventId, target.basis, target.value)), quantityStepOf(ledger.masters, lot.item, lot.unit));
   return commit(ledger, detail, meta, [{ ...lot, quantity: restored }]);
 }
 
-// 最後に数えた数（なければ登録）の数量から、指定の操作と取り消し済みの操作（誤りの前後どちらも、取消と対で打ち消し合う）を
+// 最後に数えた数（なければ保管単位を作った記録）の数量から、指定の操作と取り消し済みの操作（誤りの前後どちらも、取消と対で打ち消し合う）を
 // 除いて、減算とまとめ直しの加算だけを引き直した数量。まとめ直しの元も同じ規則で引き直し、引き直せなくても
 // 除く操作・取り消し済みの操作を含まなければ統合時の数量を使う。引き直せなければundefined。
 function rebuiltWithout(ledger: Ledger, lot: Lot, excludedOpId: string): Quantity | undefined {
   const chain = reflectedIn(ledger.history, lot);
   const first = chain[0];
-  const creates = first && ['register', 'recount', 'split', 'stage', 'transfer', 'rework', 'start'].includes(first.kind);
+  // 仮記録からの登録も newLot の数量を保存しているため、誤記を除いて根拠から戻せる。
+  const creates = first && ['register', 'adopt', 'recount', 'split', 'stage', 'transfer', 'rework', 'start'].includes(first.kind);
   const base = creates ? first.changes.find((c) => c.after.id === lot.id)?.after.quantity : undefined;
   if (base === undefined) return undefined;
   let quantity: Quantity = base;
@@ -1168,7 +1161,7 @@ function inProcessTotalAt(ledger: Ledger, stop: StopScope, occurredAt: string | 
   if (occurredAt === null) return current.numeric.value;
   const inGroup = (l: Lot | null): l is Lot =>
     l !== null && l.mergedInto === null && l.item === stop.item && l.unit === stop.unit && sameProject(l.project, stop.project) && inProcess(l.stage, stop.process);
-  const totalIn = (lots: (Lot | null)[]): Quantity => sum(lots.filter(inGroup).map((l) => l.quantity), quantityStepOf(ledger.masters, stop.item, stop.unit));
+  const totalIn = (lots: (Lot | null)[]): Quantity => sumQuantities(lots.filter(inGroup).map((l) => l.quantity), quantityStepOf(ledger.masters, stop.item, stop.unit));
   const terms = [current.numeric.value];
   for (const e of ledger.history) {
     if (e.kind === 'correctTime') continue;
@@ -1355,10 +1348,10 @@ export function productionOf(ledger: Ledger, process: string, item: string, unit
     inspecting,
     inProcess: add(working, inspecting, quantityStepOf(ledger.masters, item, unit)),
     awaitingHandover: at('awaitingHandover'),
-    completed: sum(tallies.completed, quantityStepOf(ledger.masters, item, unit)),
-    reworkStarted: sum(tallies.reworkStarted, quantityStepOf(ledger.masters, item, unit)),
-    returned: sum(tallies.returned, quantityStepOf(ledger.masters, item, unit)),
-    handedOver: sum(tallies.handedOver, quantityStepOf(ledger.masters, item, unit)),
+    completed: sumQuantities(tallies.completed, quantityStepOf(ledger.masters, item, unit)),
+    reworkStarted: sumQuantities(tallies.reworkStarted, quantityStepOf(ledger.masters, item, unit)),
+    returned: sumQuantities(tallies.returned, quantityStepOf(ledger.masters, item, unit)),
+    handedOver: sumQuantities(tallies.handedOver, quantityStepOf(ledger.masters, item, unit)),
   };
 }
 
@@ -1393,10 +1386,10 @@ export function perBoxOfLot(ledger: Ledger, lot: Lot, created: ReadonlyMap<strin
   return at === undefined ? null : perBoxAt(packaging, at);
 }
 
-// 確認が要る変更（既存IDの付替え・元の資料の更新・仮の記録の新しいまとまり・案件・用途の結び付け）。
+// 確認が要る変更（既存IDの付替え・元の資料の更新・仮の記録の新しいまとまり・案件・用途の結び付け・総予定数の超過）。
 // 画面は内容を示して確認の欄を出し、同じ入力を確認つきで再送させる。確認の前は何も記録しない。
 export class ConfirmationRequired extends Error {
-  readonly kind: 'code' | 'source' | 'adopt' | 'identify' | 'assignProject';
+  readonly kind: 'code' | 'source' | 'adopt' | 'identify' | 'assignProject' | 'progress';
   readonly lots: readonly string[];
   readonly master: Master | null;
 

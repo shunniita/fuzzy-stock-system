@@ -387,7 +387,7 @@ test('表示統合: 長い原文と動的な表を保ち、狭幅ではページ
 test('表示統合: 記録と管理の強調を分け、強制配色でも枠とフォーカスを残す', async ({ page }) => {
   await page.goto('/'); await waitForApp(page);
   const recordButton = page.locator('#input button[type=submit]');
-  await expect(recordButton).toHaveCSS('background-color', 'rgb(36, 87, 197)');
+  await expect(recordButton).toHaveCSS('background-color', 'rgb(0, 100, 217)');
   await expect(recordButton).toHaveCSS('color', 'rgb(255, 255, 255)');
   await page.locator('#nav-management').click();
   await expect(page.locator('#reset-empty')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
@@ -880,6 +880,24 @@ function contrastOf(foreground: string, background: string): number {
   const a = luminance(foreground), b = luminance(background);
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
+
+test('受け取り6.3: 通常配色の一般ボタンは押下中も文字のコントラストを保つ', async ({ page }) => {
+  await emptyNavigable(page);
+  await goTo(page, 'management');
+  const button = page.locator('#reset-empty');
+  await button.hover();
+  await page.mouse.down();
+  try {
+    const colors = await button.evaluate(node => {
+      const style = getComputedStyle(node);
+      return { active: node.matches(':active'), color: style.color, background: style.backgroundColor };
+    });
+    expect(colors.active).toBe(true);
+    expect(contrastOf(colors.color, colors.background)).toBeGreaterThanOrEqual(4.5);
+  } finally {
+    await page.mouse.up();
+  }
+});
 
 test('受け取り6.3: 通常配色の文字と境界のコントラストを測り、通知のARIAを維持する', async ({ page }, testInfo) => {
   await emptyNavigable(page);

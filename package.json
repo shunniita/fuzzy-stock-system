@@ -11,6 +11,7 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:mutation": "mutator",
     "e2e": "npm run build && playwright test",
     "release:package": "node scripts/package-release.mjs",
     "release:check": "node scripts/test-release-package.mjs",
@@ -20,6 +21,7 @@
     "performance:measure": "npm run build && node scripts/measure-local-performance.mjs"
   },
   "devDependencies": {
+    "@mizchi/mutator": "0.3.0",
     "@playwright/test": "1.63.0",
     "esbuild": "0.28.2",
     "typescript": "7.0.2",

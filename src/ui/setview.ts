@@ -43,8 +43,8 @@ export function setsPanel(ledger: Ledger, supply: Supply, selection: SetSelectio
       return button;
     };
     detail.append(h('h3', {}, template.name),
-      // 機種から入る人には主操作を目的の言葉で示す。押した後の操作欄は既存の操作名のまま。
-      action('templateReceive', 'この機種の部品を受け取る'),
+      // セットから入る人には主操作を目的の言葉で示す。押した後の操作欄は既存の操作名のまま。
+      action('templateReceive', 'このセットの部品を受け取る'),
       action('templateNeedGenerate'), action('recipeStart'),
       otherOperations([action('templateSave'), action('templateDelete')])!,
       h('p', {}, `${template.product === null ? '製品未設定' : itemRef(ledger.masters, template.product)}／1${template.productUnit ?? '単位'}あたり／${basisLabel[template.basis]}`),

@@ -88,6 +88,7 @@ function recipeStartFields(ctx: Ctx): HTMLElement[] {
   const signature = h('input', { type: 'hidden', name: 'estimateRevision', value: '' });
   const root = h('div', { 'data-estimate-preview': '' });
   const confirm = checkField('estimateConfirmed', '台数・今回の使用数・根拠・保管単位を確認した');
+  confirm.querySelector('input')!.dataset['receiptConfirm'] = '';
   const value = (name: string) => preview.closest('form')?.querySelector<HTMLInputElement | HTMLSelectElement>(`[name=${name}]`)?.value ?? '';
   // 出し直した候補に、前の候補で付けた確認を引き継がない（3.8）。
   const clear = () => { root.replaceChildren(); signature.value = ''; confirm.querySelector('input')!.checked = false; changed(root); };

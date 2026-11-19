@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { adoptProvisional, changeMasters, ConfirmationRequired, correctOccurredAt, practiceLedger, handOver, identifyProvisional, merge, move, recount, split, use, voidRecord, perBoxOfLot, recordProvisional, register, type Ledger, type Meta } from '../../src/domain/ledger.ts';
+import { adoptProvisional, changeMasters, ConfirmationRequired, correctOccurredAt, practiceLedger, handOver, identifyProvisional, merge, move, recount, split, use, voidRecord, perBoxOfLot, recordProvisional, register, resolveIssue, type Ledger, type Meta } from '../../src/domain/ledger.ts';
 import { stockOf } from '../../src/domain/packaging.ts';
 import { emptySupply } from '../../src/domain/supply.ts';
 import { initial, parse, serialize } from '../../src/ui/storage.ts';
@@ -469,6 +469,19 @@ test('取消: 2段の統合をたどった先の仮の記録から登録した�
   l = merge(l, meta('m2', '11:00'), 'S-mid', 'S-main');
   l = voidRecord(l, meta('v1', '12:00'), 'u1', '架空の誤記');
   expect(l.lots['S-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 19 } });
+});
+
+test('取消: 引き直せない統合元（保留の後に適用した使用を含む）でも、取り除く操作がなければ統合時の数量を使い約を残さない', () => {
+  let l = register(practiceLedger, meta('r0', '09:00'), lotOf('S-src', 'S', '箱', 'T'), 'counted', 10);
+  l = recount(l, meta('rc', '10:00'), 'S-src', 10, { kind: 'unknown' });
+  l = use(l, meta('late', '09:30'), 'S-src', 'counted', 2, '架空の後入力', 'unknown');
+  l = resolveIssue(l, meta('x1', '10:30'), 'late', 'apply', 'notIncluded');
+  l = register(l, meta('r1', '09:40'), lotOf('S-main', 'S', '箱', 'T'), 'counted', 5);
+  l = use(l, meta('u1', '10:40'), 'S-main', 'approximate', 2, '架空の誤り');
+  l = merge(l, meta('m1', '11:00'), 'S-src', 'S-main');
+  expect(l.lots['S-main']?.quantity).toMatchObject({ numeric: { value: 11, approximate: true } });
+  l = voidRecord(l, meta('v1', '12:00'), 'u1', '架空の誤記');
+  expect(l.lots['S-main']?.quantity).toMatchObject({ kind: 'known', numeric: { value: 13, approximate: false } });
 });
 
 test('取消: 保存して読み戻した後も、統合元の誤使用を統合先の数量へ戻す', () => {

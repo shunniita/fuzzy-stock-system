@@ -1,6 +1,6 @@
 import { normalizeAssemblyRecipe } from './assembly-recipes.ts';
 import { changeMasters, checkTime, deepFreeze, type Ledger, type Meta } from './ledger.ts';
-import { own, type Masters } from './masters.ts';
+import { own, type CaseMaster, type Masters } from './masters.ts';
 import { recipeVersion, validateReceiptTemplates, type ReceiptTemplate } from './receipt-template.ts';
 import { templateNeedRows } from './template-needs-calculation.ts';
 import { templateNeedContextOf } from './template-needs-context.ts';
@@ -102,14 +102,24 @@ function generationRows(template: ReceiptTemplate, masters: Masters, count: numb
   return rows;
 }
 
-function resolveGenerationProject(ledger: Ledger, supply: Supply, context: TemplateNeedContext, meta: Meta, caseCode: string, index: number): { ledger: Ledger; project: string; newProject: boolean } {
-  const matches = Object.values(ledger.masters.cases).filter(project => project.code === caseCode || (project.code === null && project.id === caseCode));
+export function generationCaseOf(masters: Masters, caseCode: string): CaseMaster | null {
+  const matches = Object.values(masters.cases).filter(project => project.code === caseCode || (project.code === null && project.id === caseCode));
   if (matches.length > 1) throw new Error(`案件ID ${caseCode} の対応が曖昧。登録情報を確認する`);
-  const existing = matches[0];
+  return matches[0] ?? null;
+}
+
+export function generationBlockerOf(supply: Supply, context: TemplateNeedContext, found: CaseMaster, caseCode: string): string | null {
+  if (!found.active) return `案件ID ${caseCode} は利用停止中`;
+  if (Object.values(supply.needs).some(need => need.project.id === found.id)) return `案件ID ${caseCode} は必要明細を持つ。既存の必要明細を確認・変更する`;
+  if (own(context.plans, found.id)) return `案件ID ${caseCode} は生成済み。既存の必要明細を確認・変更する`;
+  return null;
+}
+
+function resolveGenerationProject(ledger: Ledger, supply: Supply, context: TemplateNeedContext, meta: Meta, caseCode: string, index: number): { ledger: Ledger; project: string; newProject: boolean } {
+  const existing = generationCaseOf(ledger.masters, caseCode);
   if (existing) {
-    if (!existing.active) throw new Error(`案件ID ${caseCode} は利用停止中`);
-    if (Object.values(supply.needs).some(need => need.project.id === existing.id)) throw new Error(`案件ID ${caseCode} は必要明細を持つ。既存の必要明細を確認・変更する`);
-    if (own(context.plans, existing.id)) throw new Error(`案件ID ${caseCode} は生成済み。既存の必要明細を確認・変更する`);
+    const blocker = generationBlockerOf(supply, context, existing, caseCode);
+    if (blocker !== null) throw new Error(blocker);
     return { ledger, project: existing.id, newProject: false };
   }
   const next = changeMasters(ledger, { ...meta, eventId: `${meta.eventId}-c${index + 1}` }, { action: 'register', master: { type: 'case', code: caseCode, name: null, source: null } });

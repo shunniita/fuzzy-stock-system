@@ -90,12 +90,12 @@ import {
 import { checkField, choiceField, field, h, section, selectField, textField, type Child, type Values } from './dom.ts';
 import { alternativeFields, alternativeOperationOf, alternativeSourceOf } from './alternative-input.ts';
 import type { AlternativeOperation } from '../domain/alternative-record.ts';
-import { nextProcessOf, own, processOf, processRef, type Masters } from '../domain/masters.ts';
+import { nextProcessOf, own, processOf, processRef, type Master, type Masters } from '../domain/masters.ts';
 import { emptySupply } from '../domain/supply.ts';
 import { requireQuantityTotals } from '../domain/shortage.ts';
 import { processOptions, stopProcessOptions, amount, amountFields, countOrUnknown, MaterialInclusionRequired, formValue, precisionHints, quantityWarnings, quantityStepFor, quantityTargetOf, quantityValue, basisOptions, codeTarget, itemFields, itemOptions, lotOptions as lotChoices, placeOptions as placeChoices, projectField, projectKey, projectOf, registerFromValues, restrictPlaces } from './fields.ts';
 import { codeInput, type CodeHolds, type CodeInput } from './code-input.ts';
-import { recountWithReceiptChoice, renderConsumables, renderSupply, supplyAsOf, supplyOps, type Ctx, type UiOp, type UiSubject } from './supply-ui.ts';
+import { recountWithReceiptChoice, renderConsumables, renderSupply, supplyAsOf, supplyOps, withProgressConfirmation, type Ctx, type UiOp, type UiSubject } from './supply-ui.ts';
 import { fixSubject, otherOperations, type OperationTarget } from './subject-actions.ts';
 import { nextLotId, nextSplitId, readMode, simpleOps, writeMode, type Mode } from './mode.ts';
 import { opNotes } from './op-notes.ts';
@@ -118,10 +118,11 @@ import { needImportOps } from './need-import-ui.ts';
 import { receiptTemplateOps } from './receipt-template-ui.ts';
 import { setsPanel, type SetSelection } from './setview.ts';
 import { templateNeedsOps } from './template-needs-ui.ts';
+import { caseRegistrationOp } from './case-registration-ui.ts';
 import { requireTemplateNeedCaptureCapacity } from './template-needs-capacity.ts';
 import { recipeStartOps } from './recipe-start-ui.ts';
 import { followupPanel } from './followupview.ts';
-import { candidatesText, masterOf, masterOps, mastersPanel, supplyRefsText } from './master-ui.ts';
+import { candidatesText, masterKindOf, masterOf, masterOps, mastersPanel, supplyRefsText } from './master-ui.ts';
 import { returnIntakeOps } from './return-intake-ui.ts';
 
 const rootNode = document.getElementById('app');
@@ -156,6 +157,8 @@ let selectedEvent = '';
 let selectedIssue = '';
 let selectionEpoch = 0;
 let masterQuery = '';
+// 選んだ種類は画面の中だけで持ち、保存しない。
+let masterKind: Master['type'] = 'item';
 let selectedSet: SetSelection = { product: '', template: '' };
 
 function useSnapshot(next: Snapshot): void {
@@ -640,7 +643,13 @@ const ops = {
 
 const ctx: Ctx = { ledger: () => ledger, supply: () => supply, asOfChanged: () => renderFollowup(), openConsumableSettings: () => {
   switchOperation(Object.keys(ledger.masters.items).length === 0 ? 'masterItem' : 'masterConsumable');
-} };
+}, openCase: caseId => {
+  selectedProject = caseId;
+  renderCase();
+  navigation.select({ kind: 'destination', destination: 'supply' });
+  document.getElementById('case-h')!.focus();
+}, openOperation: key => switchOperation(key, null) };
+const masters = masterOps(ctx);
 
 // 既存の台帳の操作は、台帳だけを更新する操作として包む。供給の操作は supply-ui が持つ。
 const allOps: Record<string, UiOp> = {
@@ -655,11 +664,13 @@ const allOps: Record<string, UiOp> = {
   ...receiptTemplateOps(ctx),
   ...templateNeedsOps(ctx, () => nextOpIdOf(snapshot), templateNeedsPreflight),
   ...recipeStartOps(ctx),
-  ...masterOps(ctx),
+  ...masters,
+  masterCase: caseRegistrationOp(masters['masterCase']!, ctx, () => nextOpIdOf(snapshot), templateNeedsPreflight),
   ...returnIntakeOps(ctx),
 };
 // 受け入れた現物の数え直しでは、実際に受け取った数の扱いを必須で選ばせる（直し忘れを防ぐ）。
 allOps['recount'] = recountWithReceiptChoice(allOps['recount']!, ctx);
+for (const [key, op] of Object.entries(allOps)) allOps[key] = withProgressConfirmation(op);
 
 let message: { kind: 'ok' | 'error' | 'prompt'; text: string } | null = null;
 
@@ -781,14 +792,16 @@ function renderInput(): void {
   (form.elements.namedItem('occurredAt') as HTMLInputElement).value = nowIso().slice(0, 16);
   for (const [box, input] of unknownPairs) exclusive(form, box, input);
   const confirmBox = confirm.querySelector('input')!;
+  const isConfirmBox = (target: EventTarget | null) => target === confirmBox || (target instanceof HTMLInputElement && target.dataset['receiptConfirm'] !== undefined);
   const resetConfirm = (event: Event) => {
-    for (const box of form.querySelectorAll<HTMLInputElement>('[data-receipt-confirm]')) if (event.target !== box) box.checked = false;
-    if (event.target === confirmBox) return;
+    // 確認欄は記録の内容を変えないので、確認欄同士では外し合わない。外し合うと二つの確認を同時に満たせない。
+    if (isConfirmBox(event.target)) return;
+    for (const box of form.querySelectorAll<HTMLInputElement>('[data-receipt-confirm]')) box.checked = false;
     confirmBox.checked = false;
     confirm.hidden = true;
   };
   // 確認欄は確認を求める文に応える欄なので、入力の修正として扱わない。
-  const clearFeedback = (event: Event) => { if (event.target !== confirmBox) clearInputFeedback(); };
+  const clearFeedback = (event: Event) => { if (!isConfirmBox(event.target)) clearInputFeedback(); };
   form.addEventListener('input', clearFeedback);
   form.addEventListener('change', clearFeedback);
   form.addEventListener('input', resetConfirm);
@@ -1973,6 +1986,7 @@ function renderMasters(): void {
   root.append(...mastersPanel(ledger, visibleOps(), selectedMaster, {
     select: (key, focus) => {
       selectedMaster = key;
+      masterKind = masterKindOf(key);
       renderMasters();
       document.getElementById(focus)!.focus();
     },
@@ -1986,6 +2000,8 @@ function renderMasters(): void {
     } }),
     query: masterQuery,
     setQuery: query => { masterQuery = query; },
+    kind: masterKind,
+    setKind: kind => { masterKind = kind; },
   }));
   wrapTables(root);
 }
@@ -2229,8 +2245,13 @@ const { askReplace, chooseRestoreFile, cancelRestoreFile, restoreFileChosen } = 
   clearCodeHolds: () => { codeHolds.project = null; codeHolds.location = null; },
 }, { load, replace, confirmedUnreadableReset, inquireReplacement, guard: guarded });
 
-document.getElementById('reset-seed')!.addEventListener('click', () => askReset('固定の架空データ', () => ({ ledger: seedLedger(), supply: emptySupply })));
-document.getElementById('reset-scn02')!.addEventListener('click', () => askReset('SCN-02の架空データ', seedScn02));
+// サンプルデータは開発と試験のためのもので、配布物の画面には出さない。値は scripts/bundle.mjs が埋め込む。
+declare const RELEASE_BUILD: boolean;
+if (RELEASE_BUILD) for (const id of ['reset-seed', 'reset-scn02']) document.getElementById(id)!.remove();
+else {
+  document.getElementById('reset-seed')!.addEventListener('click', () => askReset('固定の架空データ', () => ({ ledger: seedLedger(), supply: emptySupply })));
+  document.getElementById('reset-scn02')!.addEventListener('click', () => askReset('SCN-02の架空データ', seedScn02));
+}
 document.getElementById('reset-empty')!.addEventListener('click', () => askReset('空の台帳', () => ({ ledger: emptyLedger, supply: emptySupply })));
 const modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
 modeSelect.value = mode;

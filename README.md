@@ -48,6 +48,17 @@ npm.cmd run release:package
 
 `release:package`はコミット済みの入力からZIPを作ります。生成結果に示されたZIPを、`npm.cmd run release:smoke -- <ZIPのパス>`で検証できます。
 
+テストがコードの誤りを検出できるかは、[mutator](https://github.com/mizchi/mutator)で確認できます。通常は変更範囲を対象にし、必要に応じてファイルを絞ります。
+
+```powershell
+npm.cmd run test:mutation -- --since origin/main --include-test-changes --time-budget 300
+npm.cmd run test:mutation -- --include src/domain/code.ts --time-budget 120
+```
+
+全体を調べる場合は`npm.cmd run test:mutation`を使います。結果とキャッシュは`.mutator/`に保存します。時間上限で未実行になった変異は`Pending`です。現時点ではスコアによる合否閾値を設けていないため、終了コード0だけでは全変異の検出を意味しません。
+
+mutator 0.3.0のWindowsパス照合を補うため、専用の`vitest.mutator.config.mjs`を使い、dry runは毎回全テストを実行します。パッケージの更新時は、この回避設定が必要か確認してください。
+
 ## ライセンス
 
 [MIT License](LICENSE)で提供し、動作や目的への適合を保証しません。Excel出力に使うSheetJS Community Editionのライセンスは、配布ZIPの`web/dist/vendor/xlsx-LICENSE.txt`に同梱しています。

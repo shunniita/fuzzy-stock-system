@@ -32,10 +32,10 @@ test('生成した必要明細の変更を必要な数から選べる', () => {
   expect(operationGroups.find(group => group.id === 'requests')?.keys).toContain('templateNeedEdit');
 });
 
-test('必要明細の3操作は確定時にも同じ保存前検査を指定する', () => {
+test('必要明細の2操作は確定時にも同じ保存前検査を指定する', () => {
   const state = generated(), preflight = () => {};
   const ops = templateNeedsOps({ ledger: () => state.ledger, supply: () => state.supply }, () => 'ui', preflight);
-  for (const key of ['templateNeedGenerate', 'templateNeedBatch', 'templateNeedEdit']) expect(ops[key]?.validateBeforeSave).toBe(preflight);
+  for (const key of ['templateNeedGenerate', 'templateNeedEdit']) expect(ops[key]?.validateBeforeSave).toBe(preflight);
 });
 
 const values = (entries: Record<string, string | boolean>): Values => ({ text: key => typeof entries[key] === 'string' ? entries[key] : '', checked: key => entries[key] === true });

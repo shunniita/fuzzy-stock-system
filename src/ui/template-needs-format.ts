@@ -2,7 +2,9 @@ import { recipeVersion } from '../domain/receipt-template.ts';
 import { own, type Masters } from '../domain/masters.ts';
 import type { Need, Supply } from '../domain/supply.ts';
 import { templateNeedInfo, templateNeedSurplus as surplusOf, type TemplateNeedContext, type TemplateNeedVersion } from '../domain/template-needs.ts';
-import { jst } from './format.ts';
+import type { Quantity } from '../domain/quantity.ts';
+import type { TemplateNeedProgress } from '../domain/template-needs-progress.ts';
+import { jst, quantityText } from './format.ts';
 import type { State } from './supply-ui.ts';
 import { judgementText } from './supply-format.ts';
 
@@ -11,6 +13,12 @@ export function templateNeedVersionText(supply: Supply, version: TemplateNeedVer
   const saved = supply.log.slice(0, Math.max(0, introduced)).findLast(event => event.kind === 'receiptTemplateSave' && event.after.id === version.template.id);
   return `${version.id}（${saved ? `${jst(saved.recordedAt)}・${saved.actor}` : '保存の記録なし'}）`;
 }
+
+// 古い構成は製品の単位を持たないので「台」で出す。
+export const progressUnitOf = (progress: TemplateNeedProgress): string => progress.unit ?? '台';
+
+// 台数不明を含むときは小計も出さず「不明」とする（要件3.3）。
+export const progressUsedText = (used: Quantity, unit: string): string => used.kind === 'known' ? quantityText(used, unit) : '不明';
 
 export function templateNeedSurplusViewOf(state: State, need: Need): { value: number | null; caution: string } {
   const { value, judgement } = surplusOf(state.ledger, state.supply, need);

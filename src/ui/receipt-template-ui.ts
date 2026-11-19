@@ -1,6 +1,6 @@
-import { deleteReceiptTemplate, receiptTemplateRowLimit, receiveTemplate, saveReceiptTemplate, type ReceiptRoute, type ReceiptTemplate } from '../domain/receipt-template.ts';
+import { deleteReceiptTemplate, receiptTemplateRowLimit, receiveTemplate, saveReceiptTemplate, type ReceiptInput, type ReceiptRoute, type ReceiptTemplate } from '../domain/receipt-template.ts';
 import { expandAssemblyRecipe, normalizeAssemblyRecipe, type ExpandedAssemblyRow } from '../domain/assembly-recipes.ts';
-import { own, quantityStepOf } from '../domain/masters.ts';
+import { own, quantityStepOf, type Masters } from '../domain/masters.ts';
 import { subtractScalar } from '../domain/scalar.ts';
 import { checkField, choiceField, h, selectField, textField, type Values } from './dom.ts';
 import { placeOptions, projectField, projectKey, projectOf, quantityValue } from './fields.ts';
@@ -142,12 +142,30 @@ function previewRow(ctx: Ctx, root: HTMLElement, row: ExpandedAssemblyRow, index
   root.append(h('p', {}, `明細${position}：${itemRef(masters, row.item)}／予定${planned}${row.unit}（製品1${productUnit}あたり${row.perSet}${row.unit}）／${locationRef(masters, row.location)}／最小単位${step}`), shortfall, actual);
 }
 
-function routesOf(template: ReceiptTemplate, value: (name: string) => string): ReceiptRoute[] {
+export function templateReceiptRowsView(ctx: Ctx, template: ReceiptTemplate, sets: number, routes: readonly ReceiptRoute[]): HTMLElement {
+  const root = h('div', {});
+  expandAssemblyRecipe(ctx.ledger().masters, template, sets, routes).forEach((row, i) => previewRow(ctx, root, row, i, template.productUnit ?? '個'));
+  return root;
+}
+
+export function templateReceiptInputsOf(masters: Masters, template: ReceiptTemplate, sets: number, routes: readonly ReceiptRoute[], v: Values): ReceiptInput[] {
+  return expandAssemblyRecipe(masters, template, sets, routes).map((row, i) => {
+    const step = quantityStepOf(masters, row.item, row.unit);
+    return { quantity: quantityValue(v.text(`actual${i}`), step), shortfall: quantityValue(v.text(`shortfall${i}`) || '0', step) };
+  });
+}
+
+export function routesOf(template: ReceiptTemplate, value: (name: string) => string): ReceiptRoute[] {
   return template.rows.map((row, i) => {
     const route = value(`route${i}`) || 'assembled';
     if (route !== 'assembled' && (route !== 'parts' || !row.assembly)) throw new Error('受け取り経路を選んでください');
     return route;
   });
+}
+
+export function templateRouteFields(ctx: Ctx, template: ReceiptTemplate | undefined): HTMLElement[] {
+  return template?.rows.flatMap((row, i) => row.assembly ? [h('p', {}, `明細${i + 1}：${itemRef(ctx.ledger().masters, row.item)}／${row.perSet}${row.unit}`), assemblyReference(ctx, row.assembly),
+    selectField(`route${i}`, `明細${i + 1}の受け取り経路`, [['assembled', '組立済みで受け取り'], ['parts', '自作分の部品を受け取り']], 'assembled')] : []) ?? [];
 }
 
 function receiptFields(ctx: Ctx): HTMLElement[] {
@@ -166,15 +184,10 @@ function receiptFields(ctx: Ctx): HTMLElement[] {
     // 案件・用途の詳細から固定した案件は、セットに登録した案件で上書きしない（記録時の照合は固定した値で行う）。
     if (!p.disabled && template?.project && [...p.options].some(o => o.value === projectKey(template.project!))) p.value = projectKey(template.project);
     if (setsLabel) setsLabel.textContent = template?.productUnit ? `製作数量（${template.productUnit}・正の整数）` : '製作個数（正の整数）';
-    references.replaceChildren();
-    template?.rows.forEach((row, i) => {
-      if (!row.assembly) return;
-      const route = selectField(`route${i}`, `明細${i + 1}の受け取り経路`, [['assembled', '組立済みで受け取り'], ['parts', '自作分の部品を受け取り']], 'assembled');
-      route.addEventListener('change', clear);
-      references.append(h('p', {}, `明細${i + 1}：${itemRef(ctx.ledger().masters, row.item)}／${row.perSet}${row.unit}`), assemblyReference(ctx, row.assembly), route);
-    });
+    references.replaceChildren(...templateRouteFields(ctx, template));
     clear();
   });
+  references.addEventListener('change', clear);
   sets.addEventListener('input', clear);
   project.addEventListener('change', clear);
   preview.addEventListener('click', () => {
@@ -183,9 +196,9 @@ function receiptFields(ctx: Ctx): HTMLElement[] {
       if (!template) throw new Error('セットを選んでください');
       const routes = routesOf(template, name => references.querySelector<HTMLSelectElement>(`[name=${name}]`)?.value ?? '');
       const count = quantityValue(sets.querySelector('input')!.value, 1), projectValue = projectOf({ text: () => project.querySelector('select')!.value, checked: () => false });
-      const planned = expandAssemblyRecipe(ctx.ledger().masters, template, count, routes);
+      const rows = templateReceiptRowsView(ctx, template, count, routes);
       root.replaceChildren(h('p', {}, `${templateLabel(ctx, template)}／${project.querySelector('select')!.selectedOptions[0]?.textContent ?? ''}／${basisLabel[template.basis]}。不足数を入れると今回受け取った数は「予定−不足」になります。不足のある明細は手配先への依頼として記録し、後日の到着は依頼への割り当てで受けます。`));
-      planned.forEach((row, i) => previewRow(ctx, root, row, i, template.productUnit ?? '個'));
+      root.append(rows);
       signature.value = receiptPreviewSignature(template, projectValue, count, routes); changed(root);
     } catch (error) { clear(); root.append(h('p', { class: 'error', role: 'status' }, error instanceof Error ? error.message : String(error))); }
   });
@@ -225,10 +238,7 @@ export function receiptTemplateOps(ctx: Ctx): Record<string, UiOp> {
         const sets = quantityValue(v.text('sets'), 1), routes = routesOf(template, name => v.text(name)), project = projectOf(v);
         if (receiptPreviewSignature(template, project, sets, routes) !== v.text('templateRevision')) throw new Error('現在のセットから予定数を展開してください');
         if (!v.checked('templateConfirmed')) throw new Error('案件・用途・明細・不足数・今回受け取った数・根拠・場所を確認してください');
-        const inputs = expandAssemblyRecipe(state.ledger.masters, template, sets, routes).map((row, i) => {
-          const step = quantityStepOf(state.ledger.masters, row.item, row.unit);
-          return { quantity: quantityValue(v.text(`actual${i}`), step), shortfall: quantityValue(v.text(`shortfall${i}`) || '0', step) };
-        });
+        const inputs = templateReceiptInputsOf(state.ledger.masters, template, sets, routes, v);
         const vendor = inputs.some(row => row.shortfall > 0) ? v.text('vendor') : null;
         return { state: receiveTemplate(state, meta, template.id, project, sets, inputs, vendor, routes) };
       },
