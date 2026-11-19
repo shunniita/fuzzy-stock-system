@@ -187,14 +187,14 @@ test('最終itemLabels込みUTF-8 1MiBの直前・一致を許し、1byte超過�
 
 test('8.1 異なるセットの同じ品目も、履歴とExcelで案件ごとの数量へ明示的に結び付ける', () => {
   const state = saved();
-  const supply = saveReceiptTemplate(state.ledger, state.supply, meta('op2'), { id: 'inspection', name: '架空検査セット', product: 'R', basis: 'label', rows: [{ item: 'P', unit: '個', perSet: 3, location: 'S1' }] });
+  const supply = saveReceiptTemplate(state.ledger, state.supply, meta('op2'), { id: 'inspection', name: '架空分け先セット', product: 'R', basis: 'label', rows: [{ item: 'P', unit: '個', perSet: 3, location: 'S1' }] });
   const result = generateTemplateNeedsBatch({ ...state, supply }, meta('op3'), { group: { assemblyIndex: 0, mode: 'same', split: null }, dueDate: '2026-11-01', projects: [{ templateId: 'kit', caseCode: '000001', count: 40 }, { templateId: 'inspection', caseCode: '000002', count: 40 }] });
   const event = result.supply.log.at(-1)!;
   const text = supplyEventText(result.ledger.masters, event), chunks = text.split('；');
   expect(chunks).toHaveLength(2);
   expect(chunks[0]).toMatch(/000001.*架空セット.*40台.*セット版op3-v1.*品目.*P.*80個/);
   expect(chunks[0]).not.toContain('120個');
-  expect(chunks[1]).toMatch(/000002.*架空検査セット.*40台.*セット版op3-v2.*品目.*P.*120個/);
+  expect(chunks[1]).toMatch(/000002.*架空分け先セット.*40台.*セット版op3-v2.*品目.*P.*120個/);
   expect(chunks[1]).not.toContain('80個');
   expect(text).toContain('同じ台数');
   expect(viewSheetsOf(result, meta('op3').recordedAt).find(sheet => sheet.name === '供給の履歴')?.rows.at(-1)?.[5]).toBe(text);
