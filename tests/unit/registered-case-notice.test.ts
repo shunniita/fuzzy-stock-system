@@ -40,10 +40,11 @@ describe('登録済み案件の案内 2.1・2.2・2.4・2.5', () => {
     expect(registeredCaseNoticeOf(state(), 'ZZ', 'register')).toBeNull();
   });
 
-  test('生成用は品番・コードなしの案件の内部ID一致でも出て、利用停止中の文を完全一致で出す', () => {
-    expect(registeredCaseNoticeOf(withCases(state(), { ZZ: { ...noCode, active: false } }), 'ZZ', 'generate')).toEqual({
-      caseId: 'ZZ',
-      lines: ['品番・コード 品番・コードなし（仮）', '名称 なし', '利用停止', '案件ID ZZ は利用停止中'],
+  test('生成用も品番・コードなしの案件の内部IDでは出ない。利用停止中の文を完全一致で出す', () => {
+    expect(registeredCaseNoticeOf(state(), 'ZZ', 'generate')).toBeNull();
+    expect(registeredCaseNoticeOf(withCases(state(), { YY: { ...noCode, id: 'YY', code: 'YY', active: false } }), 'YY', 'generate')).toEqual({
+      caseId: 'YY',
+      lines: ['品番・コード YY', '名称 なし', '利用停止', '案件ID YY は利用停止中'],
     });
   });
 
@@ -68,11 +69,11 @@ describe('登録済み案件の案内 2.1・2.2・2.4・2.5', () => {
 
   test('照合した案件のIDを返す（「この案件を開く」はこのIDで開く）', () => {
     expect(registeredCaseNoticeOf(state(), 'A-001', 'register')?.caseId).toBe('A-001');
-    expect(registeredCaseNoticeOf(state(), 'ZZ', 'generate')?.caseId).toBe('ZZ');
+    expect(registeredCaseNoticeOf(state(), 'A-001', 'generate')?.caseId).toBe('A-001');
   });
 
-  test('生成用の照合が曖昧なときは例外をそのまま投げる', () => {
-    const ambiguous = withCases(state(), { YY: { ...noCode, id: 'YY', code: 'ZZ' } });
-    expect(() => registeredCaseNoticeOf(ambiguous, 'ZZ', 'generate')).toThrow('案件ID ZZ の対応が曖昧。登録情報を確認する');
+  test('品番・コードなしの案件の内部IDと同じ品番・コードを持つ案件があれば、その案件だけを示す（曖昧にしない）', () => {
+    const coded = withCases(state(), { YY: { ...noCode, id: 'YY', code: 'ZZ' } });
+    expect(registeredCaseNoticeOf(coded, 'ZZ', 'generate')?.caseId).toBe('YY');
   });
 });

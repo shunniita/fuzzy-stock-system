@@ -1,6 +1,7 @@
-import { buildTemplateNeedGeneration, generateTemplateNeeds, templateNeedContextOf, type TemplateNeedGenerationInput } from '../domain/template-needs.ts';
+import { refOf } from '../domain/masters.ts';
+import { buildTemplateNeedGeneration, generateTemplateNeeds, generationTargetsOf, templateNeedContextOf, type TemplateNeedGenerationInput } from '../domain/template-needs.ts';
 import { recordTemplateNeeds } from '../domain/supply.ts';
-import { choiceField, checkField, h, textField, type Values } from './dom.ts';
+import { choiceField, checkField, h, selectField, textField, type Values } from './dom.ts';
 import { quantityValue } from './fields.ts';
 import { attachRegisteredCaseNotice } from './registered-case-notice.ts';
 import type { Ctx, State, UiOp } from './supply-ui.ts';
@@ -9,13 +10,23 @@ export { templateNeedPreviewSignature } from './template-needs-preview.ts';
 import { templateNeedEditOp } from './template-needs-edit-ui.ts';
 
 function generationInput(v: Values): TemplateNeedGenerationInput {
-  return { templateId: v.text('needTemplate'), caseCode: v.text('needCase'), count: quantityValue(v.text('needCount'), 1), dueDate: v.text('needDue') || null };
+  const caseId = v.text('needCaseTarget');
+  return { templateId: v.text('needTemplate'), caseCode: caseId === '' ? v.text('needCase') : '', ...(caseId === '' ? {} : { caseId }), count: quantityValue(v.text('needCount'), 1), dueDate: v.text('needDue') || null };
 }
+
+const targetLabel = (state: State, id: string): string => {
+  const m = state.ledger.masters.cases[id]!;
+  return m.code !== null && m.name !== null ? `${m.code}「${m.name}」` : refOf(state.ledger.masters.cases, id);
+};
 
 function generationFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFormElement | null, state: State) => void): HTMLElement[] {
   const state = { ledger: ctx.ledger(), supply: ctx.supply() }, options = templateNeedOptions(state);
   const caseField = textField('needCase', '案件ID');
-  const fields = h('div', {}, choiceField('needTemplate', 'セット', options), caseField, attachRegisteredCaseNotice(caseField, ctx, 'generate'), textField('needCount', '台数', 'integer'), textField('needDue', '必要日（省略可）', 'date'));
+  // 品番・コードのない案件・用途は案件IDで指せないので、内部IDを出さずに一覧から選ぶ。
+  const target = selectField('needCaseTarget', '対象', [['', '案件IDで指定する（未登録なら登録する）'], ...generationTargetsOf(state).map(m => [m.id, targetLabel(state, m.id)] as const)]);
+  const byCode = h('div', {}, caseField, attachRegisteredCaseNotice(caseField, ctx, 'generate'));
+  target.querySelector('select')!.addEventListener('change', event => { byCode.hidden = caseField.hidden = (event.target as HTMLSelectElement).value !== ''; });
+  const fields = h('div', {}, choiceField('needTemplate', 'セット', options), target, byCode, textField('needCount', '台数', 'integer'), textField('needDue', '必要日（省略可）', 'date'));
   const signature = h('input', { type: 'hidden', name: 'needPreview', value: '' });
   const root = h('div', { 'data-need-preview': '', 'aria-live': 'polite' });
   const confirm = checkField('needConfirmed', '案件ID・版・必要明細を確認した');
