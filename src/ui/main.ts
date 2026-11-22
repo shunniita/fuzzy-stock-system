@@ -2229,8 +2229,13 @@ const { askReplace, chooseRestoreFile, cancelRestoreFile, restoreFileChosen } = 
   clearCodeHolds: () => { codeHolds.project = null; codeHolds.location = null; },
 }, { load, replace, confirmedUnreadableReset, inquireReplacement, guard: guarded });
 
-document.getElementById('reset-seed')!.addEventListener('click', () => askReset('固定の架空データ', () => ({ ledger: seedLedger(), supply: emptySupply })));
-document.getElementById('reset-scn02')!.addEventListener('click', () => askReset('SCN-02の架空データ', seedScn02));
+// サンプルデータは開発と試験のためのもので、配布物の画面には出さない。値は scripts/bundle.mjs が埋め込む。
+declare const RELEASE_BUILD: boolean;
+if (RELEASE_BUILD) for (const id of ['reset-seed', 'reset-scn02']) document.getElementById(id)!.remove();
+else {
+  document.getElementById('reset-seed')!.addEventListener('click', () => askReset('固定の架空データ', () => ({ ledger: seedLedger(), supply: emptySupply })));
+  document.getElementById('reset-scn02')!.addEventListener('click', () => askReset('SCN-02の架空データ', seedScn02));
+}
 document.getElementById('reset-empty')!.addEventListener('click', () => askReset('空の台帳', () => ({ ledger: emptyLedger, supply: emptySupply })));
 const modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
 modeSelect.value = mode;

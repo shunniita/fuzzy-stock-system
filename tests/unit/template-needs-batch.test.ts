@@ -79,7 +79,7 @@ test.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('3.4 不正�
   expect(JSON.stringify(state)).toBe(before);
 });
 
-test('3.2,3.6 合計不一致と同数方式の検査用複数件を拒否し、差を正確に示す', () => {
+test('3.2,3.6 合計不一致と同数方式の分け先複数件を拒否し、差を正確に示す', () => {
   const input = split();
   expect(() => generateTemplateNeedsBatch(saved(), meta('gen'), { ...input, projects: input.projects.map((project, index) => index === 1 ? { ...project, count: 19 } : project) })).toThrow('差は-1台');
   expect(() => generateTemplateNeedsBatch(saved(), meta('gen'), { ...input, group: { assemblyIndex: 0, mode: 'same', split: null } })).toThrow('同数');
@@ -112,8 +112,8 @@ test('3.10 現物・依頼・他案件を変えず、案件別に不足を分け
   for (const project of ['000A', '000I']) expect(shortageOf(result.ledger, result.supply, { project: { kind: 'case', id: project }, item: 'P', unit: '個' }).shortage).toBe(80);
 });
 
-test('組立・検査の別セットを各一回だけ導入し、保存後も全案件と原文コードを保つ', () => {
-  const base = saved(), other = { id: 'inspection', name: '架空検査セット', product: 'Q', basis: 'label', rows: [{ item: 'P', unit: '個', perSet: 3, location: 'S1' }] } satisfies Omit<ReceiptTemplate, 'project'>;
+test('元と分け先の別セットを各一回だけ導入し、保存後も全案件と原文コードを保つ', () => {
+  const base = saved(), other = { id: 'inspection', name: '架空分け先セット', product: 'Q', basis: 'label', rows: [{ item: 'P', unit: '個', perSet: 3, location: 'S1' }] } satisfies Omit<ReceiptTemplate, 'project'>;
   const supply = saveReceiptTemplate(base.ledger, base.supply, meta('save-other'), other), input = split();
   const result = generateTemplateNeedsBatch({ ...base, supply }, meta('gen'), { ...input, projects: input.projects.map((project, index) => index === 0 ? project : { ...project, templateId: other.id }) });
   expect(result.supply.log.at(-1)).toMatchObject({ versions: [{ id: 'gen-v1' }, { id: 'gen-v2' }] });
@@ -130,7 +130,7 @@ const corruptions: [string, (value: ReturnType<typeof wire>) => void][] = [
   ['合計', value => { value.supply.log[1].plansAfter[1].count = 19; }],
   ['方式', value => { value.supply.log[1].group.mode = 'same'; value.supply.log[1].group.split = null; }],
   ['分割0', value => { value.supply.log[1].group.split = 0; }],
-  ['組立位置', value => { value.supply.log[1].group.assemblyIndex = 1; }],
+  ['元の位置', value => { value.supply.log[1].group.assemblyIndex = 1; }],
   ['group欠落', value => { value.supply.log[1].group = null; }],
   ['計画欠落', value => { value.supply.log[1].plansAfter.pop(); }],
   ['案件重複', value => { value.supply.log[1].plansAfter[1].project = value.supply.log[1].plansAfter[0].project; }],

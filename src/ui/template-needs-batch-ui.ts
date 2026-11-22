@@ -18,26 +18,26 @@ export function templateNeedBatchInput(v: Values): TemplateNeedBatchInput {
 
 function batchFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFormElement | null, state: State) => void): HTMLElement[] {
   const state = { ledger: ctx.ledger(), supply: ctx.supply() }, options = templateNeedOptions(state);
-  const mode = selectField('needMode', '生成方法', [['same', '同じ台数'], ['split', '検査用を分割']]);
+  const mode = selectField('needMode', '生成方法', [['same', '同じ台数'], ['split', '分け先を分割']]);
   const split = textField('needSplit', '分割台数', 'integer');
   split.querySelector('input')!.value = String(defaultTemplateNeedSplit(state.supply));
   const rows = h('div', { 'data-inspection-rows': '' });
-  const size = h('input', { type: 'hidden', name: 'needRows', value: '0', 'data-conflict-label': '検査用の案件数' });
+  const size = h('input', { type: 'hidden', name: 'needRows', value: '0', 'data-conflict-label': '分け先の案件数' });
   const signature = h('input', { type: 'hidden', name: 'needPreview', value: '' });
   const root = h('div', { 'data-need-preview': '', 'aria-live': 'polite' });
   const confirmed = checkField('needConfirmed', '全案件のID・版・必要明細を確認した');
   const confirmation = confirmed.querySelector('input')!;
   confirmation.dataset['receiptConfirm'] = ''; confirmation.disabled = true;
   const clear = () => { signature.value = ''; root.replaceChildren(); confirmation.checked = false; confirmation.disabled = true; };
-  const fields = h('div', {}, choiceField('needAssemblyTemplate', '組立用セット', options), choiceField('needInspectionTemplate', '検査用セット', options),
-    textField('needAssemblyCase', '組立用の案件ID'), textField('needAssemblyCount', '組立用の台数', 'integer'), mode, split, textField('needDue', '必要日（省略可）', 'date'), rows, size);
+  const fields = h('div', {}, choiceField('needAssemblyTemplate', '元のセット', options), choiceField('needInspectionTemplate', '分け先のセット', options),
+    textField('needAssemblyCase', '元の案件ID'), textField('needAssemblyCount', '元の台数', 'integer'), mode, split, textField('needDue', '必要日（省略可）', 'date'), rows, size);
   const values: Values = { text: name => fields.querySelector<HTMLInputElement | HTMLSelectElement>(`[name=${name}]`)?.value ?? '', checked: () => false };
   const showRows = (counts: readonly string[], ids: readonly string[]) => {
     rows.replaceChildren(...counts.map((count, index) => {
-      const id = textField(`needInspectionCase${index}`, `検査用${index + 1}の案件ID`), amount = textField(`needInspectionCount${index}`, `検査用${index + 1}の台数`, 'integer');
+      const id = textField(`needInspectionCase${index}`, `分け先${index + 1}の案件ID`), amount = textField(`needInspectionCount${index}`, `分け先${index + 1}の台数`, 'integer');
       id.querySelector('input')!.value = ids[index] ?? ''; amount.querySelector('input')!.value = count;
       amount.querySelector('input')!.readOnly = values.text('needMode') === 'same';
-      const remove = h('button', { type: 'button', 'aria-label': `検査用${index + 1}の案件を削除` }, '削除');
+      const remove = h('button', { type: 'button', 'aria-label': `分け先${index + 1}の案件を削除` }, '削除');
       remove.hidden = values.text('needMode') === 'same' || counts.length < 2;
       remove.addEventListener('click', () => showRows(currentCounts().filter((_, row) => row !== index), currentIds().filter((_, row) => row !== index)));
       return h('div', {}, id, amount, remove);
@@ -47,7 +47,7 @@ function batchFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFor
   const currentIds = () => Array.from({ length: Number(size.value) }, (_, index) => values.text(`needInspectionCase${index}`));
   const currentCounts = () => Array.from({ length: Number(size.value) }, (_, index) => values.text(`needInspectionCount${index}`));
   const error = (caught: unknown) => { clear(); root.append(h('p', { role: 'status', class: 'error' }, caught instanceof Error ? caught.message : String(caught))); };
-  const propose = h('button', { type: 'button' }, '検査用の台数を提案');
+  const propose = h('button', { type: 'button' }, '分け先の台数を提案');
   propose.addEventListener('click', () => {
     try {
       const count = quantityValue(values.text('needAssemblyCount'), 1);
@@ -55,7 +55,7 @@ function batchFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFor
       showRows(counts.map(String), currentIds());
     } catch (caught) { error(caught); }
   });
-  const add = h('button', { type: 'button' }, '検査用の案件を追加');
+  const add = h('button', { type: 'button' }, '分け先の案件を追加');
   add.addEventListener('click', () => { if (Number(size.value) >= templateNeedProjectLimit - 1) { error(new Error(`一度に生成できる案件は${templateNeedProjectLimit}件までです`)); return; } showRows([...currentCounts(), ''], currentIds()); });
   const preview = h('button', { type: 'button' }, '全案件の必要明細をプレビュー');
   preview.addEventListener('click', () => {
@@ -94,7 +94,7 @@ function batchFields(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFor
 }
 
 export function templateNeedBatchOp(ctx: Ctx, nextOpId: () => string, preflight: (form: HTMLFormElement | null, state: State) => void): UiOp {
-  return { label: '組立用と検査用をまとめて生成', fields: () => batchFields(ctx, nextOpId, preflight), validateBeforeSave: preflight, run: (state, meta, values) => {
+  return { label: '2つのセットでまとめて生成', fields: () => batchFields(ctx, nextOpId, preflight), validateBeforeSave: preflight, run: (state, meta, values) => {
     const input = templateNeedBatchInput(values);
     if (values.text('needPreview') !== templateNeedPreviewSignature(state, input)) throw new Error('現在の入力と記録から全案件をプレビューし直してください');
     if (!values.checked('needConfirmed')) throw new Error('全案件のID・版・必要明細を確認してください');
