@@ -44,7 +44,7 @@ export const opLabels = {
   requestCancel: '依頼の取消',
   receive: '受け取り',
   templateNeedGenerate: 'セットから必要明細を生成',
-  templateNeedBatch: '組立用と検査用をまとめて生成',
+  templateNeedBatch: '2つのセットでまとめて生成',
   templateNeedEdit: '生成した必要明細の変更',
   templateSave: 'セットの登録・変更',
   templateDelete: 'セットの削除',

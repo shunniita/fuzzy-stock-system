@@ -5,11 +5,14 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export const manualNames = ['README', '01-getting-started', '02-guide', '03-reference', '04-troubleshooting', '05-checklist', '06-sets'];
+
 export const releaseFiles = [
   { source: 'LICENSE', path: 'LICENSE', eol: 'crlf' },
   { source: 'start-local.cmd', path: 'start-local.cmd', eol: 'crlf' },
   { source: 'manual/RELEASE_README.md', path: 'README.md', eol: 'lf' },
-  ...['README', '01-getting-started', '02-guide', '03-reference', '04-troubleshooting', '05-checklist', '06-sets'].map(name => ({ source: `manual/${name}.md`, path: `manual/${name}.md`, eol: 'lf' })),
+  ...manualNames.map(name => ({ source: `manual/${name}.md`, path: `manual/${name}.md`, eol: 'lf' })),
+  ...manualNames.map(name => ({ source: `web/dist/manual/${name}.pdf`, path: `manual/${name}.pdf` })),
   { source: 'web/help.html', path: 'web/help.html', eol: 'lf' },
   { source: 'web/index.html', path: 'web/index.html', eol: 'lf' },
   { source: 'web/style.css', path: 'web/style.css', eol: 'lf' },
@@ -103,7 +106,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
     checkRawInputs(checkout);
     const npm = join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
     execFileSync(process.execPath, [npm, 'ci', '--allow-remote=all', '--prefer-offline', '--no-audit', '--no-fund'], { cwd: checkout, windowsHide: true, stdio: ['ignore', 2, 2] });
-    execFileSync(process.execPath, [join(checkout, 'scripts/build.mjs')], { cwd: checkout, windowsHide: true, stdio: ['ignore', 2, 2] });
+    execFileSync(process.execPath, [join(checkout, 'scripts/build.mjs'), '--release'], { cwd: checkout, windowsHide: true, stdio: ['ignore', 2, 2] });
     if (execFileSync('git', ['rev-parse', 'HEAD'], { ...options, cwd: checkout }).trim() !== revision || execFileSync('git', ['status', '--porcelain', '--untracked-files=all', '--', ...inputs], { ...options, cwd: checkout }).trim()) throw new Error('ビルド中に配布入力が変わったため作成しません。');
     checkRawInputs(checkout);
     checkCommittedInputs(checkout);

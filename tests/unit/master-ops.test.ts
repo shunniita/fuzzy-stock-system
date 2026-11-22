@@ -39,11 +39,11 @@ describe('F1-B 3.1・要件1 登録情報の登録', () => {
   test('1.2・1.3・1.4: 場所（記録の対象の内外を選ぶ）・案件・用途（元の資料の名称と版）・担当者を登録する', () => {
     let l = change(practiceLedger, 'm1', { action: 'register', master: { type: 'location', code: 'S3', name: '棚S3', trial: true, inScope: true } });
     l = change(l, 'm2', { action: 'register', master: { type: 'location', code: 'W', name: '別棟の倉庫W', trial: false, inScope: false } });
-    l = change(l, 'm3', { action: 'register', master: { type: 'case', code: 'A-003', name: '架空機種K', source: { name: '架空案件・用途K', revision: '初版' } } });
+    l = change(l, 'm3', { action: 'register', master: { type: 'case', code: 'A-003', name: '架空製品K', source: { name: '架空案件・用途K', revision: '初版' } } });
     l = change(l, 'm4', { action: 'register', master: { type: 'actor', name: '架空担当C' } });
     expect(l.masters.locations.S3?.scope).toEqual([{ from: null, inScope: true }]);
     expect(l.masters.locations.W?.scope).toEqual([{ from: null, inScope: false }]);
-    expect(l.masters.cases['A-003']).toMatchObject({ code: 'A-003', name: '架空機種K', source: { name: '架空案件・用途K', revision: '初版' } });
+    expect(l.masters.cases['A-003']).toMatchObject({ code: 'A-003', name: '架空製品K', source: { name: '架空案件・用途K', revision: '初版' } });
     expect(l.masters.actors['架空担当C']).toEqual({ type: 'actor', id: '架空担当C', active: true });
   });
 

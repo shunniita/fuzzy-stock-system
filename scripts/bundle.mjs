@@ -14,4 +14,5 @@ await build({
   charset: 'utf8',
   external: ['xlsx'],
   logLevel: 'info',
+  define: { RELEASE_BUILD: String(process.argv.includes('--release')) },
 });

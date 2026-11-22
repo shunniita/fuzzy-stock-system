@@ -130,16 +130,16 @@ test('案件IDの前後の空白は入力を残して生成を止める', async 
   expect((await snapshotOf(page)).ledger).toEqual(before.ledger);
 });
 
-test('検査用の行の削除は選んだ行だけを除き、他行の手入力台数とIDを保つ', async ({ page }) => {
+test('分け先の行の削除は選んだ行だけを除き、他行の手入力台数とIDを保つ', async ({ page }) => {
   await startEmpty(page);
   const id = await createSet(page), form = formOf(page);
   await selectOperation(form.locator('[name=op]'), 'templateNeedBatch');
   await form.locator('[name=needAssemblyTemplate]').selectOption(id); await form.locator('[name=needInspectionTemplate]').selectOption(id);
   await form.locator('[name=needAssemblyCount]').fill('50'); await form.locator('[name=needMode]').selectOption('split');
-  await form.getByRole('button', { name: '検査用の台数を提案', exact: true }).click();
+  await form.getByRole('button', { name: '分け先の台数を提案', exact: true }).click();
   for (let index = 0; index < 3; index++) await form.locator(`[name=needInspectionCase${index}]`).fill(`00000${index + 1}`);
   await form.locator('[name=needInspectionCount2]').fill('17');
-  await form.getByRole('button', { name: '検査用2の案件を削除', exact: true }).click();
+  await form.getByRole('button', { name: '分け先2の案件を削除', exact: true }).click();
   await expect(form.locator('[name=needRows]')).toHaveValue('2');
   await expect(form.locator('[name=needInspectionCase0]')).toHaveValue('000001');
   await expect(form.locator('[name=needInspectionCount0]')).toHaveValue('20');
@@ -147,7 +147,7 @@ test('検査用の行の削除は選んだ行だけを除き、他行の手入�
   await expect(form.locator('[name=needInspectionCount1]')).toHaveValue('17');
   await expect(form.locator('[name=needConfirmed]')).toBeDisabled();
   await form.locator('[name=needMode]').selectOption('same');
-  await expect(form.getByRole('button', { name: '検査用1の案件を削除', exact: true })).toBeHidden();
+  await expect(form.getByRole('button', { name: '分け先1の案件を削除', exact: true })).toBeHidden();
   await form.locator('[name=needMode]').selectOption('split');
   await expect(form.locator('[name=needInspectionCase1]')).toHaveValue('000003');
   await expect(form.locator('[name=needInspectionCount1]')).toHaveValue('17');
@@ -238,7 +238,7 @@ test('3.3–3.5 分割90台は20/20/20/20/10を提案し、ID原文と手編集�
   await form.locator('[name=needAssemblyCount]').fill('90');
   await form.locator('[name=needMode]').selectOption('split');
   await expect(form.locator('[name=needSplit]')).toHaveValue('20');
-  await form.getByRole('button', { name: '検査用の台数を提案', exact: true }).click();
+  await form.getByRole('button', { name: '分け先の台数を提案', exact: true }).click();
   for (const [index, count] of ['20', '20', '20', '20', '10'].entries()) {
     await expect(form.locator(`[name=needInspectionCount${index}]`)).toHaveValue(count);
     await expect(form.locator(`[name=needInspectionCase${index}]`)).toHaveValue('');
@@ -255,12 +255,12 @@ test('3.3–3.5 分割90台は20/20/20/20/10を提案し、ID原文と手編集�
   await form.locator('[name=needMode]').selectOption('same');
   await expect(form.locator('[name=needInspectionCount0]')).toHaveValue('90');
   await expect(form.locator('[name=needInspectionCase0]')).toHaveValue('000021');
-  await expect(form.getByRole('button', { name: '検査用の案件を追加', exact: true })).toBeHidden();
+  await expect(form.getByRole('button', { name: '分け先の案件を追加', exact: true })).toBeHidden();
   await form.locator('[name=needMode]').selectOption('split');
   await expect(form.locator('[name=needInspectionCount3]')).toHaveValue('19');
   await expect(form.locator('[name=needInspectionCount4]')).toHaveValue('1');
   await expect(form.locator('[name=needInspectionCase4]')).toHaveValue('000025');
-  await form.getByRole('button', { name: '検査用の台数を提案', exact: true }).click();
+  await form.getByRole('button', { name: '分け先の台数を提案', exact: true }).click();
   for (let index = 0; index < 5; index++) await expect(form.locator(`[name=needInspectionCase${index}]`)).toHaveValue(`00002${index + 1}`);
   await form.getByRole('button', { name: '全案件の必要明細をプレビュー', exact: true }).click();
   await expect(form.getByRole('table', { name: '生成する必要明細' })).toHaveCount(6);
@@ -289,7 +289,7 @@ test('FT-14, 8.2 共有保存のnative中断・応答喪失・照会・再試行
     const opId = storage.nextOpIdOf(loaded.snapshot), at = '2026-10-30T12:00:00+09:00';
     const input = { group: { assemblyIndex: 0, mode: 'same', split: null } as const, dueDate: null, projects: [{ templateId, caseCode: '000030', count: 40 }, { templateId, caseCode: '000031', count: 40 }] };
     const after = generateTemplateNeedsBatch(loaded.snapshot, { eventId: opId, actor: '架空担当A', occurredAt: at, recordedAt: at }, input);
-    const opLabel = '組立用と検査用をまとめて生成', values = { input: JSON.stringify(input) };
+    const opLabel = '2つのセットでまとめて生成', values = { input: JSON.stringify(input) };
     const op = { opId, opLabel, values, fingerprint: storage.fingerprintOf(opLabel, values), actor: '架空担当A', startedAt: at, savingSince: at };
     const units = [{ ...after, conflictReviews: [], targets: storage.targetsOf(loaded.snapshot, after) }];
     const before = await authority.read();

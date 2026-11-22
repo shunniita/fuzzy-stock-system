@@ -90,7 +90,7 @@ function supplyEventDetails(m: Masters, e: SupplyEvent, ref: ItemFormatter, vers
         const changes = e.changes.filter(change => change.after.project.id === plan.project);
         return `${projectText(m, { kind: 'case', id: plan.project })}・セット「${changes[0]?.after.source ?? '不明'}」・${plan.count}台・セット版${plan.version}：${changes.map(change => `品目${ref(change.after.item)}・${needQuantityText(change.after.required, change.after.unit)}・必要日${change.after.dueDate ?? 'なし'}`).join('、')}`;
       });
-      return `${e.group === null ? 'セットから必要明細を生成' : `組立用と検査用をまとめて生成（${e.group.mode === 'same' ? '同じ台数' : `分割${e.group.split}台`}）`}：${projects.join('；')}`;
+      return `${e.group === null ? 'セットから必要明細を生成' : `2つのセットでまとめて生成（${e.group.mode === 'same' ? '同じ台数' : `分割${e.group.split}台`}）`}：${projects.join('；')}`;
     }
     case 'receiptTemplateSave': return `セットの${e.before === null ? '登録' : '変更'}：${e.before === null ? '' : `${receiptTemplateText(m, e.before, ref)} → `}${receiptTemplateText(m, e.after, ref)}`;
     case 'receiptTemplateDelete': return `セットの削除：${receiptTemplateText(m, e.before, ref)}（過去の受け取りは保持）`;

@@ -23,7 +23,7 @@ async function registerMasters(page: Page) {
   expect(empty.supply.needs).toEqual({});
   await recorded(page, 'masterActor', { name: '架空担当' });
   await recorded(page, 'masterLocation', { code: 'S1', name: '架空棚', inScope: 'true' });
-  for (const [code, name, units] of [['P', '架空組立部品', '個'], ['Q', '架空検査部品', '個'], ['R_ASSY', '架空機種_ASSY', '台'], ['R', '架空機種', '台']] as const) {
+  for (const [code, name, units] of [['P', '架空部品P', '個'], ['Q', '架空部品Q', '個'], ['R_SUB', '架空半製品R', '台'], ['R', '架空製品R', '台']] as const) {
     await recorded(page, 'masterItem', { code, name, units });
   }
 }
@@ -67,7 +67,7 @@ test('FT-01/03/04/06/12/13 空台帳で別セット・無関係IDを登録し、
   await expect(form.locator('[name=needConfirmed]')).toBeDisabled(); await form.getByRole('button', { name: '記録する', exact: true }).click();
   await expect(page.locator('#input > [role=status]')).toContainText('セットを選ぶ');
   expect(await snapshotOf(page)).toEqual(noSet);
-  const assembly = await createSet(page, 'R_ASSY', 'P', '1');
+  const assembly = await createSet(page, 'R_SUB', 'P', '1');
   const inspection = await createSet(page, 'R', 'Q', '2');
   const before = await snapshotOf(page);
   expect(before.supply.receiptTemplates[inspection]?.rows.map(row => row.item)).toEqual(['Q']);
@@ -77,7 +77,7 @@ test('FT-01/03/04/06/12/13 空台帳で別セット・無関係IDを登録し、
   await form.locator('[name=needAssemblyCase]').fill('00582103');
   await form.locator('[name=needAssemblyCount]').fill('90');
   await form.locator('[name=needMode]').selectOption('split');
-  await form.getByRole('button', { name: '検査用の台数を提案', exact: true }).click();
+  await form.getByRole('button', { name: '分け先の台数を提案', exact: true }).click();
   const projects = ['900007', '0042', '7310009', '0000876', '260019'];
   for (const [index, project] of projects.entries()) {
     await expect(form.locator(`[name=needInspectionCase${index}]`)).toHaveValue('');
@@ -120,7 +120,7 @@ test('FT-05/08/09/10/11/15/17 欠品受け取り後の案件変更・15台再計
     context = await launchAdvanced(profile, options);
     const page = await context.newPage();
     await registerMasters(page);
-    const assembly = await createSet(page, 'R_ASSY', 'P', '1'), inspection = await createSet(page, 'R', 'Q', '1');
+    const assembly = await createSet(page, 'R_SUB', 'P', '1'), inspection = await createSet(page, 'R', 'Q', '1');
     let form = await choose(page, 'templateNeedBatch');
     await form.locator('[name=needAssemblyTemplate]').selectOption(assembly);
     await form.locator('[name=needInspectionTemplate]').selectOption(inspection);

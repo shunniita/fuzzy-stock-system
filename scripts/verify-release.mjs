@@ -105,6 +105,9 @@ try {
   assert.match(await help.locator('h1').innerText(), /fuzzy-stock-system/);
   await help.close();
   await page.locator('#nav-management').click();
+  assert.deepEqual(await page.getByRole('group', { name: '初期化' }).getByRole('button').allInnerTexts(), ['空の台帳で初期化', '練習用の台帳で初期化'], '配布物には開発用のサンプルデータの初期化を出さない');
+  for (const file of manifest.files.filter(({ path }) => path.endsWith('.pdf'))) assert.equal(readFileSync(join(payload, file.path)).subarray(0, 5).toString('latin1'), '%PDF-', file.path);
+  assert.equal(manifest.files.filter(({ path }) => path.endsWith('.pdf')).length, manifest.files.filter(({ path }) => /^manual\/.*\.md$/.test(path)).length, 'マニュアルの各章にPDFがある');
   await page.locator('#reset-practice').click();
   await page.getByRole('button', { name: '初期化する', exact: true }).click(); await page.locator('#nav-stock').click();
   const coreOf = async () => parse(await page.evaluate(() => localStorage.getItem('fuzzy-stock/slot-' + localStorage.getItem('fuzzy-stock/head'))));
