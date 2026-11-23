@@ -1,6 +1,6 @@
 {
   "name": "fuzzy-stock-system",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -11,6 +11,7 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:mutation": "mutator",
     "e2e": "npm run build && playwright test",
     "release:package": "node scripts/package-release.mjs",
     "release:check": "node scripts/test-release-package.mjs",
@@ -20,6 +21,7 @@
     "performance:measure": "npm run build && node scripts/measure-local-performance.mjs"
   },
   "devDependencies": {
+    "@mizchi/mutator": "0.3.0",
     "@playwright/test": "1.63.0",
     "esbuild": "0.28.2",
     "typescript": "7.0.2",

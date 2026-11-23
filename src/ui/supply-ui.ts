@@ -1,4 +1,4 @@
-import { hold, release, split, voidOf, type Inclusion, type Issue, type Ledger, type LedgerEvent, type Lot, type Meta, type Project } from '../domain/ledger.ts';
+import { ConfirmationRequired, hold, release, split, voidOf, type Inclusion, type Issue, type Ledger, type LedgerEvent, type Lot, type Meta, type Project } from '../domain/ledger.ts';
 import type { CaseMaster, Master } from '../domain/masters.ts';
 import {
   acknowledgeReturn,
@@ -43,7 +43,8 @@ import { dateStatusOf, groupsOf, requestSummaryOf, shortageOf, stopsOf, type Gro
 import { consumableLinesText, needQuantityText, receivedText, requestDateText, remainderText, replyText, requestStateText, shortageLinesText, stateTriadText, stopLineText, supplyEventText, supplyOccurredText } from './supply-format.ts';
 import { createHistoryTargetCollector } from '../domain/history-targets.ts';
 import { templateNeedContextOf, templateNeedInfo } from '../domain/template-needs.ts';
-import { templateNeedOriginText, templateNeedVersionText } from './template-needs-format.ts';
+import { progressUnitOf, templateNeedOriginText, templateNeedVersionText } from './template-needs-format.ts';
+import { progressOverflowsOf, templateNeedProgressOf } from '../domain/template-needs-progress.ts';
 
 // 画面の状態。台帳と供給を、一回の入力のどちらも更新できるよう一組で持つ。どれかで例外になれば、どちらも代入しない（DAT-04）。
 export type State = { ledger: Ledger; supply: Supply };
@@ -70,8 +71,24 @@ export type UiOp = {
   run: (s: State, m: Meta, v: Values, inclusion: Inclusion | undefined) => { state: State; notice?: string; units?: State[] };
 };
 
+// 超過は記録の結果を見て初めて分かるので、実行後に比べ、確認なしなら結果を捨てて止める。
+export function withProgressConfirmation(base: UiOp): UiOp {
+  return {
+    ...base,
+    run: (s, m, v, inclusion) => {
+      const result = base.run(s, m, v, inclusion);
+      const overflows = progressOverflowsOf(s, result.state);
+      if (overflows.length > 0 && !v.checked('confirmed')) {
+        const masters = result.state.ledger.masters;
+        throw new ConfirmationRequired('progress', overflows.map(o => `${projectText(masters, { kind: 'case', id: o.caseId })}の総予定数を${o.over}${progressUnitOf(templateNeedProgressOf(result.state, o.caseId)!)}超える`).join('、'));
+      }
+      return result;
+    },
+  };
+}
+
 // 画面の部品が、現在の状態を引くための口。入力欄は描画のたびに作り直すので、値でなく取り出す関数を渡す。
-export type Ctx = { ledger: () => Ledger; supply: () => Supply; asOfChanged?: () => void; openConsumableSettings?: () => void };
+export type Ctx = { ledger: () => Ledger; supply: () => Supply; asOfChanged?: () => void; openConsumableSettings?: () => void; openCase?: (caseId: string) => void; openOperation?: (key: string) => void };
 
 // 一回の入力に付ける基本ID。供給だけを変える入力では台帳の件数が増えないので、両方の履歴の件数の和から付ける。
 // 入力は一件以上の記録を作るので、件数の和は入力ごとに必ず増え、基本IDは重ならない。

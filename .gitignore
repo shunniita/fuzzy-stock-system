@@ -6,3 +6,4 @@ playwright-report/
 ci-logs/
 local-settings.txt
 .local-logs/
+.mutator/

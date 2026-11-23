@@ -2,7 +2,8 @@ import { chromium, expect, test, type BrowserContext, type Page } from '@playwri
 import * as XLSX from 'xlsx';
 import { backupButton, downloadVia, exportButton, goTo, jsonFile, pickFile, recorded, selectOperation, waitForApp, waitForPersistence, launchAdvanced } from './helpers.ts';
 import { snapshotOf } from './conflict-helpers.ts';
-import { parse } from '../../src/ui/storage.ts';
+import { nextOpIdOf, parse, serialize } from '../../src/ui/storage.ts';
+import { generateTemplateNeedsBatch, type TemplateNeedBatchInput } from '../../src/domain/template-needs.ts';
 
 const formOf = (page: Page) => page.getByRole('form', { name: '操作の入力' });
 async function choose(page: Page, operation: string) {
@@ -47,6 +48,13 @@ async function previewChange(page: Page, project: string, action: string) {
   await form.locator('[name=needAction]').selectOption(action);
   return form;
 }
+// 一括生成は画面から行えないため、過去の一括記録は domain で作って保存へ書き込む。
+async function seedBatch(page: Page, input: TemplateNeedBatchInput) {
+  const current = await snapshotOf(page), eventId = nextOpIdOf(current), at = '2026-10-30T12:00:00+09:00';
+  const raw = serialize({ ...current, ...generateTemplateNeedsBatch(current, { eventId, actor: '架空担当', occurredAt: at, recordedAt: at }, input) });
+  await page.evaluate(raw => { localStorage.setItem('fuzzy-stock/slot-A', raw); localStorage.setItem('fuzzy-stock/head', 'A'); }, raw);
+  await page.reload(); await waitForApp(page);
+}
 async function restore(page: Page, file: string | ReturnType<typeof jsonFile>) {
   await pickFile(page, file);
   const confirmation = page.getByRole('region', { name: '復元の確認' });
@@ -55,7 +63,7 @@ async function restore(page: Page, file: string | ReturnType<typeof jsonFile>) {
   await waitForPersistence(page);
 }
 
-test('FT-01/03/04/06/12/13 空台帳で別セット・無関係IDを登録し、合計80は全件拒否、90台を分割生成する', async ({ page }) => {
+test('FT-01/03/04/06/12 空台帳で別セットを登録し、無関係IDへ90台を分割生成した過去の記録はセットの変更で変わらない', async ({ page }) => {
   await registerMasters(page);
   let form = await choose(page, 'templateNeedGenerate');
   await expect(form).toContainText('セットの登録・変更');
@@ -71,32 +79,8 @@ test('FT-01/03/04/06/12/13 空台帳で別セット・無関係IDを登録し、
   const inspection = await createSet(page, 'R', 'Q', '2');
   const before = await snapshotOf(page);
   expect(before.supply.receiptTemplates[inspection]?.rows.map(row => row.item)).toEqual(['Q']);
-  form = await choose(page, 'templateNeedBatch');
-  await form.locator('[name=needAssemblyTemplate]').selectOption(assembly);
-  await form.locator('[name=needInspectionTemplate]').selectOption(inspection);
-  await form.locator('[name=needAssemblyCase]').fill('00582103');
-  await form.locator('[name=needAssemblyCount]').fill('90');
-  await form.locator('[name=needMode]').selectOption('split');
-  await form.getByRole('button', { name: '分け先の台数を提案', exact: true }).click();
   const projects = ['900007', '0042', '7310009', '0000876', '260019'];
-  for (const [index, project] of projects.entries()) {
-    await expect(form.locator(`[name=needInspectionCase${index}]`)).toHaveValue('');
-    await expect(form.locator(`[name=needInspectionCount${index}]`)).toHaveValue(index === 4 ? '10' : '20');
-    await form.locator(`[name=needInspectionCase${index}]`).fill(project);
-  }
-  await form.locator('[name=needInspectionCount3]').fill('10');
-  await form.getByRole('button', { name: '全案件の必要明細をプレビュー', exact: true }).click();
-  await expect(form.locator('[data-need-preview]')).toContainText('台数の差は-10台');
-  await expect(form.locator('[data-need-preview]')).toContainText('合計を一致させる');
-  await expect(form.locator('[name=needConfirmed]')).toBeDisabled(); await form.getByRole('button', { name: '記録する', exact: true }).click();
-  await expect(page.locator('#input > [role=status]')).toContainText('プレビュー');
-  expect(await snapshotOf(page)).toEqual(before);
-  await form.locator('[name=needInspectionCount3]').fill('20');
-  await form.getByRole('button', { name: '全案件の必要明細をプレビュー', exact: true }).click();
-  const tables = form.getByRole('table', { name: '生成する必要明細' });
-  await expect(tables).toHaveCount(6);
-  for (const [index, quantity] of ['40', '40', '40', '40', '20'].entries()) await expect(tables.nth(index + 1)).toContainText(`${quantity}個`);
-  await form.locator('[name=needConfirmed]').check(); await save(page);
+  await seedBatch(page, { group: { assemblyIndex: 0, mode: 'split', split: 20 }, dueDate: null, projects: [{ templateId: assembly, caseCode: '00582103', count: 90 }, ...projects.map((caseCode, index) => ({ templateId: inspection, caseCode, count: index === 4 ? 10 : 20 }))] });
   const generated = await snapshotOf(page);
   expect(['00582103', ...projects].map(project => generated.supply.templateNeeds[project]?.count)).toEqual([90, 20, 20, 20, 20, 10]);
   expect(Object.values(generated.ledger.masters.cases).map(project => project.code).sort()).toEqual(['00582103', ...projects].sort());
@@ -121,13 +105,7 @@ test('FT-05/08/09/10/11/15/17 欠品受け取り後の案件変更・15台再計
     const page = await context.newPage();
     await registerMasters(page);
     const assembly = await createSet(page, 'R_SUB', 'P', '1'), inspection = await createSet(page, 'R', 'Q', '1');
-    let form = await choose(page, 'templateNeedBatch');
-    await form.locator('[name=needAssemblyTemplate]').selectOption(assembly);
-    await form.locator('[name=needInspectionTemplate]').selectOption(inspection);
-    await form.locator('[name=needAssemblyCase]').fill('00582103'); await form.locator('[name=needAssemblyCount]').fill('20');
-    await form.locator('[name=needInspectionCase0]').fill('901076');
-    await form.getByRole('button', { name: '全案件の必要明細をプレビュー', exact: true }).click();
-    await form.locator('[name=needConfirmed]').check(); await save(page);
+    await seedBatch(page, { group: { assemblyIndex: 0, mode: 'same', split: null }, dueDate: null, projects: [{ templateId: assembly, caseCode: '00582103', count: 20 }, { templateId: inspection, caseCode: '901076', count: 20 }] });
     const generated = await snapshotOf(page), plan = generated.supply.templateNeeds['00582103'];
     if (!plan) throw new Error('生成した案件がない');
     const needId = plan.origins[0]!.needId;
@@ -135,7 +113,7 @@ test('FT-05/08/09/10/11/15/17 欠品受け取り後の案件変更・15台再計
     await goTo(page, 'supply');
     const group = page.locator('[data-group="00582103/P/個"]');
     await expect(group).toContainText('必要な数 20個'); await expect(group).toContainText('不足 20個');
-    form = await choose(page, 'templateReceive');
+    let form = await choose(page, 'templateReceive');
     await form.locator('[name=template]').selectOption(assembly); await form.locator('[name=project]').selectOption('00582103');
     await form.locator('[name=sets]').fill('20'); await form.getByRole('button', { name: '予定数を展開' }).click();
     await form.locator('[name=shortfall0]').fill('2'); await expect(form.locator('[name=actual0]')).toHaveValue('18');

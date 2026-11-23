@@ -1,0 +1,96 @@
+import { expect, test } from '@playwright/test';
+import { goTo, recorded, selectOperation, set, waitForApp } from './helpers.ts';
+import { snapshotOf } from './conflict-helpers.ts';
+
+test('Factory B empty start, shortage, production, rework, correction and revised plan', async ({ page }) => {
+  // 一連の記録を1本で通すので、手元で約24秒かかり、CIの30秒の既定を超える。
+  test.setTimeout(90_000);
+  await page.goto('/'); await waitForApp(page);
+  expect((await snapshotOf(page)).ledger.history).toHaveLength(0);
+  await goTo(page, 'management'); await page.getByLabel('操作モード').selectOption('advanced');
+  await goTo(page, 'stock');
+  const form = page.getByRole('form', { name: '操作の入力' });
+  const choose = async (op: string) => { await goTo(page, 'stock'); await selectOperation(form.locator('[name=op]'), op); };
+  const fill = async (values: Record<string, string | boolean>) => { for (const [name, value] of Object.entries(values)) await set(form.locator(`[name=${name}]`), value); };
+  const submit = async () => { await form.getByRole('button', { name: '記録する', exact: true }).click(); await expect(page.locator('#input > [role=status]')).toContainText('記録した'); };
+  const capture = async (label: string) => { console.log(label, await page.locator('#case').innerText()); await page.screenshot({ path: `.local-logs/scenarios-20261120/factory-b-${label}.png`, fullPage: true }); };
+  await recorded(page, 'masterActor', { name: '架空工場担当B' });
+  for (const [code, name] of [['WH', '架空部品棚'], ['ASM', '架空組立台'], ['QC', '架空検査台'], ['SHIP', '架空出荷棚']]) await recorded(page, 'masterLocation', { code: code!, name: name!, inScope: 'true' });
+  for (const [code, name, units] of [['BOLT', '架空ボルト', '本'], ['PCB', '架空基板', '枚'], ['CASE', '架空ケース', '個'], ['UNIT', '架空組立製品', '台'], ['FIN', '架空検査済製品', '台']]) await recorded(page, 'masterItem', { code: code!, name: name!, units: units! });
+  await recorded(page, 'masterProcess', { name: '架空組立', criterion: 'inspection' });
+  await recorded(page, 'masterProcess', { name: '架空検査', criterion: 'workEnd' });
+  await recorded(page, 'masterNextProcess', { location: 'SHIP', reason: '架空検査済み品の置き場' });
+  await choose('templateSave'); await fill({ templateName: '架空装置B構成', templateProduct: 'UNIT', templateProductUnit: '台' });
+  for (const [i, item, unit, perSet] of [[0, 'BOLT', '本', '4'], [1, 'PCB', '枚', '1'], [2, 'CASE', '個', '1']] as const) {
+    if (i > 0) await form.getByRole('button', { name: '明細を追加', exact: true }).click();
+    await fill({ [`t${i}item`]: item, [`t${i}unit`]: unit, [`t${i}perSet`]: perSet, [`t${i}location`]: 'WH' });
+  }
+  await submit();
+  const template = Object.values((await snapshotOf(page)).supply.receiptTemplates)[0]!;
+  await choose('masterCase'); await fill({ code: 'FACTORY-B', name: '架空制御装置10台', caseSet: template.id, caseTotal: '10', caseDue: '2026-11-27' });
+  await form.getByRole('button', { name: '必要明細をプレビュー', exact: true }).click(); await form.locator('[name=caseRegistrationConfirmed]').check(); await submit();
+  const project = Object.values((await snapshotOf(page)).ledger.masters.cases).find(item => item.code === 'FACTORY-B')!.id;
+  for (const [newId, item, value] of [['bolts', 'BOLT', '32'], ['boards', 'PCB', '11'], ['cases', 'CASE', '10']]) await recorded(page, 'register', { newId: newId!, item: item!, value: value!, project, location: 'WH', basis: 'counted' }, '08:00');
+  await goTo(page, 'supply'); await page.locator('[name=case-project]').selectOption(project); await capture('01-shortage');
+  await expect(page.locator('#case')).toContainText('不足ありの品目 1件'); await expect(page.locator('#case')).toContainText('不足 8本');
+  await choose('requestRecord'); await recorded(page, 'requestRecord', { project, item: 'BOLT', unit: '本', quantity: '8', vendor: '架空ボルト商会', requestedOn: '2026-11-20', replyKind: 'estimated', replyDate: '2026-11-21' }, '08:10');
+  const request = Object.values((await snapshotOf(page)).supply.requests)[0]!.id;
+  await recorded(page, 'orderConfirm', { request }, '08:15');
+  await recorded(page, 'receive', { newId: 'arrival-bolts', item: 'BOLT', unit: '本', project, location: 'WH', basis: 'counted', value: '8' }, '08:20');
+  await recorded(page, 'allocate', { receipt: 'arrival-bolts', request, arrived: '8', good: '8' }, '08:25');
+  await goTo(page, 'supply'); await capture('02-received');
+  await expect(page.locator('#case')).toContainText('不足ありの品目 0件'); await expect(page.locator('#case')).toContainText('不足 0本');
+  const startBatch = async (id: string, quantity: string, firstBolts: string, secondBolts: string, hour: string) => {
+    await choose('recipeStart'); await fill({ process: '架空組立', newId: id, item: 'UNIT', project, location: 'ASM', basis: 'counted', value: quantity, occurredAt: `2026-09-29T${hour}:00`, recipe: template.id });
+    await form.getByRole('button', { name: '使用候補を出す', exact: true }).click();
+    await fill({ e0u0lot: id === 'batch4' ? 'arrival-bolts' : 'bolts', e0u0basis: 'counted', e0u0value: firstBolts, e1u0lot: 'boards', e1u0basis: 'counted', e2u0lot: 'cases', e2u0basis: 'counted' });
+    if (secondBolts !== '0') {
+      await form.locator('[data-estimate-row]').first().getByRole('button', { name: '保管単位を分ける', exact: true }).click();
+      await fill({ e0u1lot: 'arrival-bolts', e0u1basis: 'counted', e0u1value: secondBolts });
+    }
+    await form.locator('[name=estimateConfirmed]').check(); await submit();
+  };
+  await startBatch('batch1', '3', '12', '0', '09');
+  await recorded(page, 'finish', { lot: 'batch1', childId: 'check1', basis: 'counted', value: '3' }, '10:00');
+  await recorded(page, 'inspect', { lot: 'check1', childId: 'good1', basis: 'counted', value: '2' }, '10:10');
+  await recorded(page, 'toNext', { lot: 'good1', childId: 'shipped1', basis: 'counted', value: '2', location: 'SHIP' }, '10:20');
+  await recorded(page, 'reworkBegin', { lot: 'check1', childId: 'repair1', basis: 'counted', value: '1', reason: '架空の基板不良' }, '10:30');
+  const rework = (await snapshotOf(page)).ledger.history.find(event => event.kind === 'rework')!.eventId;
+  await recorded(page, 'reworkReplace', { reworkId: rework, subjectLotId: 'repair1', lot: 'boards', value: '1', reason: '架空の不良基板交換' }, '10:35');
+  await recorded(page, 'finish', { lot: 'repair1', childId: 'recheck1', basis: 'counted', value: '1' }, '10:40');
+  await recorded(page, 'inspect', { lot: 'recheck1', childId: 'repaired1', basis: 'counted', value: '1' }, '10:45');
+  await recorded(page, 'toNext', { lot: 'repaired1', childId: 'shipped-repair1', basis: 'counted', value: '1', location: 'SHIP' }, '10:50');
+  await startBatch('batch2', '3', '12', '0', '11');
+  await recorded(page, 'finish', { lot: 'batch2', childId: 'check2', basis: 'counted', value: '3' }, '11:10');
+  await recorded(page, 'inspect', { lot: 'check2', childId: 'good2', basis: 'counted', value: '3' }, '11:20');
+  await recorded(page, 'toNext', { lot: 'good2', childId: 'shipped2', basis: 'counted', value: '3', location: 'SHIP' }, '11:30');
+  await startBatch('batch3', '3', '8', '4', '12');
+  await recorded(page, 'finish', { lot: 'batch3', childId: 'check3', basis: 'counted', value: '3' }, '12:10');
+  await recorded(page, 'inspect', { lot: 'check3', childId: 'good3', basis: 'counted', value: '3' }, '12:20');
+  await recorded(page, 'toNext', { lot: 'good3', childId: 'shipped3', basis: 'counted', value: '3', location: 'SHIP' }, '12:30');
+  await choose('start'); await fill({ process: '架空組立', newId: 'overplan', item: 'UNIT', project, location: 'ASM', basis: 'counted', value: '3', occurredAt: '2026-09-29T12:35' });
+  await form.getByRole('button', { name: '記録する', exact: true }).click();
+  console.log('OVERAGE', await page.locator('#input > [role=status]').innerText());
+  await expect(page.locator('#input > [role=status]')).toContainText('総予定数を2台超える');
+  expect((await snapshotOf(page)).ledger.lots.overplan).toBeUndefined();
+  await startBatch('batch4', '1', '4', '0', '13');
+  await recorded(page, 'finish', { lot: 'batch4', childId: 'check4', basis: 'counted', value: '1' }, '13:10');
+  await recorded(page, 'inspect', { lot: 'check4', childId: 'good4', basis: 'counted', value: '1' }, '13:20');
+  await recorded(page, 'toNext', { lot: 'good4', childId: 'shipped4', basis: 'counted', value: '1', location: 'SHIP' }, '13:30');
+  await recorded(page, 'start', { process: '架空検査', newId: 'final-inspection', item: 'FIN', project, location: 'QC', basis: 'counted', value: '3', m1lot: 'shipped1', m1basis: 'counted', m1value: '2', m2lot: 'shipped-repair1', m2basis: 'counted', m2value: '1' }, '14:00');
+  await recorded(page, 'finish', { lot: 'final-inspection', childId: 'final-good', basis: 'counted', value: '3' }, '14:15');
+  await recorded(page, 'toNext', { lot: 'final-good', childId: 'final-shipment', basis: 'counted', value: '3', location: 'SHIP' }, '14:20');
+  await recorded(page, 'handover', { lot: 'final-shipment', basis: 'counted', value: '3', counterpart: '架空出荷先' }, '14:30');
+  await recorded(page, 'recount', { lot: 'bolts', value: '2', causeText: '架空の棚卸で予備2本を発見' }, '15:00');
+  await goTo(page, 'supply'); await capture('03-completed10');
+  await choose('templateNeedEdit'); await fill({ needProject: project, needAction: 'recalculate', needCount: '12', needReason: '架空の追加2台依頼' });
+  await form.getByRole('button', { name: '変更をプレビュー', exact: true }).click();
+  console.log('RECALC PREVIEW', await form.innerText());
+  await form.locator('[name=needConfirmed]').check(); await submit();
+  await goTo(page, 'supply'); await capture('04-revised12');
+  await expect(page.locator('#case [data-progress]')).toContainText('総予定数12台・作業で使った台数 記録上の数10台・未使用の残り2台');
+  const saved = await snapshotOf(page);
+  console.log('FINAL SNAPSHOT', JSON.stringify(saved));
+  await page.reload(); await waitForApp(page); expect((await snapshotOf(page)).ledger).toEqual(saved.ledger); expect((await snapshotOf(page)).supply).toEqual(saved.supply);
+  await goTo(page, 'supply'); await page.locator('[name=case-project]').selectOption(project); await capture('05-persisted');
+});

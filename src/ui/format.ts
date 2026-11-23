@@ -209,6 +209,7 @@ export const kindLabel: Record<LedgerEvent['kind'], string> = {
   use: '使用',
   handover: '外へ出す（譲渡・持ち出し）',
   split: '分割',
+  open: '開封',
   transfer: '案件・用途の付け替え',
   move: '移動',
   merge: '統合',
@@ -291,7 +292,7 @@ function eventDetails(ledger: Ledger, e: LedgerEvent, ref: ItemFormatter, target
   const pname = (id: string): string => processNameAt(ledger, e.eventId, id);
   switch (e.kind) {
     case 'rework':
-      return `${label}：${e.lotId}から${e.childId}へ${valueText(e.basis, e.value, lotUnit(e.lotId))}、理由「${e.reason}」${e.returnSource === undefined ? '' : `／返ってきた物の新規割当の記録${e.returnSource.adoptEventId}／工程${pname(e.returnSource.process.id)}・${e.returnSource.process.criterion === 'workEnd' ? '作業終了' : '確認の完了'}基準／物理的なやり直し・修理を確認`}`;
+      return `${label}：${e.lotId}から${e.childId}へ${valueText(e.basis, e.value, lotUnit(e.lotId))}${e.changes.some(c => c.after.id === e.lotId && c.before?.stage.kind === 'inspecting') ? '（確認待ちから）' : ''}、理由「${e.reason}」${e.returnSource === undefined ? '' : `／返ってきた物の新規割当の記録${e.returnSource.adoptEventId}／工程${pname(e.returnSource.process.id)}・${e.returnSource.process.criterion === 'workEnd' ? '作業終了' : '確認の完了'}基準／物理的なやり直し・修理を確認`}`;
     case 'reworkPart': {
       const detail = e.action === 'discard' ? `廃棄 品目${ref(e.item)} ${e.value}${e.unit}（組付け済み部品。未使用在庫の増減なし）` : (() => {
         const id = e.action === 'replace' ? e.useEventId : e.registerEventId;
@@ -300,6 +301,8 @@ function eventDetails(ledger: Ledger, e: LedgerEvent, ref: ItemFormatter, target
       })();
       return `${label}：やり直し・修理${e.reworkId}、${e.subjectLotId === undefined ? '対象枝の記録なし（旧記録）' : `対象枝${e.subjectLotId}`}、${detail}、理由「${e.reason}」`;
     }
+    case 'open':
+      return `${label}：${e.lotId}から${e.value}${lotUnit(e.lotId)}を開けて${e.childId}へ${valueText('counted', e.childValue, e.childUnit)}${e.inclusion === null ? '' : `・${inclusionLabel[e.inclusion]}`}`;
     case 'transfer':
       return `${label}：${e.lotId}から${e.childId}へ${valueText(e.basis, e.value, lotUnit(e.lotId))}、${projectText(m, e.from)} → ${projectText(m, e.to)}${e.inclusion === null ? '' : `・${inclusionLabel[e.inclusion]}`}（場所は変えていない）`;
     case 'register': {
@@ -414,7 +417,7 @@ function masterChangeText(action: MasterRequest['action'], { before, after }: Ma
       return `${ref}の完了基準 ${criterion(before)} → ${criterion(after)}`;
     }
     case 'nextProcess':
-      return after.type === 'location' && after.nextProcess ? `${ref}を次工程の場所に指定` : `${ref}の次工程の場所の指定を解除`;
+      return after.type === 'location' && after.nextProcess ? `${ref}を次工程への置き場に指定` : `${ref}の次工程への置き場の指定を解除`;
     case 'rename':
       return `${masterTypeDisplayLabel[after.type]}${after.type === 'actor' ? after.id : after.type === 'process' ? '' : after.code ?? unassignedCode}の名称「${before && before.type !== 'actor' ? before.name ?? 'なし' : ''}」→「${after.type !== 'actor' ? after.name ?? 'なし' : ''}」`;
     case 'deactivate':

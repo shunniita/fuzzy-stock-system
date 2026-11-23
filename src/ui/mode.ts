@@ -22,8 +22,8 @@ export function writeMode(mode: Mode): void {
 
 // 簡単操作モードで入口から開ける操作。ここにない操作は二段選択（高度な操作モード）からだけ開く。
 export const simpleOps: ReadonlySet<string> = new Set([
-  'register', 'use', 'move', 'split', 'splitMove', 'merge', 'recount', 'hold', 'release',
-  'masterItem', 'masterLocation', 'masterRename', 'masterDeactivate', 'masterReactivate',
+  'register', 'use', 'move', 'split', 'splitMove', 'openBox', 'merge', 'recount', 'hold', 'release',
+  'masterItem', 'masterLocation', 'masterRename', 'masterDeactivate', 'masterReactivate', 'masterPerBox', 'masterConsumable',
   'void', 'correctTime', 'resolve',
 ]);
 

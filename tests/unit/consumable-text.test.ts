@@ -5,6 +5,8 @@ import { consumablesOf, replenishmentOf, stockOf } from '../../src/domain/packag
 import { emptySupply, recordReply, recordRemainder, recordRequest, type Supply } from '../../src/domain/supply.ts';
 import { consumableLinesText } from '../../src/ui/supply-format.ts';
 import { viewSheetsOf } from '../../src/ui/viewsheets.ts';
+import { initial, parse, serialize } from '../../src/ui/storage.ts';
+import { backupTextOf, readBackup } from '../../src/ui/backup.ts';
 
 const common: Project = { kind: 'common' };
 
@@ -68,6 +70,31 @@ describe('ネジの欄の文言', () => {
     expect(text).toContain('数量合計（個） 7個');
     expect(text).not.toContain('数量（本）');
   });
+
+  test.each([0, 7, Number.MAX_SAFE_INTEGER])('基準なしで数えた%s本と残量区分が混在するときは、保存・復元後も数量合計と断定しない', value => {
+    const counted = reg(practiceLedger, 'KNOWN', 'V', '本', 'counted', value);
+    expect(linesOf(washers, counted, emptySupply)).toContain(`数量合計（本） ${value}本・数えた`);
+    const ledger = reg(counted, 'OPEN', 'V', '本', 'unknown', null);
+    const supply = recordRemainder(ledger, emptySupply, meta('level'), 'OPEN', 'few');
+    const snapshot = initial(ledger, supply), before = serialize(snapshot);
+    const text = linesOf(washers, ledger, supply);
+    expect(text).toContain(`数量の数値部分の小計（本） ${value}本・数えた`);
+    expect(text).not.toContain('数量合計（本）');
+    expect(text).toContain('残量区分のみ（数量へは換算しない）：OPEN 少ない');
+    expect(text).not.toContain('補充');
+    expect(serialize(snapshot)).toBe(before);
+
+    const loaded = parse(before);
+    expect(loaded.ledger).toEqual(ledger);
+    expect(loaded.supply).toEqual(supply);
+    expect(linesOf(washers, loaded.ledger, loaded.supply)).toBe(text);
+    const restored = readBackup(new TextEncoder().encode(backupTextOf(snapshot, meta('backup').recordedAt)));
+    expect(restored.kind).toBe('ok');
+    if (restored.kind !== 'ok') throw new Error('バックアップを復元できない');
+    expect(restored.snapshot.ledger).toEqual(ledger);
+    expect(restored.snapshot.supply).toEqual(supply);
+    expect(linesOf(washers, restored.snapshot.ledger, restored.snapshot.supply)).toBe(text);
+  });
   test('AT-35・AT-52・QTY-05b: 1箱あたりの数既知の精度上限を1箱あたりの数不明と表示せず、本数は小計と補充判定不能を示す', () => {
     let l = changeMasters(practiceLedger, meta('pb', 9), { action: 'perBox', id: 'S', value: 9007199254740991, reason: '架空の境界試験' });
     l = register(l, meta('BOX', 10), { id: 'BOX', item: 'S', unit: '箱', project: common, location: 'S1' }, 'counted', 2);
@@ -129,8 +156,8 @@ describe('ネジの欄の文言', () => {
     const s = recordRemainder(l, askBox(emptySupply), meta('m1'), 'S-OPEN', 'few');
     const text = linesOf(screws, l, s);
     expect(text).toContain('残量区分のみ（数量へは換算しない）：S-OPEN 少ない');
-    expect(text).toMatch(/数量合計（本） .*2000本/);
-    expect(text).not.toMatch(/数量合計（本） .*2[0-9]{3}本.*少ない/);
+    expect(text).toMatch(/数量の数値部分の小計（本） .*2000本/);
+    expect(text).not.toContain('数量合計（本）');
   });
 
   test('9.4: 数値部分がなく区分だけのときは、本数で比べず、区分と既存の依頼を示す。8.5: 1箱あたりの数が分からない包装は合算せず別に書く', () => {
@@ -168,6 +195,8 @@ describe('ネジの欄の文言', () => {
     const s = recordRemainder(l, emptySupply, meta('m1'), 'V-1', 'half');
     const text = linesOf(washers, l, s);
     expect(text).toContain('残量区分のみ（数量へは換算しない）：V-1 半分程度');
+    expect(text).toContain('数量合計（本） 数値なし');
+    expect(text).not.toContain('0本');
     expect(text).not.toContain('補充');
   });
 });

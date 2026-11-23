@@ -81,7 +81,7 @@ describe('工程の設定 2.3・6.2・6.4・6.5: 保存途中と復元', () => {
     const flagged = JSON.parse(serialize(initial(registered, emptySupply)));
     flagged.ledger.history[0].masters[0].after.nextProcess = true;
     flagged.ledger.masters.locations.L9.nextProcess = true; flagged.ledger.masters.locations.N.nextProcess = false;
-    expect(() => parse(JSON.stringify(flagged))).toThrow('場所 L9 は次工程の場所として登録できない');
+    expect(() => parse(JSON.stringify(flagged))).toThrow('場所 L9 は次工程への置き場として登録できない');
 
     // v1.2.0の空の台帳で品番・コード「N」の場所を登録すると、版11では登録の写しから次工程として読む。
     const blank = changed(emptyLedger, 'n', { action: 'register', master: { type: 'location', code: 'N', name: '架空の次工程', trial: true, inScope: true } });
@@ -101,7 +101,7 @@ describe('工程の設定 2.3・6.2・6.4・6.5: 保存途中と復元', () => {
     const [first, second] = twice.ledger.history;
     const n = first.masters.findIndex((pair: { after: { id: string } }) => pair.after.id === 'N');
     second.masters.push(...first.masters.splice(n, 1));
-    expect(() => parse(JSON.stringify(twice))).toThrow('次工程の場所は一か所まで');
+    expect(() => parse(JSON.stringify(twice))).toThrow('次工程への置き場は一か所まで');
   });
 
   test.each(['partial', 'unknown'] as const)('%sでも設定と元入力を保ち、再試行で履歴が一度だけ残る', mode => {

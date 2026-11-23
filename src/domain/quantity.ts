@@ -99,6 +99,26 @@ export function add(a: Quantity, b: Quantity, step: Step = 1): Quantity {
   };
 }
 
+// 左から add で足すのと同じ結果。add を繰り返すと根拠と不明部分の配列を毎回写し、件数の二乗の時間になるので、配列は一度だけ作る。
+// 0を初期値にして足すと、ラベルだけの合計が「中身未確認」から「未確認部分あり」へ変わってしまうので、空のときだけ0にする。
+export function sumQuantities(quantities: readonly Quantity[], step: Step): Quantity {
+  const [first, ...rest] = quantities;
+  if (first === undefined) return { kind: 'known', numeric: { value: 0, approximate: false, unconfirmed: 'none' }, computed: true, terms: [] };
+  if (rest.length === 0) return first;
+  checkNumericPart(first, step);
+  const terms = [...first.terms], unknownParts = [...unknownPartsOf(first)];
+  let numeric = numericPart(first), known = first.kind === 'known';
+  for (const quantity of rest) {
+    checkNumericPart(quantity, step);
+    for (const term of quantity.terms) terms.push(term);
+    for (const part of unknownPartsOf(quantity)) unknownParts.push(part);
+    const next = numericPart(quantity);
+    numeric = numeric && next ? addNumeric(numeric, next, step) : (numeric ?? next);
+    known &&= quantity.kind === 'known';
+  }
+  return known ? { kind: 'known', numeric: numeric!, computed: true, terms } : { kind: 'partlyUnknown', numeric, unknownParts, terms };
+}
+
 // 不明分岐で数値部分を引き継ぐ場合も、演算対象の精度外の値を通さない。
 function checkNumericPart(q: Quantity, step: Step): void {
   validateSignedScalar(numericPart(q)?.value ?? 0, step);

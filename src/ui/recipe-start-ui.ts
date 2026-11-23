@@ -1,11 +1,11 @@
 import { isUsable, type Inclusion } from '../domain/ledger.ts';
-import { nextProcessOf, own, processOf, quantityStepOf } from '../domain/masters.ts';
+import { own, processOf, quantityStepOf } from '../domain/masters.ts';
 import type { Basis } from '../domain/quantity.ts';
 import type { ReceiptTemplate } from '../domain/receipt-template.ts';
 import { subtractScalar, sumScalars } from '../domain/scalar.ts';
 import { EstimateInclusionRequired, estimateCandidates, estimateUseLimit, manualUseLimit, startWithEstimate, type Candidate, type EstimateInput, type ManualUse } from '../domain/usage-estimate.ts';
 import { checkField, choiceField, h, selectField, textField, type Values } from './dom.ts';
-import { amount, amountFields, basisOptions, codeTarget, itemFields, lotOptions, MaterialInclusionRequired, placeOptions, processOptions, projectField, projectOf, quantityValue } from './fields.ts';
+import { amount, amountFields, basisOptions, codeTarget, itemFields, lotOptions, MaterialInclusionRequired, placeOptions, processOptions, projectField, projectOf, quantityValue, workLocationField } from './fields.ts';
 import { inclusionLabel, itemRef } from './format.ts';
 import type { Ctx, UiOp } from './supply-ui.ts';
 import { fixSubject } from './subject-actions.ts';
@@ -88,6 +88,7 @@ function recipeStartFields(ctx: Ctx): HTMLElement[] {
   const signature = h('input', { type: 'hidden', name: 'estimateRevision', value: '' });
   const root = h('div', { 'data-estimate-preview': '' });
   const confirm = checkField('estimateConfirmed', '台数・今回の使用数・根拠・保管単位を確認した');
+  confirm.querySelector('input')!.dataset['receiptConfirm'] = '';
   const value = (name: string) => preview.closest('form')?.querySelector<HTMLInputElement | HTMLSelectElement>(`[name=${name}]`)?.value ?? '';
   // 出し直した候補に、前の候補で付けた確認を引き継がない（3.8）。
   const clear = () => { root.replaceChildren(); signature.value = ''; confirm.querySelector('input')!.checked = false; changed(root); };
@@ -124,7 +125,7 @@ function recipeStartFields(ctx: Ctx): HTMLElement[] {
     choiceField('process', '工程', processOptions(masters)),
     textField('newId', '作業中の保管単位の新しいID'),
     itemSelect!, unitSelect!, projectField(masters),
-    codeTarget(choiceField('location', '作業の場所', placeOptions(masters).filter(([id]) => id !== nextProcessOf(masters)?.id)), 'location', { hold: 'location' }),
+    workLocationField(masters, placeOptions(masters)),
     basisField!, valueField!, status, recipe, preview, signature, root, ...manualFields(ctx), confirm,
   ];
 }

@@ -5,7 +5,7 @@ import type { Arrival, Declaration, Need, Reply, Request, Supply, SupplyDetail, 
 import type { OpEntry, Pending, SaveCheck, Snapshot, UnitState } from './storage.ts';
 import { isReviewFingerprint, isReviewOperation, parseConflictReviews, reviewOpLabel, reviewPendingValues, type ConflictReview } from './conflictrecord.ts';
 import { readCode, type CodeReference, type Scan } from '../domain/code.ts';
-import { legacyProcesses, requireConsistentProcesses, validateReworkLinks } from '../domain/ledger.ts';
+import { legacyProcesses, requireConsistentProcesses, validateOpenLinks, validateReworkLinks } from '../domain/ledger.ts';
 import { readNeedRow, validateNeedImports, type NeedImportDetail, type NeedImportInput } from '../domain/need-import.ts';
 import { checkAlternativeSource, validateAlternativeRecords, type AlternativeRecord } from '../domain/alternative-record.ts';
 import { validateScalar, validateSignedScalar, type Step } from '../domain/scalar.ts';
@@ -373,7 +373,7 @@ function masterChange(value: unknown, path: string, version: number): MasterChan
 }
 
 function eventDetail(o: Record<string, unknown>, path: string, table: QuantityTable | null, version: number): EventDetail {
-  const kind = oneOf<EventDetail['kind']>(o.kind, `${path}.kind`, ['alternativeRecord', 'register', 'move', 'merge', 'master', 'identify', 'adopt', 'assignProject', 'recount', 'hold', 'release', 'resolve', 'correctTime', 'declare', 'provisional', 'start', 'void', 'stop', 'stopUpdate', 'resume', 'use', 'handover', 'split', 'stage', 'transfer', 'rework', 'reworkPart']);
+  const kind = oneOf<EventDetail['kind']>(o.kind, `${path}.kind`, ['alternativeRecord', 'register', 'move', 'merge', 'master', 'identify', 'adopt', 'assignProject', 'recount', 'hold', 'release', 'resolve', 'correctTime', 'declare', 'provisional', 'start', 'void', 'stop', 'stopUpdate', 'resume', 'use', 'handover', 'split', 'open', 'stage', 'transfer', 'rework', 'reworkPart']);
   switch (kind) {
     case 'alternativeRecord': return alternativeRecord(o, path, version);
     case 'register': case 'move': case 'merge': return { kind };
@@ -396,12 +396,18 @@ function eventDetail(o: Record<string, unknown>, path: string, table: QuantityTa
     case 'stop': return { kind, stop: field(o, 'stop', path, stop) };
     case 'stopUpdate': return { kind, stopId: field(o, 'stopId', path, string), previous: field(o, 'previous', path, countOrNull), affected: field(o, 'affected', path, countOrNull) };
     case 'resume': return { kind, stopId: field(o, 'stopId', path, string) };
-    case 'use': case 'handover': case 'split': case 'stage': case 'transfer': case 'rework': {
+    case 'use': case 'handover': case 'split': case 'open': case 'stage': case 'transfer': case 'rework': {
       const common = { lotId: field(o, 'lotId', path, string), ...basisValue(o, path), applied: field(o, 'applied', path, boolean), inclusion: field(o, 'inclusion', path, inclusion) };
       switch (kind) {
         case 'use': return { kind, ...common, usedFor: field(o, 'usedFor', path, string) };
         case 'handover': return { kind, ...common, counterpart: field(o, 'counterpart', path, string) };
         case 'split': return { kind, ...common, childId: field(o, 'childId', path, string) };
+        case 'open': {
+          exactKeys(o, [...eventMetaKeys(o, version), 'changes', 'lotId', 'basis', 'value', 'applied', 'inclusion', 'childId', 'childUnit', 'childValue'], path);
+          const childValue = field(o, 'childValue', path, amount);
+          if (!common.applied || common.basis !== 'counted' || common.value === null || !Number.isSafeInteger(common.value) || common.value <= 0 || common.inclusion === 'included' || common.inclusion === 'unknown') return invalid(path, '開封には数えた正の整数の箱の数が必要');
+          return { kind, ...common, childId: field(o, 'childId', path, nonblank), childUnit: field(o, 'childUnit', path, nonblank), childValue };
+        }
         case 'stage': return { kind, ...common, childId: field(o, 'childId', path, string), to: field(o, 'to', path, stage), correction: field(o, 'correction', path, boolean) };
         case 'rework':
           exactKeys(o, [...eventMetaKeys(o, version), 'changes', 'lotId', 'basis', 'value', 'applied', 'inclusion', 'childId', 'reason', ...(o.returnSource === undefined ? [] : ['returnSource'])], path);
@@ -692,6 +698,7 @@ function ledger(value: unknown, path: string, table: QuantityTable | null, versi
   requireConsistentItemSettings(decoded);
   validateSplitLineage(decoded, path);
   validateReworkLinks(decoded);
+  validateOpenLinks(decoded);
   // 手直しの由来の照合が先に具体的な理由を示すよう、工程の整合は後で確かめる。
   requireConsistentProcesses(decoded);
   for (const event of decoded.history) {
@@ -1025,6 +1032,7 @@ function checkLedgerPrecision(ledger: Ledger, memo: PrecisionMemo, count: CountC
         break;
       }
       case 'use': case 'handover': case 'split': case 'stage': case 'transfer': case 'rework': count(e.value, lotRef(e.lotId)); break;
+      case 'open': count(e.value, lotRef(e.lotId)); count(e.childValue, { item: lotRef(e.lotId).item, unit: e.childUnit }); break;
       // 単位を持たない仮の記録は整数のまま。
       case 'provisional': if (e.value !== null) validateScalar(e.value, 1); break;
       case 'stop': checkStop(e.stop); break;

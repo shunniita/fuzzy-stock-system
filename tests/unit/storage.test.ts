@@ -583,7 +583,7 @@ describe('B3 task2.3 確定単位の対象（要件4.2・4.6、AT-24・AT-38の�
     rework: ['まとまりP-001'], reworkPart: ['操作rework'],
     register: [], move: [], merge: [], hold: [], release: [], provisional: [], master: ['品目（仮）架空部品Q', '品目Q'],
     identify: ['まとまりP-001', '照合事項i'], adopt: ['まとまりP-001', '照合事項i'], assignProject: ['まとまりP-001'],
-    recount: ['まとまりP-001'], declare: ['まとまりP-001'], start: ['まとまりP-001'], use: ['まとまりP-001'], handover: ['まとまりP-001'], split: ['まとまりP-001'], stage: ['まとまりP-001'], transfer: ['まとまりP-001'],
+    recount: ['まとまりP-001'], declare: ['まとまりP-001'], start: ['まとまりP-001'], use: ['まとまりP-001'], handover: ['まとまりP-001'], split: ['まとまりP-001'], open: ['まとまりP-001'], stage: ['まとまりP-001'], transfer: ['まとまりP-001'],
     resolve: ['照合事項i', 'まとまり参照元'], correctTime: ['操作old', 'まとまり参照元'], void: ['まとまりP-001', '操作use1'], stop: ['停止st'], stopUpdate: ['停止st'], resume: ['停止st'],
   };
   test.each(details)('台帳の $kind は変えた保管単位と明示の参照を順序を保って重複なく返す', detail => {

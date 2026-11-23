@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { decodeSnapshot } from '../../src/ui/storageparse.ts';
-import { waitForPersistence, selectOperation, goTo, backupButton, cell, downloadVia, lot, opLabels, pickFile, recorded, set, startEmpty, storageBytes } from './helpers.ts';
+import { waitForPersistence, selectOperation, goTo, backupButton, cell, downloadVia, lot, opLabels, pickFile, recorded, set, startEmpty, storageBytes, openCodeInput } from './helpers.ts';
 
 test.use({ trace: 'retain-on-failure' });
 const formOf = (page: Page) => page.getByRole('form', { name: '操作の入力' });
@@ -10,10 +10,12 @@ async function fill(page: Page, values: Record<string, string | boolean>): Promi
   for (const [name, value] of Object.entries(values)) await set(formOf(page).locator(`[name=${name}]`), value);
 }
 async function interpret(page: Page, raw: string): Promise<void> {
+  await openCodeInput(page);
   await panelOf(page).getByLabel('読取原文・品目ID').fill(raw);
   await panelOf(page).getByRole('button', { name: '解釈', exact: true }).click();
 }
 async function apply(page: Page, target: string, name: RegExp): Promise<void> {
+  await openCodeInput(page);
   await panelOf(page).getByLabel('コードの入力先').selectOption(target);
   await panelOf(page).locator('[data-code-options]').getByRole('button', { name }).click();
 }
@@ -32,7 +34,8 @@ test('AT-30/46: Enterは解釈だけ、案件・用途相違を選び直し、�
   await startEmpty(page);
   const before = await storageBytes(page);
   await fill(page, { project: 'A-001', location: 'S1', basis: 'counted', value: '999' });
-  await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
+  await openCodeInput(page);
+  await openCodeInput(page); await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
   await panelOf(page).getByLabel('読取原文・品目ID').fill('LABA|B-001|P');
   await panelOf(page).getByLabel('読取原文・品目ID').press('Enter');
   expect(await storageBytes(page)).toEqual(before);
@@ -58,7 +61,8 @@ test('AT-30/46: Enterは解釈だけ、案件・用途相違を選び直し、�
 test('FH-C02/03/04・AT-23: CRLF貼付と同じラベルの別箱、保持、バックアップ復元、次操作への非流用', async ({ page }) => {
   await startEmpty(page); await selectOp(page, 'receive');
   await fill(page, { project: 'A-001', location: 'S1' });
-  await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
+  await openCodeInput(page);
+  await openCodeInput(page); await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
   await panelOf(page).getByRole('button', { name: '現在の場所を保持' }).click();
   const raw = ' LABA|A-001|P\t\r\n';
   for (const id of ['box1', 'box2']) {
@@ -203,7 +207,7 @@ test('FH-C02: 共通・所属不明の保持、解除、操作切替と初期化
   await startEmpty(page);
   for (const [project, shown] of [['common', '共通在庫'], ['unassigned', '案件・用途が不明']] as const) {
     await selectOp(page, 'register'); await fill(page, { project });
-    await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
+    await openCodeInput(page); await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
     await selectOp(page, 'receive'); await expect(formOf(page).locator('[name=project]')).toHaveValue(project);
     await expect(panelOf(page).locator('[data-code-holds]')).toContainText(shown);
     await expect(panelOf(page).locator('[data-code-holds]')).toContainText('再読込・復元・初期化で保持は消えます');
@@ -211,7 +215,7 @@ test('FH-C02: 共通・所属不明の保持、解除、操作切替と初期化
   await panelOf(page).getByRole('button', { name: '案件・用途の保持を解除' }).click();
   await selectOp(page, 'register'); await expect(formOf(page).locator('[name=project]')).toHaveValue('');
   await fill(page, { project: 'A-001', location: 'S1' });
-  await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
+  await openCodeInput(page); await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
   await selectOp(page, 'transfer'); await expect(formOf(page).locator('[name=toProject]')).toHaveValue('');
   await goTo(page, 'management');
   await page.getByRole('button', { name: '練習用の台帳で初期化' }).click();
@@ -260,11 +264,11 @@ test('AT-30・FH-C02: 案件・用途名・場所名で検索し、保持と最�
   await recorded(page, 'masterRename', { target: 'location:S1', name: '架空の青棚', reason: '表示試験' });
   await selectOp(page, 'register');
   await interpret(page, 'BAD?');
-  await panelOf(page).getByLabel('コードの入力先').selectOption('project');
+  await openCodeInput(page); await panelOf(page).getByLabel('コードの入力先').selectOption('project');
   await panelOf(page).getByLabel('名称・品番・コードで検索').fill('架空の青案件・用途');
   await panelOf(page).getByRole('button', { name: '検索', exact: true }).click();
   await panelOf(page).locator('[data-code-options]').getByRole('button', { name: /架空の青案件・用途.*A-001/ }).click();
-  await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
+  await openCodeInput(page); await panelOf(page).getByRole('button', { name: '現在の案件・用途を保持' }).click();
   await panelOf(page).getByLabel('コードの入力先').selectOption('location');
   await panelOf(page).getByLabel('名称・品番・コードで検索').fill('架空の青棚');
   await panelOf(page).getByRole('button', { name: '検索', exact: true }).click();

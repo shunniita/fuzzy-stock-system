@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { changeMasters, practiceLedger, type Meta } from '../../src/domain/ledger.ts';
+import { changeMasters, practiceLedger, start, type Meta } from '../../src/domain/ledger.ts';
 import { emptySupply, registerNeed, reviseNeed } from '../../src/domain/supply.ts';
-import { commit, faults, initial, load, parse, replace, retry, serialize, serializePending, targetsOf, type Pending, type Snapshot, type StoreLike } from '../../src/ui/storage.ts';
+import { abandon, commit, faults, initial, load, parse, replace, retry, serialize, serializePending, targetsOf, type Pending, type Snapshot, type StoreLike } from '../../src/ui/storage.ts';
 import { decodePending } from '../../src/ui/storageparse.ts';
 import { backupTextOf, crc32, readBackup } from '../../src/ui/backup.ts';
 import { buildTemplateNeedGeneration, generateTemplateNeeds, templateNeedContextOf } from '../../src/domain/template-needs.ts';
@@ -85,6 +85,43 @@ describe('Task2.2 保存版と生成済み案件の旧入口保護', () => {
     expect(() => decodePending(envelope(value))).toThrow();
     expect(readBackup(backup(value)).kind).toBe('unreadable');
   });
+  // 通常の記録は進み具合の確認で止まるが、読込・復元・保存中の操作の再試行はそこを通らないので、案件の詳細を描けない状態を読まず、書かない。
+  describe('案件の進み具合を0.1の精度で表せない状態', () => {
+    const items = practiceLedger.masters.items, ledger = { ...practiceLedger, masters: { ...practiceLedger.masters, items: { ...items, R: { ...items['R']!, unitSteps: { 台: 0.1 as const } } } } };
+    const kit: ReceiptTemplate = { ...template, productUnit: '台', rows: [{ item: 'P', unit: '個', perSet: 1, location: 'S1' }] };
+    const plan = () => generateTemplateNeeds({ ledger, supply: saveReceiptTemplate(ledger, emptySupply, meta('save'), kit) }, meta('gen'), { ...input, count: 562949953421313 });
+    const lot = { id: 'W1', item: 'R', unit: '台', project: { kind: 'case', id: input.caseCode } as const, location: 'S1' };
+    const startedOf = (state: ReturnType<typeof plan>) => ({ ...state, ledger: start(state.ledger, meta('s1'), lot, { id: 'R組立', criterion: 'inspection' }, 'counted', 0.1, []) });
+    const message = `案件${input.caseCode}の作業で使った台数・未使用の残りが上限を超える`;
+
+    test('写しは snapshot・backup・保存先の読込で拒否する', () => {
+      const state = startedOf(plan()), text = serialize(initial(state.ledger, state.supply));
+      expect(() => parse(text)).toThrow(message);
+      expect(readBackup(backup(JSON.parse(text))).kind).toBe('unreadable');
+      const store = new Memory(); store.setItem('fuzzy-stock/head', 'A'); store.setItem('fuzzy-stock/slot-A', text);
+      expect(load(store).kind).toBe('unreadable');
+    });
+
+    test('保存はせず、保存先を変えない', () => {
+      const store = new Memory(), base = plan(), current = replace(store, null, initial(base.ledger, base.supply)), before = [...store.data];
+      const state = startedOf(current);
+      expect(commit(store, current, pending(current), [{ ...state, conflictReviews: [], targets: targetsOf(current, state) }])).toMatchObject({ kind: 'failed', reason: expect.stringContaining(message) });
+      expect([...store.data]).toEqual(before);
+    });
+
+    test('保存中の操作に残っていても読めて、再試行は保存先を変えずに拒否し、取り下げはできる', () => {
+      const store = new Memory(), base = plan(), current = replace(store, null, initial(base.ledger, base.supply)), state = startedOf(current);
+      store.setItem('fuzzy-stock/pending', serializePending({ ...pending(state), baseRevision: current.revision, units: [{ ...state, conflictReviews: [], targets: targetsOf(current, state) }] }));
+      const loaded = load(store);
+      if (loaded.kind !== 'ok' || loaded.pending === null) throw new Error(`保存中の操作が読めない: ${loaded.kind}`);
+      const before = [...store.data];
+      expect(retry(store, loaded.snapshot, loaded.pending, '架空担当A', meta('p').recordedAt)).toMatchObject({ kind: 'failed', reason: expect.stringContaining(message) });
+      expect([...store.data]).toEqual(before);
+      expect(abandon(store, loaded.snapshot, loaded.pending, '架空担当A', meta('p').recordedAt).kind).not.toBe('failed');
+      expect(load(store)).toMatchObject({ kind: 'ok', pending: null });
+    });
+  });
+
   test('版12以前へ新欄または新イベントを混ぜず、空欄だけを補う', () => {
     const current = JSON.parse(serialize(initial(practiceLedger, emptySupply)));
     expect(() => parse(JSON.stringify({ ...current, version: 12 }))).toThrow('旧版');

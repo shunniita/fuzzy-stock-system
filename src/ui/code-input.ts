@@ -8,7 +8,7 @@ import { caseRef, placeName, projectText } from './format.ts';
 
 export type CodeHolds = { project: string | null; location: string | null };
 // reference：送信の可否に関わらず、読取原文と採用済みの証拠（未確認を含む）を参照用に取り出す。送信にはevidenceを使う。
-export type CodeInput = { node: HTMLElement; evidence(): Scan | undefined; reference(): { raw: string; query: string; target: string; adopted: Scan | undefined } };
+export type CodeInput = { node: HTMLElement; trigger: HTMLButtonElement; evidence(): Scan | undefined; reference(): { raw: string; query: string; target: string; adopted: Scan | undefined } };
 const labelOf = (select: HTMLSelectElement): string => Array.from(select.closest('label')?.childNodes ?? []).filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent ?? '').join('').trim();
 const selectedText = (select: HTMLSelectElement): string => select.value === '' ? '未選択' : select.selectedOptions[0]?.textContent ?? select.value;
 const selectable = (select: HTMLSelectElement): HTMLOptionElement[] => Array.from(select.options).filter(o => o.value !== '' && !o.disabled && !o.hidden);
@@ -52,11 +52,20 @@ function clearLabelQuantity(form: HTMLFormElement, target: HTMLSelectElement): v
   if (basis instanceof HTMLSelectElement && selectable(basis).some(o => o.value === 'label')) basis.value = 'label';
 }
 
+// 操作を切り替えても続けて読み取れるよう、小窓の開閉はタブ内で引き継ぐ。
+let panelOpen = false;
+
 // 一フォームの読取状態。保持だけは呼出し側がタブ内で共有し、保存データへは含めない。
 export function codeInput(form: HTMLFormElement, ledger: Ledger, operation: string, holds: CodeHolds): CodeInput {
   const targets = Array.from(form.querySelectorAll<HTMLSelectElement>('select[data-code-target]'));
-  const node = h('section', { class: 'code-input', 'aria-label': 'コード入力補助' }, h('h3', {}, 'コード入力・検索'));
-  if (targets.length === 0) { node.hidden = true; return { node, evidence: () => undefined, reference: () => ({ raw: '', query: '', target: '', adopted: undefined }) }; }
+  const close = h('button', { type: 'button' }, '閉じる');
+  const node = h('section', { class: 'code-input', 'aria-label': 'コード入力補助' }, h('header', {}, h('h3', {}, 'コード入力・検索'), close));
+  const trigger = h('button', { type: 'button', class: 'code-input-trigger', 'aria-expanded': 'false' }, 'コード入力・検索');
+  const show = (open: boolean) => { panelOpen = open; node.hidden = !open; trigger.setAttribute('aria-expanded', String(open)); };
+  trigger.addEventListener('click', () => show(!panelOpen));
+  close.addEventListener('click', () => { show(false); trigger.focus(); });
+  if (targets.length === 0) { trigger.disabled = true; node.hidden = true; return { node, trigger, evidence: () => undefined, reference: () => ({ raw: '', query: '', target: '', adopted: undefined }) }; }
+  show(panelOpen);
   const raw = h('textarea', { rows: '2', autocomplete: 'off', spellcheck: 'false' });
   const result = h('div', { 'aria-live': 'polite', 'data-code-result': '' });
   const targetChoice = h('select');
@@ -192,7 +201,7 @@ export function codeInput(form: HTMLFormElement, ledger: Ledger, operation: stri
   const searchGroup = h('fieldset', {}, h('legend', {}, '検索して入力する対象'), field('コードの入力先', targetChoice), field('名称・品番・コードで検索', query), search, options);
   node.append(held, holdsButtons, field('読取原文・品目ID', raw), parse, result, searchGroup, final, confirm);
   changed();
-  return { node, evidence: () => {
+  return { node, trigger, evidence: () => {
     if (adopted && !confirmed) throw new Error('読取後の最終対象を「この対象で続ける」で確認する');
     return adopted;
   }, reference: () => ({ raw: raw.value, query: query.value, target: targetChoice.value, adopted }) };

@@ -8,6 +8,8 @@ import type { Values } from '../../src/ui/dom.ts';
 import { templateNeedContextOf } from '../../src/domain/template-needs.ts';
 import { templateNeedInfo } from '../../src/domain/template-needs.ts';
 import { viewSheetsOf } from '../../src/ui/viewsheets.ts';
+import { requireTemplateNeedCaptureCapacity } from '../../src/ui/template-needs-capacity.ts';
+import { captureDraft, fieldsOf } from '../../src/ui/conflict-ui.ts';
 
 const meta = (eventId: string): Meta => ({ eventId, actor: '架空担当', occurredAt: '2026-10-30T09:00:00+09:00', recordedAt: '2026-10-30T09:00:00+09:00' });
 const input = { templateId: 'kit', caseCode: '000007', count: 10, dueDate: '2026-11-01' };
@@ -28,8 +30,10 @@ test('2.1 単独生成を「必要な数・依頼・発注」から選べる', (
   expect(operationGroups.find(group => group.id === 'requests')?.keys).toContain('templateNeedGenerate');
 });
 
-test('3.1 まとめて生成を必要な数から選べる', () => {
-  expect(operationGroups.find(group => group.id === 'requests')?.keys).toContain('templateNeedBatch');
+test('6.1 2つのセットでまとめて生成する操作を出さない', () => {
+  const state = stateOf();
+  expect(operationGroups.flatMap(group => group.keys)).not.toContain('templateNeedBatch');
+  expect(templateNeedsOps({ ledger: () => state.ledger, supply: () => state.supply }, () => 'gen', () => {})).not.toHaveProperty('templateNeedBatch');
 });
 
 test('2.11 プレビュー署名は履歴件数に比例してフォームを膨らませない', () => {
@@ -63,4 +67,10 @@ test('2.1, 4.6, 8.1 確認した生成結果を必要明細一覧・履歴・Exc
   expect(sheet?.rows[0]?.join(' ')).toContain('架空セット');
   expect(sheets.find(sheet => sheet.name === '供給の履歴')?.rows.at(-1)?.join(' ')).toContain('架空セット');
   expect(result.ledger.lots).toEqual(state.ledger.lots);
+});
+
+test('8.3 競合回収と照合の実形式が大きすぎれば確定前に理由を示す', () => {
+  const made = captureDraft({ initial: [], fields: fieldsOf([{ type: 'text', name: 'needCase', label: '案件ID', value: '架空'.repeat(12000), checked: false, selectedText: '', fileNames: [], readState: 'unread' }]), initialActor: '', actor: '架空担当', initialOccurredAt: null, occurredAt: null, origin: { kind: 'unsent' }, opKey: 'templateNeedGenerate', opLabel: 'セットから必要明細を生成', baseRevision: 0, baseLastWriter: null, detectedAt: meta('gen').recordedAt, detectedReason: '外部更新', readEvidence: [], targets: [], unapplied: ['未送信'] }, () => 'fictional-review');
+  if (made.kind !== 'captured') throw new Error('捕捉できない');
+  expect(() => requireTemplateNeedCaptureCapacity(made.draft, 'legacy/unknown', 'gen')).toThrow('64KiB');
 });

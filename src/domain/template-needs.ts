@@ -1,6 +1,6 @@
 import { normalizeAssemblyRecipe } from './assembly-recipes.ts';
 import { changeMasters, checkTime, deepFreeze, type Ledger, type Meta } from './ledger.ts';
-import { own, type Masters } from './masters.ts';
+import { codeOwner, own, refOf, type CaseMaster, type Masters } from './masters.ts';
 import { recipeVersion, validateReceiptTemplates, type ReceiptTemplate } from './receipt-template.ts';
 import { templateNeedRows } from './template-needs-calculation.ts';
 import { templateNeedContextOf } from './template-needs-context.ts';
@@ -27,8 +27,9 @@ export type TemplateNeedContext = {
   plans: Readonly<Record<string, TemplateNeedPlan>>;
   versions: Readonly<Record<string, TemplateNeedVersion>>;
 };
-export type TemplateNeedGenerationInput = { templateId: string; caseCode: string; count: number; dueDate: string | null };
-export type TemplateNeedBatchInput = { projects: readonly Omit<TemplateNeedGenerationInput, 'dueDate'>[]; dueDate: string | null; group: TemplateNeedGroup };
+// caseId は一覧で選んだ案件・用途の内部ID。あれば caseCode は使わない（品番・コードのない案件・用途を指す唯一の方法）。
+export type TemplateNeedGenerationInput = { templateId: string; caseCode: string; caseId?: string; count: number; dueDate: string | null };
+export type TemplateNeedBatchInput = { projects: readonly Omit<TemplateNeedGenerationInput, 'dueDate' | 'caseId'>[]; dueDate: string | null; group: TemplateNeedGroup };
 export type TemplateNeedGenerationRow = { item: string; unit: string; perSet: number; required: number; sourceRows: readonly number[] };
 export type TemplateNeedGenerationDetail = {
   kind: 'templateNeeds';
@@ -90,7 +91,8 @@ export function generateTemplateNeedsBatch(state: { ledger: Ledger; supply: Supp
 }
 
 export function buildTemplateNeedBatchGeneration(state: { ledger: Ledger; supply: Supply }, context: TemplateNeedContext, meta: Meta, input: TemplateNeedBatchInput): TemplateNeedBatchGeneration {
-  return buildGeneration(state, context, meta, input.projects, input.dueDate, input.group);
+  // 型の Omit は余分な caseId を取り除かないので、案件IDの欄だけで組み直す（一括は品番・コードで指す）。
+  return buildGeneration(state, context, meta, input.projects.map(({ templateId, caseCode, count }) => ({ templateId, caseCode, count })), input.dueDate, input.group);
 }
 
 function generationRows(template: ReceiptTemplate, masters: Masters, count: number): TemplateNeedGenerationRow[] {
@@ -102,14 +104,40 @@ function generationRows(template: ReceiptTemplate, masters: Masters, count: numb
   return rows;
 }
 
-function resolveGenerationProject(ledger: Ledger, supply: Supply, context: TemplateNeedContext, meta: Meta, caseCode: string, index: number): { ledger: Ledger; project: string; newProject: boolean } {
-  const matches = Object.values(ledger.masters.cases).filter(project => project.code === caseCode || (project.code === null && project.id === caseCode));
-  if (matches.length > 1) throw new Error(`案件ID ${caseCode} の対応が曖昧。登録情報を確認する`);
-  const existing = matches[0];
+// 今その品番・コードを持つ案件・用途だけ。内部IDとは照合しない：内部IDは登録時の品番・コードと同じ文字のことがあり、
+// 対応変更で外された後も、以前の品番・コードとして別の案件・用途に当たってしまう。
+export function generationCaseOf(masters: Masters, caseCode: string): CaseMaster | null {
+  const found = codeOwner(masters, 'case', caseCode);
+  return found?.type === 'case' ? found : null;
+}
+
+export function generationBlockerOf(supply: Supply, context: TemplateNeedContext, found: CaseMaster, caseCode: string): string | null {
+  if (!found.active) return `案件ID ${caseCode} は利用停止中`;
+  if (Object.values(supply.needs).some(need => need.project.id === found.id)) return `案件ID ${caseCode} は必要明細を持つ。既存の必要明細を確認・変更する`;
+  if (own(context.plans, found.id)) return `案件ID ${caseCode} は生成済み。既存の必要明細を確認・変更する`;
+  return null;
+}
+
+// 一覧から選べる生成先：generationBlockerOf が理由を出さない案件・用途（利用中で、必要明細も計画もない。品番・コードのない仮のものを含む）。
+// 案件ごとに generationBlockerOf を呼ぶと案件数×必要明細数になるので、必要明細のある案件を一度だけ集める。
+export function generationTargetsOf(state: { ledger: Ledger; supply: Supply }): CaseMaster[] {
+  const context = templateNeedContextOf(state.supply), withNeeds = new Set(Object.values(state.supply.needs).map(need => need.project.id));
+  return Object.values(state.ledger.masters.cases).filter(m => m.active && !withNeeds.has(m.id) && !own(context.plans, m.id));
+}
+
+function resolveGenerationProject(ledger: Ledger, supply: Supply, context: TemplateNeedContext, meta: Meta, input: Omit<TemplateNeedGenerationInput, 'dueDate'>, index: number): { ledger: Ledger; project: string; newProject: boolean } {
+  if (input.caseId !== undefined) {
+    const chosen = own(ledger.masters.cases, input.caseId);
+    if (!chosen) throw new Error('選んだ案件・用途がない。一覧から選び直す');
+    const blocker = generationBlockerOf(supply, context, chosen, refOf(ledger.masters.cases, chosen.id));
+    if (blocker !== null) throw new Error(blocker);
+    return { ledger, project: chosen.id, newProject: false };
+  }
+  const caseCode = input.caseCode;
+  const existing = generationCaseOf(ledger.masters, caseCode);
   if (existing) {
-    if (!existing.active) throw new Error(`案件ID ${caseCode} は利用停止中`);
-    if (Object.values(supply.needs).some(need => need.project.id === existing.id)) throw new Error(`案件ID ${caseCode} は必要明細を持つ。既存の必要明細を確認・変更する`);
-    if (own(context.plans, existing.id)) throw new Error(`案件ID ${caseCode} は生成済み。既存の必要明細を確認・変更する`);
+    const blocker = generationBlockerOf(supply, context, existing, caseCode);
+    if (blocker !== null) throw new Error(blocker);
     return { ledger, project: existing.id, newProject: false };
   }
   const next = changeMasters(ledger, { ...meta, eventId: `${meta.eventId}-c${index + 1}` }, { action: 'register', master: { type: 'case', code: caseCode, name: null, source: null } });
@@ -126,10 +154,11 @@ export function buildTemplateNeedGeneration(state: { ledger: Ledger; supply: Sup
 
 function buildGeneration(state: { ledger: Ledger; supply: Supply }, context: TemplateNeedContext, meta: Meta, inputs: readonly Omit<TemplateNeedGenerationInput, 'dueDate'>[], dueDate: string | null, group: TemplateNeedGroup | null): TemplateNeedBatchGeneration {
   checkTemplateNeedGroup(inputs.map(input => input.count), group);
-  if (inputs.some(input => !input.caseCode.trim())) throw new Error('案件IDを入力する');
-  if (inputs.some(input => input.caseCode !== input.caseCode.trim())) throw new Error('案件IDの前後の空白を取り除いて確認する。以前の空白付き案件は既存の明細から変更する');
-  if (inputs.some(input => Object.values(state.ledger.masters.cases).some(project => project.code !== null && project.code !== project.code.trim() && project.code.trim() === input.caseCode))) throw new Error('同じコードの空白付き案件がある。登録情報で案件コードを確認・変更してから生成する');
-  const codes = inputs.map(input => input.caseCode), duplicates = [...new Set(codes.filter((code, index) => codes.indexOf(code) !== index))];
+  const coded = inputs.filter(input => input.caseId === undefined);
+  if (coded.some(input => !input.caseCode.trim())) throw new Error('案件IDを入力する');
+  if (coded.some(input => input.caseCode !== input.caseCode.trim())) throw new Error('案件IDの前後の空白を取り除いて確認する。以前の空白付き案件は既存の明細から変更する');
+  if (coded.some(input => Object.values(state.ledger.masters.cases).some(project => project.code !== null && project.code !== project.code.trim() && project.code.trim() === input.caseCode))) throw new Error('同じコードの空白付き案件がある。登録情報で案件コードを確認・変更してから生成する');
+  const codes = coded.map(input => input.caseCode), duplicates = [...new Set(codes.filter((code, index) => codes.indexOf(code) !== index))];
   if (duplicates.length > 0) throw new Error(`案件ID「${duplicates.join('」「')}」が重複している`);
   if (dueDate !== null) checkDate(dueDate, '必要日');
   checkTime(meta.occurredAt, '発生');
@@ -150,7 +179,7 @@ function buildGeneration(state: { ledger: Ledger; supply: Supply }, context: Tem
       if (own(context.versions, version.id)) throw new Error(`版ID ${version.id} は使用済み`);
       versions.push(version); versionsByContent.set(content, version);
     }
-    const target = resolveGenerationProject(ledger, state.supply, context, meta, input.caseCode, index);
+    const target = resolveGenerationProject(ledger, state.supply, context, meta, input, index);
     const previous = projectIds.get(target.project);
     if (previous !== undefined) throw new Error(`案件ID「${previous}」「${input.caseCode}」は同じ案件に対応している`);
     projectIds.set(target.project, input.caseCode); ledger = target.ledger;

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { decodeSnapshot } from '../../src/ui/storageparse.ts';
-import { selectOperation, goTo, backupButton, cell, downloadVia, lot, opLabels, pickFile, record, recorded, row, set, startEmpty, storageBytes, waitForApp } from './helpers.ts';
+import { selectOperation, goTo, backupButton, cell, downloadVia, lot, opLabels, pickFile, record, recorded, row, set, startEmpty, storageBytes, waitForApp, openCodeInput } from './helpers.ts';
 
 test.use({ trace: 'retain-on-failure' });
 const formOf = (page: Page) => page.getByRole('form', { name: '操作の入力' });
@@ -109,6 +109,7 @@ test('FH-C06/07: 廃棄は未使用品を減らさず、ラベルで実数を変
   const form = formOf(page), panel = page.getByRole('region', { name: 'コード入力補助' });
   await selectOperation(form.locator('[name=op]'), { label: opLabels.reworkRecover });
   for (const [name, value] of Object.entries({ reworkId, subjectLotId: 'repair', newId: 'recovered', item: 'P', location: 'S1', value: '1', reason: '架空回収', occurredAt: '2026-09-29T14:00' })) await set(form.locator(`[name=${name}]`), value);
+  await openCodeInput(page);
   await panel.getByLabel('読取原文・品目ID').fill('LABA|A-001|P');
   await panel.getByRole('button', { name: '解釈', exact: true }).click();
   await panel.getByLabel('コードの入力先').selectOption('item');
@@ -181,4 +182,33 @@ test('ADR-039の3: 処置した枝を選び、部分完了の残り・後入力�
   await goTo(page, 'stock');
   await row(page, 'repair').getByRole('button', { name: 'repair', exact: true }).click();
   await expect(page.locator('#detail')).toContainText('対象枝repair');
+});
+
+test('p2-inspection-rework 1.1・2.1・2.3・3.1・3.2: 確認待ちの詳細からやり直し・修理を始め、履歴で見分け、交換の対象枝に選べる', async ({ page }) => {
+  await startEmpty(page);
+  await recorded(page, 'register', lot('parts', 'P', 'S1', 'counted', '100'), '08:00');
+  await recorded(page, 'start', { newId: 'work', item: 'R', project: 'A-001', location: 'T', process: 'R組立', basis: 'counted', value: '20', m1lot: 'parts', m1basis: 'counted', m1value: '20' }, '09:00');
+  await recorded(page, 'finish', { lot: 'work', childId: 'checking', basis: 'counted', value: '20' }, '10:00');
+  await goTo(page, 'stock');
+  await row(page, 'checking').getByRole('button', { name: 'checking', exact: true }).click();
+  const detail = page.locator('#detail');
+  await detail.getByText('その他の操作', { exact: true }).click();
+  await detail.getByRole('button', { name: opLabels.reworkBegin, exact: true }).click();
+  const form = formOf(page);
+  await expect(form).toContainText('確認で不合格になった物もここから戻す');
+  await expect(form.locator('[name=lot]')).toHaveValue('checking');
+  for (const [name, value] of [['childId', 'repair'], ['value', '2'], ['reason', '確認で通電不良'], ['occurredAt', '2026-09-29T11:00']] as const) await form.locator(`[name=${name}]`).fill(value);
+  await form.locator('[name=basis]').selectOption('counted');
+  await form.getByRole('button', { name: '記録する', exact: true }).click();
+  await expect(page.locator('#input > [role=status]')).toContainText('記録した');
+  await goTo(page, 'stock');
+  await expect(cell(page, 'checking', '記録上の数と根拠')).toContainText('18台');
+  await expect(cell(page, 'repair', '記録上の数と根拠')).toContainText('2台');
+  const after = await snapshot(page);
+  expect(after.ledger.lots['repair']?.stage).toMatchObject({ kind: 'working', process: { id: 'R組立' } });
+  expect(after.ledger.lots['checking']?.stage.kind).toBe('inspecting');
+  await row(page, 'repair').getByRole('button', { name: 'repair', exact: true }).click();
+  await expect(page.locator('#detail')).toContainText('（確認待ちから）');
+  const reworkId = after.ledger.history.find(e => e.kind === 'rework')!.eventId;
+  await recorded(page, 'reworkReplace', { reworkId, subjectLotId: 'repair', lot: 'parts', value: '1', reason: '基板交換' }, '11:30');
 });

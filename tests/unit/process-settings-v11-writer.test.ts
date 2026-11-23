@@ -29,7 +29,7 @@ describe('工程の設定 5.3・5.4: v1.2.0（保存版11）のwriterが書い�
     expect([...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')).toBe(fixture.sha256);
   });
 
-  test('工程と次工程の場所を補って読み、集計・履歴・工程上の位置をv1.2.0と同じに示し、再試行後も同じ', () => {
+  test('工程と次工程への置き場を補って読み、集計・履歴・工程上の位置をv1.2.0と同じに示し、再試行後も同じ', () => {
     const store = new Memory(fixture.data);
     const loaded = load(store);
     if (loaded.kind !== 'ok' || loaded.pending === null) throw new Error('v1.2.0の保存途中を読めない');

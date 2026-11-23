@@ -48,7 +48,7 @@ describe('工程の設定 1.2: 新しく工程に載せる記録は台帳の工�
   });
 });
 
-describe('工程の設定 1.2: 次工程の場所は台帳の指定で判定する（3.2）', () => {
+describe('工程の設定 1.2: 次工程への置き場は台帳の指定で判定する（3.2）', () => {
   test('指定された場所へは製造中の物を登録・移動・位置の変更で置かない', () => {
     expect(() => register(practiceLedger, meta('r'), { ...product('W', 'N'), stage: { kind: 'working', process: assembly } }, 'counted', 1)).toThrow('次工程N');
     const l = start(practiceLedger, meta('s'), product('W'), assembly, 'counted', 2, []);
@@ -118,7 +118,7 @@ describe('工程の設定 2.1: 工程の登録・名前・完了基準・利用�
   });
 });
 
-describe('工程の設定 2.2: 次工程の場所の指定・付け替え・解除（3.1・3.3・3.4・3.6）', () => {
+describe('工程の設定 2.2: 次工程への置き場の指定・付け替え・解除（3.1・3.3・3.4・3.6）', () => {
   test('付け替えは外す場所と付ける場所を一つの変更に残し、渡した物の所在は変えない', () => {
     let l = register(practiceLedger, meta('done', 7), product('handed', 'N'), 'counted', 1);
     l = changed(l, 'nx', { action: 'nextProcess', id: 'S2', reason: '次工程の棚を変える' });
@@ -148,6 +148,6 @@ describe('工程の設定 2.2: 次工程の場所の指定・付け替え・解�
     const off = changed(practiceLedger, 'off', { action: 'deactivate', type: 'location', id: 'S2', reason: '使わない' }, 7);
     expect(() => changed(off, 'nx', { action: 'nextProcess', id: 'S2', reason: '指定' })).toThrow('利用停止中');
     expect(() => changed(practiceLedger, 'offN', { action: 'deactivate', type: 'location', id: 'N', reason: '使わない' })).toThrow('先に次工程の指定を解除する');
-    expect(() => changed(practiceLedger, 'same', { action: 'nextProcess', id: 'N', reason: '同じ' })).toThrow('今と同じ次工程の場所');
+    expect(() => changed(practiceLedger, 'same', { action: 'nextProcess', id: 'N', reason: '同じ' })).toThrow('今と同じ次工程への置き場');
   });
 });

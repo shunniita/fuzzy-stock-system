@@ -1,6 +1,6 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { browserZoomProfile } from './browser-zoom-profile.mjs';
-import { goTo, lot, recorded, usePractice, waitForApp } from './helpers.ts';
+import { goTo, lot, openMasterKind, recorded, usePractice, waitForApp } from './helpers.ts';
 import { snapshotOf } from './conflict-helpers.ts';
 
 // 初めて開いたブラウザーと同じく、モードを選んだことがない状態から始める。
@@ -91,12 +91,84 @@ test('登録情報: 簡単操作モードでは品目と場所の登録・名称
   await start(page);
   await goTo(page, 'masters');
   const masters = page.locator('#masters');
-  for (const name of ['品目を登録', '場所を登録']) await expect(masters.getByRole('button', { name, exact: true })).toBeVisible();
-  for (const name of ['案件・用途を登録', '担当者を登録', '工程を登録', '次工程の場所を指定']) await expect(masters.getByRole('button', { name, exact: true })).toHaveCount(0);
+  await expect(masters.getByRole('button', { name: '品目を登録', exact: true })).toBeVisible();
+  for (const name of ['案件・用途を登録', '担当者を登録', '工程を登録', '次工程への置き場を指定']) await expect(masters.getByRole('button', { name, exact: true, includeHidden: true })).toHaveCount(0);
   await masters.locator('tr[data-master="item:P"]').getByRole('button').first().click();
   const keys = await masters.getByRole('group', { name: 'この登録情報にできる操作' }).locator('[data-op]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-op')));
-  expect(keys.sort()).toEqual(['masterDeactivate', 'masterRename']);
+  expect(keys.sort()).toEqual(['masterConsumable', 'masterDeactivate', 'masterPerBox', 'masterRename']);
   await expect(masters.getByRole('button', { name: 'この品目のセット', exact: true })).toHaveCount(0);
+  await openMasterKind(page, '場所');
+  await expect(masters.getByRole('button', { name: '場所を登録', exact: true })).toBeVisible();
+});
+
+test('p2-simple-consumables: 簡単操作モードで補充基準を設定し、在庫と入力で補充確認を見る。高度な操作モードでは不足・依頼に戻る', async ({ page }) => {
+  await page.goto('/'); await waitForApp(page);
+  await expect(page.locator('#page-stock #consumables')).toBeHidden();
+  await usePractice(page);
+  await expect(page.locator('#page-stock #consumables')).toBeVisible();
+  await put(page, 'P', '12');
+  await goTo(page, 'masters');
+  const masters = page.locator('#masters');
+  await masters.locator('tr[data-master="item:P"]').getByRole('button').first().click();
+  await masters.getByRole('group', { name: 'この登録情報にできる操作' }).getByText('その他の操作', { exact: true }).click();
+  await masters.locator('[data-op=masterConsumable]').click();
+  await form(page).locator('[name=consumableEnabled]').check();
+  await form(page).locator('[name=pieceUnit]').selectOption('個');
+  await form(page).locator('[name=replenishmentEnabled]').check();
+  await form(page).locator('[name=threshold]').fill('20');
+  await form(page).locator('[name=standardOrderValue]').fill('10');
+  await form(page).locator('[name=standardOrderUnit]').selectOption('個');
+  await form(page).locator('[name=reason]').fill('架空の買い置きの目安');
+  await form(page).getByRole('button', { name: '記録する', exact: true }).click();
+  await expect(page.locator('#input > [role=status]')).toContainText('記録した');
+  await goTo(page, 'stock');
+  const consumables = page.locator('#page-stock #consumables');
+  await expect(consumables).toBeVisible();
+  expect(await page.evaluate(() => document.getElementById('list')!.nextElementSibling?.id)).toBe('consumables');
+  await expect(consumables.locator('article[data-stock="P"] li.warn')).toContainText('補充基準20個を下回る');
+  const before = await snapshotOf(page);
+  await goTo(page, 'management');
+  await page.getByLabel('操作モード').selectOption('advanced');
+  await expect(page.locator('#page-supply #consumables')).toHaveCount(1);
+  await expect(page.locator('#page-stock #consumables')).toHaveCount(0);
+  const after = await snapshotOf(page);
+  expect(after.ledger).toEqual(before.ledger);
+  expect(after.supply).toEqual(before.supply);
+});
+
+test('p2-box-opening: 簡単操作モードで箱を開け、数えた本数で中身を持ち、1本使うと補充の区画に残りが出る', async ({ page }) => {
+  await start(page);
+  await page.locator('#list').getByRole('button', { name: '入れる', exact: true }).click();
+  await form(page).locator('select[name=item]').selectOption('S');
+  await form(page).locator('select[name=unit]').selectOption('箱');
+  await form(page).locator('select[name=location]').selectOption('S1');
+  await form(page).locator('[name=basis]').selectOption('label');
+  await form(page).locator('[name=value]').fill('2');
+  await form(page).getByRole('button', { name: '記録する', exact: true }).click();
+  await expect(page.locator('#input > [role=status]')).toContainText('記録した');
+  await page.locator('#list tr[data-lot="L-0001"]').getByRole('button', { name: 'L-0001', exact: true }).click();
+  const detail = page.locator('#detail');
+  await detail.getByText('その他の操作', { exact: true }).click();
+  await detail.locator('[data-op=openBox]').click();
+  await expect(form(page).locator('[name=boxes]')).toHaveValue('1');
+  await expect(form(page).locator('[name=childId]')).toHaveValue('L-0002');
+  await form(page).getByRole('button', { name: '記録する', exact: true }).click();
+  await expect(page.locator('#input > [role=status]')).toContainText('開けた中身を数えた数を入力する');
+  await form(page).locator('[name=counted]').fill('1000');
+  await form(page).getByRole('button', { name: '記録する', exact: true }).click();
+  await expect(page.locator('#input > [role=status]')).toContainText('記録した');
+  const saved = (await snapshotOf(page)).ledger;
+  expect(saved.lots['L-0001']?.quantity).toMatchObject({ numeric: { value: 1 } });
+  expect(saved.lots['L-0002']).toMatchObject({ unit: '本', quantity: { numeric: { value: 1000, unconfirmed: 'none' } } });
+  await page.locator('#list tr[data-lot="L-0002"]').getByRole('button', { name: 'L-0002', exact: true }).click();
+  await expect(detail).toContainText('開封：L-0001から1箱を開けてL-0002へ1000本（数えた）');
+  await detail.getByRole('button', { name: '使用', exact: true }).click();
+  await form(page).locator('[name=basis]').selectOption('counted');
+  await form(page).locator('[name=value]').fill('1');
+  await form(page).locator('[name=usedFor]').fill('架空の作業');
+  await form(page).getByRole('button', { name: '記録する', exact: true }).click();
+  await expect(page.locator('#input > [role=status]')).toContainText('記録した');
+  await expect(page.locator('#page-stock #consumables article[data-stock="S"]')).toContainText('開封済み・バラの数量（本）：L-0002 記録上の数999本');
 });
 
 for (const width of [1366, 390]) test(`入れる: ${width}pxでキーボードだけで記録し、横にはみ出さない`, async ({ page }) => {

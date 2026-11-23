@@ -188,7 +188,8 @@ test('MFG-06: 作業の開始の作業の場所に次工程Nを選べない（�
   await startEmpty(page);
   const form = page.getByRole('form', { name: '操作の入力' });
   await selectOperation(form.locator('[name=op]'), { label: '作業の開始' });
-  await expect(form.locator('[name=location] option')).toHaveText(['選ぶ', '棚S1（S1）', '棚S2（S2）', '作業台T（T）', '対象外の棚O（O）']);
+  await expect(form.locator('[name=location] option')).toHaveText(['選ぶ', '棚S1（S1）', '棚S2（S2）', '作業台T（T）', '対象外の棚O（O）', '次工程N（N）：次工程への置き場なので作業の場所にできない']);
+  await expect(form.locator('[name=location] option[value=N]')).toHaveJSProperty('disabled', true);
 });
 
 test('MFG-06: 次工程への引渡しの渡した先は次工程Nだけで、棚や作業台を選べない', async ({ page }) => {

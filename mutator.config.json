@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/@mizchi/mutator/schema/mutator.config.schema.json",
+  "include": ["src/**/*.ts"],
+  "runner": "vitest",
+  "vitestConfig": "vitest.mutator.config.mjs",
+  "fullDryRun": true,
+  "concurrency": 1,
+  "reporters": ["text", "json"]
+}

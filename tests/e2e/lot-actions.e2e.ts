@@ -1,6 +1,6 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { browserZoomProfile } from './browser-zoom-profile.mjs';
-import { goTo, lot, opLabels, record, recorded, startEmpty, storageBytes, waitForApp, launchAdvanced } from './helpers.ts';
+import { goTo, lot, opLabels, record, recorded, startEmpty, storageBytes, waitForApp, launchAdvanced, openCodeInput } from './helpers.ts';
 import { draftOf, snapshotOf } from './conflict-helpers.ts';
 
 async function openLot(page: Page, id: string): Promise<void> {
@@ -39,6 +39,7 @@ test('操作切替: 取消・同じ対象・閲覧移動で固定対象と日時
   const form = page.getByRole('form', { name: '操作の入力' }), original = await form.elementHandle();
   await form.locator('[name=location]').selectOption('T');
   await form.locator('[name=occurredAt]').fill('2026-09-29T10:17');
+  await openCodeInput(page);
   const raw = page.locator('#input .code-input textarea');
   await raw.fill('架空の読取原文 001');
   const before = await storageBytes(page);
@@ -104,7 +105,7 @@ test('対象候補: 16操作を状態で絞り、統合元だけを固定して�
   await expect(other.locator('button[data-op=finish]')).toHaveCount(1);
   await expect(other.locator('button[data-op=inspect], button[data-op=toNext], button[data-op=reworkBegin]')).toHaveCount(0);
   const base = ['declare', 'handover', 'hold', 'merge', 'release', 'splitMove', 'stageFix', 'transfer'];
-  for (const [id, extra] of [['source', ['surplusAllocate']], ['working', ['finish']], ['inspection', ['inspect']], ['completed', ['toNext', 'reworkBegin']]] as const) {
+  for (const [id, extra] of [['source', ['surplusAllocate']], ['working', ['finish']], ['inspection', ['inspect', 'reworkBegin']], ['completed', ['toNext', 'reworkBegin']]] as const) {
     await openLot(page, id);
     const keys = await other.locator('button[data-op]').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-op')));
     expect(keys.sort()).toEqual([...base, ...extra].sort());
