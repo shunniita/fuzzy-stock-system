@@ -15,6 +15,7 @@ export const opLabels = {
   handover: '外へ出す',
   move: '移動',
   splitMove: '一部を分けて移動',
+  openBox: '開封',
   split: '分割',
   merge: '統合',
   recount: '数えて確認・訂正',
@@ -44,7 +45,6 @@ export const opLabels = {
   requestCancel: '依頼の取消',
   receive: '受け取り',
   templateNeedGenerate: 'セットから必要明細を生成',
-  templateNeedBatch: '2つのセットでまとめて生成',
   templateNeedEdit: '生成した必要明細の変更',
   templateSave: 'セットの登録・変更',
   templateDelete: 'セットの削除',
@@ -70,7 +70,7 @@ export const opLabels = {
   masterScope: '記録の対象の変更',
   masterProcess: '工程の登録',
   masterProcessCriterion: '工程の完了基準の変更',
-  masterNextProcess: '次工程の場所の指定・解除',
+  masterNextProcess: '次工程への置き場の指定・解除',
   identify: '仮の記録を既存の保管単位に対応付ける',
   adopt: '仮の記録を新しい保管単位にする',
   assignProject: '所属が不明な保管単位の結び付け',
@@ -84,6 +84,11 @@ export const opLabels = {
   returnRework: '返ってきた物のやり直し・修理を開始',
   needImportResolve: '必要明細取込の照合',
 } as const;
+
+export async function openCodeInput(page: Page): Promise<void> {
+  const trigger = page.locator('#input .code-input-trigger');
+  if (await trigger.getAttribute('aria-expanded') === 'false') await trigger.click();
+}
 
 export async function waitForApp(page: Page): Promise<void> {
   await expect(page.locator('#app')).toHaveJSProperty('inert', false);
@@ -256,3 +261,10 @@ export function filePayload(name: string, mimeType: string, bytes: Uint8Array): 
 }
 
 export const jsonFile = (name: string, text: string): FilePayload => filePayload(name, 'application/json', new TextEncoder().encode(text));
+
+// 登録情報は種類ごとのサブメニューで切り替える。絞り込み中は名前に件数が付くので前方一致で探す。
+export async function openMasterKind(page: Page, kind: '品目' | '場所' | '案件・用途' | '担当者' | '工程'): Promise<void> {
+  const button = page.locator('#masters').getByRole('group', { name: '登録情報の種類' }).getByRole('button', { name: new RegExp(`^${kind}(（|$)`) });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-current', 'true');
+}

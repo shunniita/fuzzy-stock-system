@@ -168,3 +168,25 @@ describe('FH-C07〜08・やり直し・修理の保存と出力', () => {
     expect(() => parse(serialize(initial(ledger, emptySupply)))).toThrow();
   });
 });
+
+describe('p2-inspection-rework・確認待ちからのやり直し・修理の保存と履歴', () => {
+  const inspection = { id: '検査組立', criterion: 'inspection' } as const;
+  const ledgerOf = withProcesses(practiceBase, inspection);
+  function fromWaiting(): Ledger {
+    const l = register(ledgerOf, meta('register'), { id: 'checking', item: 'R', unit: '台', project: { kind: 'case', id: 'A-001' }, location: 'T', stage: { kind: 'inspecting', process: inspection } }, 'label', 5);
+    return beginRework(l, meta('rework'), 'checking', 'repair', 'label', 1, '確認で不合格');
+  }
+
+  test('1.2: 確認待ちからの記録を保存して読み込み直せる。元の前の状態を作業中に書き換えた写しは拒否する', () => {
+    const s = initial(fromWaiting(), emptySupply);
+    expect(parse(serialize(s)).ledger).toEqual(s.ledger);
+    const forged = { ...s, ledger: { ...s.ledger, history: s.ledger.history.map(e => e.kind === 'rework' ? { ...e, changes: e.changes.map(c => c.before === null ? c : { ...c, before: { ...c.before, stage: { kind: 'working' as const, process: inspection } } }) } : e) } };
+    expect(() => parse(serialize(forged))).toThrow(/完成（渡す前）・確認待ちでない/);
+  });
+
+  test('2.1・2.2: 確認待ちからは「（確認待ちから）」を付け、完成からの文は変えない', () => {
+    const text = (l: Ledger) => eventText(l, l.history.find(e => e.kind === 'rework')!);
+    expect(text(fromWaiting())).toContain('（確認待ちから）');
+    expect(text(base())).not.toContain('確認待ち');
+  });
+});

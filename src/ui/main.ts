@@ -7,6 +7,8 @@ import type { HistoryTargetCollector } from './history-item-format.ts';
 import {
   beginAlternativeRecord,
   beginRework,
+  isReworkSource,
+  openBox,
   changeStage,
   correctOccurredAt,
   declareDiscrepancy,
@@ -90,14 +92,15 @@ import {
 import { checkField, choiceField, field, h, section, selectField, textField, type Child, type Values } from './dom.ts';
 import { alternativeFields, alternativeOperationOf, alternativeSourceOf } from './alternative-input.ts';
 import type { AlternativeOperation } from '../domain/alternative-record.ts';
-import { nextProcessOf, own, processOf, processRef, type Masters } from '../domain/masters.ts';
+import { nextProcessOf, own, processOf, processRef, type Master, type Masters } from '../domain/masters.ts';
 import { emptySupply } from '../domain/supply.ts';
 import { requireQuantityTotals } from '../domain/shortage.ts';
-import { processOptions, stopProcessOptions, amount, amountFields, countOrUnknown, MaterialInclusionRequired, formValue, precisionHints, quantityWarnings, quantityStepFor, quantityTargetOf, quantityValue, basisOptions, codeTarget, itemFields, itemOptions, lotOptions as lotChoices, placeOptions as placeChoices, projectField, projectKey, projectOf, registerFromValues, restrictPlaces } from './fields.ts';
+import { processOptions, stopProcessOptions, amount, amountFields, countOrUnknown, MaterialInclusionRequired, formValue, precisionHints, quantityWarnings, quantityStepFor, quantityTargetOf, quantityValue, basisOptions, codeTarget, itemFields, itemOptions, lotOptions as lotChoices, placeOptions as placeChoices, projectField, projectKey, projectOf, registerFromValues, restrictPlaces, workLocationField } from './fields.ts';
 import { codeInput, type CodeHolds, type CodeInput } from './code-input.ts';
-import { recountWithReceiptChoice, renderConsumables, renderSupply, supplyAsOf, supplyOps, type Ctx, type UiOp, type UiSubject } from './supply-ui.ts';
+import { recountWithReceiptChoice, renderConsumables, renderSupply, supplyAsOf, supplyOps, withProgressConfirmation, type Ctx, type UiOp, type UiSubject } from './supply-ui.ts';
 import { fixSubject, otherOperations, type OperationTarget } from './subject-actions.ts';
 import { nextLotId, nextSplitId, readMode, simpleOps, writeMode, type Mode } from './mode.ts';
+import { consumablesOf } from '../domain/packaging.ts';
 import { opNotes } from './op-notes.ts';
 import { seedLedger, seedScn02 } from './seed.ts';
 import { browserStore, fingerprintOf, initial, nextOpIdOf, sameSnapshot, targetsOf, unknownSinceOf, type CommitResult, type Pending, type RecordContents, type SettleResult, type Snapshot, type UnitState } from './storage.ts';
@@ -118,10 +121,11 @@ import { needImportOps } from './need-import-ui.ts';
 import { receiptTemplateOps } from './receipt-template-ui.ts';
 import { setsPanel, type SetSelection } from './setview.ts';
 import { templateNeedsOps } from './template-needs-ui.ts';
+import { caseRegistrationOp } from './case-registration-ui.ts';
 import { requireTemplateNeedCaptureCapacity } from './template-needs-capacity.ts';
 import { recipeStartOps } from './recipe-start-ui.ts';
 import { followupPanel } from './followupview.ts';
-import { candidatesText, masterOf, masterOps, mastersPanel, supplyRefsText } from './master-ui.ts';
+import { candidatesText, masterKindOf, masterOf, masterOps, mastersPanel, supplyRefsText } from './master-ui.ts';
 import { returnIntakeOps } from './return-intake-ui.ts';
 
 const rootNode = document.getElementById('app');
@@ -156,6 +160,8 @@ let selectedEvent = '';
 let selectedIssue = '';
 let selectionEpoch = 0;
 let masterQuery = '';
+// 選んだ種類は画面の中だけで持ち、保存しない。
+let masterKind: Master['type'] = 'item';
 let selectedSet: SetSelection = { product: '', template: '' };
 
 function useSnapshot(next: Snapshot): void {
@@ -190,7 +196,8 @@ const lotOptions = (where?: (lot: Lot) => boolean) => lotChoices(ledger, where);
 const lotSubject = (where: (lot: Lot) => boolean = () => true): Extract<UiSubject, { kind: 'lot' }> => ({ kind: 'lot', field: 'lot', accepts: lot => lot.mergedInto === null && where(lot) });
 const anyLotSubject = lotSubject();
 const caseLotSubject = lotSubject(lot => lot.project.kind === 'case');
-const completedLotSubject = lotSubject(lot => lot.stage.kind === 'awaitingHandover');
+const reworkSourceSubject = lotSubject(lot => isReworkSource(lot.stage));
+const boxLotSubject = lotSubject(lot => lot.stage.kind === 'none' && own(ledger.masters.items, lot.item)?.packaging?.boxUnit === lot.unit);
 const lotField = (name = 'lot', label = '対象の保管単位', subject = anyLotSubject) => codeTarget(choiceField(name, label, lotOptions(subject.accepts)), 'lot', { quantity: 'value', basis: 'basis' });
 const placeOptions = () => placeChoices(ledger.masters);
 const locationField = (label = '場所') => codeTarget(choiceField('location', label, placeOptions()), 'location', { hold: 'location' });
@@ -228,13 +235,13 @@ const processFields = (options = processOptions(ledger.masters)): HTMLElement[] 
   ];
 };
 
-const noNextProcess = '次工程の場所が指定されていません。作業の種類「工程の登録・設定」で次工程の場所を指定してください。';
+const noNextProcess = '次工程への置き場が指定されていません。作業の種類「工程の登録・設定」で次工程への置き場を指定してください。';
 
 // 旧版から引き継いだ指定は、利用停止・記録の対象外の場所のこともあり、そのときは選べる渡し先がない。
 function nextProcessProblem(masters: Masters): string | null {
   const next = nextProcessOf(masters);
   if (next === null) return noNextProcess;
-  return placeChoices(masters).some(([id]) => id === next.id) ? null : `次工程の場所 ${next.name}（${next.code}）は利用停止中か記録の対象外です。場所の利用を再開するか、作業の種類「工程の登録・設定」で次工程の場所を指定し直してください。`;
+  return placeChoices(masters).some(([id]) => id === next.id) ? null : `次工程への置き場 ${next.name}（${next.code}）は利用停止中か記録の対象外です。場所の利用を再開するか、作業の種類「工程の登録・設定」で次工程への置き場を指定し直してください。`;
 }
 
 function nextProcessFields(): HTMLElement[] {
@@ -352,7 +359,7 @@ const ops = {
       textField('newId', '作業中の保管単位の新しいID'),
       ...itemFields(ledger.masters),
       projectField(ledger.masters),
-      codeTarget(choiceField('location', '作業の場所', placeOptions().filter(([id]) => id !== nextProcessOf(ledger.masters)?.id)), 'location', { hold: 'location' }),
+      workLocationField(ledger.masters, placeOptions()),
       ...amountFields(),
       ...materialFields(),
     ],
@@ -390,10 +397,10 @@ const ops = {
   finish: stageStep('作業終了', 'working'),
   reworkBegin: {
     label: 'やり直し・修理を開始',
-    subject: completedLotSubject,
+    subject: reworkSourceSubject,
     fields: () => [
-      h('p', {}, '手元の完成（渡す前）で、元の現物と数量が分かる分を同じ工程へ戻す。作業をしていない返ってきた物は仮の記録の新規割当後に「返ってきた物のやり直し・修理を開始」を使う。専用の取消は未実装。'),
-      lotField('lot', 'やり直し・修理元の保管単位', completedLotSubject),
+      h('p', {}, '手元の完成（渡す前）か確認待ちで、元の現物と数量が分かる分を同じ工程へ戻す。確認で不合格になった物もここから戻す。作業をしていない返ってきた物は仮の記録の新規割当後に「返ってきた物のやり直し・修理を開始」を使う。専用の取消は未実装。'),
+      lotField('lot', 'やり直し・修理元の保管単位', reworkSourceSubject),
       textField('childId', 'やり直し・修理分の新しいID'), ...amountFields(), textField('reason', 'やり直し・修理の理由'),
     ],
     run: (l, m, v, inc) => {
@@ -529,6 +536,20 @@ const ops = {
       return split(l, m, v.text('lot'), v.text('childId'), basis, value, inc);
     },
   },
+  openBox: {
+    label: '開封',
+    subject: boxLotSubject,
+    fields: () => {
+      const boxes = textField('boxes', '開ける箱の数', 'integer');
+      boxes.querySelector('input')!.value = '1';
+      return [lotField('lot', '開ける箱の保管単位', boxLotSubject), boxes, textField('childId', '開けた中身の新しいID'), textField('counted', '開けた中身を数えた数', 'number')];
+    },
+    run: (l, m, v, inc) => {
+      const counted = v.text('counted').trim();
+      if (counted === '') throw new Error('開けた中身を数えた数を入力する');
+      return openBox(l, m, { lotId: v.text('lot'), childId: v.text('childId'), boxes: Number(v.text('boxes').trim() || '0'), counted: quantityValue(counted) }, inc);
+    },
+  },
   transfer: {
     label: '案件・用途の付け替え',
     subject: caseLotSubject,
@@ -640,7 +661,13 @@ const ops = {
 
 const ctx: Ctx = { ledger: () => ledger, supply: () => supply, asOfChanged: () => renderFollowup(), openConsumableSettings: () => {
   switchOperation(Object.keys(ledger.masters.items).length === 0 ? 'masterItem' : 'masterConsumable');
-} };
+}, openCase: caseId => {
+  selectedProject = caseId;
+  renderCase();
+  navigation.select({ kind: 'destination', destination: 'supply' });
+  document.getElementById('case-h')!.focus();
+}, openOperation: key => switchOperation(key, null) };
+const masters = masterOps(ctx);
 
 // 既存の台帳の操作は、台帳だけを更新する操作として包む。供給の操作は supply-ui が持つ。
 const allOps: Record<string, UiOp> = {
@@ -655,11 +682,13 @@ const allOps: Record<string, UiOp> = {
   ...receiptTemplateOps(ctx),
   ...templateNeedsOps(ctx, () => nextOpIdOf(snapshot), templateNeedsPreflight),
   ...recipeStartOps(ctx),
-  ...masterOps(ctx),
+  ...masters,
+  masterCase: caseRegistrationOp(masters['masterCase']!, ctx, () => nextOpIdOf(snapshot), templateNeedsPreflight),
   ...returnIntakeOps(ctx),
 };
 // 受け入れた現物の数え直しでは、実際に受け取った数の扱いを必須で選ばせる（直し忘れを防ぐ）。
 allOps['recount'] = recountWithReceiptChoice(allOps['recount']!, ctx);
+for (const [key, op] of Object.entries(allOps)) allOps[key] = withProgressConfirmation(op);
 
 let message: { kind: 'ok' | 'error' | 'prompt'; text: string } | null = null;
 
@@ -771,7 +800,7 @@ function renderInput(): void {
   );
   try {
     if (currentTarget !== undefined) fixTarget(form, capture.op, currentTarget);
-    if (currentOp === 'split' || currentOp === 'splitMove') suggestSplitId(form);
+    if (currentOp === 'split' || currentOp === 'splitMove' || currentOp === 'openBox') suggestSplitId(form);
     if (mode === 'simple' && currentOp === 'register' && currentTarget === undefined) simpleRegister(form);
   }
   catch (error) {
@@ -781,14 +810,16 @@ function renderInput(): void {
   (form.elements.namedItem('occurredAt') as HTMLInputElement).value = nowIso().slice(0, 16);
   for (const [box, input] of unknownPairs) exclusive(form, box, input);
   const confirmBox = confirm.querySelector('input')!;
+  const isConfirmBox = (target: EventTarget | null) => target === confirmBox || (target instanceof HTMLInputElement && target.dataset['receiptConfirm'] !== undefined);
   const resetConfirm = (event: Event) => {
-    for (const box of form.querySelectorAll<HTMLInputElement>('[data-receipt-confirm]')) if (event.target !== box) box.checked = false;
-    if (event.target === confirmBox) return;
+    // 確認欄は記録の内容を変えないので、確認欄同士では外し合わない。外し合うと二つの確認を同時に満たせない。
+    if (isConfirmBox(event.target)) return;
+    for (const box of form.querySelectorAll<HTMLInputElement>('[data-receipt-confirm]')) box.checked = false;
     confirmBox.checked = false;
     confirm.hidden = true;
   };
   // 確認欄は確認を求める文に応える欄なので、入力の修正として扱わない。
-  const clearFeedback = (event: Event) => { if (event.target !== confirmBox) clearInputFeedback(); };
+  const clearFeedback = (event: Event) => { if (!isConfirmBox(event.target)) clearInputFeedback(); };
   form.addEventListener('input', clearFeedback);
   form.addEventListener('change', clearFeedback);
   form.addEventListener('input', resetConfirm);
@@ -807,7 +838,7 @@ function renderInput(): void {
   const note = opNotes[currentOp];
   if (note !== undefined) choice.after(h('p', { class: 'op-note' }, note));
   capture.code = codeInput(form, ledger, capture.op.label, codeHolds);
-  root.append(capture.code.node, picker.browsing, ...(mode === 'simple' ? [h('p', { class: 'simple-op' }, capture.op.label)] : []), form);
+  root.append(capture.code.trigger, capture.code.node, picker.browsing, ...(mode === 'simple' ? [h('p', { class: 'simple-op' }, capture.op.label)] : []), form);
   if (message) root.append(h('p', { class: message.kind === 'error' ? 'error' : '', role: 'status' }, message.text));
   liveInput = { form, capture, initial: fieldsOf(controlsOf(form, capture.code)), initialActor: actorSelect.value, initialOccurredAt: occurredOf(form), baseLastWriter: snapshot.lastWriter, generation: generationOf(snapshot) };
 }
@@ -1400,6 +1431,10 @@ function renderViews(): void {
   renderRequests();
   renderCase();
   renderFollowup();
+  // 簡単操作モードには不足・依頼の行き先がないので、補充の確認を在庫の隣へ移す。
+  const consumables = document.getElementById('consumables')!;
+  document.getElementById(mode === 'simple' ? 'list' : 'followup')!.after(consumables);
+  consumables.hidden = mode === 'simple' && consumablesOf(ledger.masters).length === 0;
   renderConsumables(ctx);
   renderMasters();
   renderSets();
@@ -1973,6 +2008,7 @@ function renderMasters(): void {
   root.append(...mastersPanel(ledger, visibleOps(), selectedMaster, {
     select: (key, focus) => {
       selectedMaster = key;
+      masterKind = masterKindOf(key);
       renderMasters();
       document.getElementById(focus)!.focus();
     },
@@ -1986,6 +2022,8 @@ function renderMasters(): void {
     } }),
     query: masterQuery,
     setQuery: query => { masterQuery = query; },
+    kind: masterKind,
+    setKind: kind => { masterKind = kind; },
   }));
   wrapTables(root);
 }

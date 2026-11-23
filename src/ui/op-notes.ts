@@ -4,6 +4,7 @@ export const opNotes: Readonly<Record<string, string>> = {
   handover: '譲渡・持ち出し',
   move: '全部を移す。一部は「一部を分けて移動」',
   split: '同じ場所で分ける',
+  openBox: '箱を開けて中身を数える',
   recount: '原因不明でもよい',
   declare: '数量は変えない',
   provisional: '適用先の保管単位が分からない',

@@ -89,14 +89,14 @@ describe('工程の設定 3.3: 一覧・履歴・保存文字列の工程名（2
     expect(parse(serialize(initial(done.ledger, done.supply)))?.ledger).toEqual(done.ledger);
   });
 
-  test('Excelの「工程の設定」シートに工程と次工程の場所を出す', () => {
+  test('Excelの「工程の設定」シートに工程と次工程への置き場を出す', () => {
     const l = changeMasters(practiceLedger, meta('reg', 8), { action: 'register', master: { type: 'process', name: '塗装', criterion: 'workEnd' } });
     const sheet = viewSheetsOf({ ledger: l, supply: emptySupply }, '2026-10-27T18:00:00+09:00').find(s => s.name === '工程の設定');
     expect(sheet?.columns.map(c => c.header)).toEqual(['種類', 'ID', '名前', '完了基準', '利用状況']);
     expect(sheet?.rows).toEqual([
       ['工程', 'R組立', 'R組立', '作業終了後の確認の完了', '利用中'],
       ['工程', '塗装', '塗装', '作業終了', '利用中'],
-      ['次工程の場所', 'N', '次工程N', '対象外', '利用中'],
+      ['次工程への置き場', 'N', '次工程N', '対象外', '利用中'],
     ]);
   });
 });

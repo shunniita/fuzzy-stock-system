@@ -232,3 +232,40 @@ describe('FH-C06・やり直し・修理の部品処置', () => {
     expect(() => correctOccurredAt(legacy, meta('fix', 14), 'part', meta('before', 11).occurredAt)).toThrow(/前後/);
   });
 });
+
+describe('p2-inspection-rework・確認待ちからのやり直し・修理', () => {
+  const inspection = processFor('inspection');
+  function waiting(): Ledger {
+    let l = register(practiceLedger, meta('parts', 8), part('parts'), 'counted', 100);
+    l = use(l, meta('original-use', 9), 'parts', 'counted', 20, '初回組立');
+    l = start(l, meta('start', 10), product('working'), inspection, 'counted', 20, ['original-use']);
+    return changeStage(l, meta('end', 11), 'working', 'checking', 'counted', 20, { kind: 'inspecting', process: inspection });
+  }
+
+  test('1.2・1.3・1.6: 確認待ち20台のうち2台を戻すと、元は確認待ち18台、子は同じ工程の作業中2台', () => {
+    const l = beginRework(waiting(), meta('rework', 12), 'checking', 'repair', 'counted', 2, '確認で通電不良');
+    expect(l.lots['checking']).toMatchObject({ stage: { kind: 'inspecting', process: inspection }, quantity: { numeric: { value: 18 } } });
+    expect(l.lots['repair']).toMatchObject({ splitFrom: 'checking', project, location: 'T', stage: { kind: 'working', process: inspection }, quantity: { numeric: { value: 2 } } });
+    expect(l.history.at(-1)).toMatchObject({ kind: 'rework', lotId: 'checking', childId: 'repair' });
+    expect(totalOf(l, 'R')).toMatchObject({ numeric: { value: 20 } });
+  });
+
+  test('2.4・2.5: 戻した子を作業終了・確認の完了で完成にでき、完了の累計は確認の完了の分だけ増える', () => {
+    let l = beginRework(waiting(), meta('rework', 12), 'checking', 'repair', 'counted', 2, '確認で通電不良');
+    expect(productionOf(l, inspection.id, 'R', '台', project)).toMatchObject({ completed: { numeric: { value: 0 } }, reworkStarted: { numeric: { value: 2 } }, inspecting: { numeric: { value: 18 } }, working: { numeric: { value: 2 } } });
+    l = changeStage(l, meta('end2', 13), 'repair', 'recheck', 'counted', 2, { kind: 'inspecting', process: inspection });
+    l = changeStage(l, meta('ok', 14), 'recheck', 'done', 'counted', 2, { kind: 'awaitingHandover', process: inspection });
+    expect(productionOf(l, inspection.id, 'R', '台', project)).toMatchObject({ completed: { numeric: { value: 2 } }, reworkStarted: { numeric: { value: 2 } }, awaitingHandover: { numeric: { value: 2 } } });
+  });
+
+  test('1.5: 確認待ちの元でも、未解決の確認事項・数量不明・過量・作業中を拒否し台帳を変えない', () => {
+    const l = waiting(), before = JSON.stringify(l);
+    expect(() => beginRework(declareDiscrepancy(l, meta('issue'), 'checking', '数量差'), meta('rw', 12), 'checking', 'repair', 'counted', 2, '修理')).toThrow(/確認事項/);
+    expect(() => beginRework(l, meta('rw', 12), 'checking', 'repair', 'counted', 21, '修理')).toThrow();
+    const unknown = register(practiceLedger, meta('unknown', 8), { ...product('unknown'), stage: { kind: 'inspecting', process: inspection } }, 'unknown', null);
+    expect(() => beginRework(unknown, meta('rw'), 'unknown', 'repair', 'counted', 2, '修理')).toThrow(/数量/);
+    const working = start(practiceLedger, meta('w', 10), product('w'), inspection, 'counted', 3, []);
+    expect(() => beginRework(working, meta('rw', 12), 'w', 'repair', 'counted', 1, '修理')).toThrow(/完成（渡す前）または確認待ち/);
+    expect(JSON.stringify(l)).toBe(before);
+  });
+});

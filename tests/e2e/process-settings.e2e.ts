@@ -20,14 +20,28 @@ test('工程の設定4.2・7.1: 空の台帳では工程と次工程の案内を
   await expect(form).toContainText('利用中の工程がありません。作業の種類「工程の登録・設定」で工程を登録してください。');
   await expect(form.locator('[name=process] option')).toHaveCount(1);
   await selectOperation(form.locator('[name=op]'), 'toNext');
-  await expect(form).toContainText('次工程の場所が指定されていません。');
+  await expect(form).toContainText('次工程への置き場が指定されていません。');
   await expect(form.locator('[name=location]')).toHaveCount(0);
   const before = await snapshotOf(page);
   await expect(await record(page, 'start', { newId: 'W1', ...product, value: '1' })).not.toContainText('記録した');
   expect((await snapshotOf(page)).ledger).toEqual(before.ledger);
 });
 
-test('工程の設定4.2: 次工程の場所が記録の時点で対象外なら、引渡しを台帳の理由で拒否する', async ({ page }) => {
+test('作業の場所: 次工程への置き場は黙って消さず、選べない理由を選択肢に示す', async ({ page }) => {
+  await blankStart(page);
+  await recorded(page, 'masterProcess', { name: '塗装', criterion: 'workEnd' }, '08:00');
+  await recorded(page, 'masterNextProcess', { location: 'NX', reason: '次工程の棚' }, '08:00');
+  const form = page.getByRole('form', { name: '操作の入力' });
+  for (const op of ['start', 'recipeStart'] as const) {
+    await selectOperation(form.locator('[name=op]'), op);
+    const next = form.locator('[name=location] option[value=NX]');
+    await expect(next).toHaveJSProperty('disabled', true);
+    await expect(next).toHaveText('架空次工程棚（NX）：次工程への置き場なので作業の場所にできない');
+    await expect(form.locator('[name=location] option[value=T]')).toHaveJSProperty('disabled', false);
+  }
+});
+
+test('工程の設定4.2: 次工程への置き場が記録の時点で対象外なら、引渡しを台帳の理由で拒否する', async ({ page }) => {
   await blankStart(page);
   await recorded(page, 'masterProcess', { name: '塗装', criterion: 'workEnd' }, '08:00');
   await recorded(page, 'masterNextProcess', { location: 'NX', reason: '次工程の棚' }, '08:00');

@@ -103,7 +103,7 @@ export function createHistoryTargetCollector(context: HistoryTargetContext) {
       case 'register': case 'move': case 'merge': case 'hold': case 'release': return;
       case 'use': case 'handover': case 'declare': case 'assignProject':
         addLot(frame, event.lotId); return;
-      case 'split': case 'transfer': case 'stage':
+      case 'split': case 'open': case 'transfer': case 'stage':
         addLot(frame, event.lotId); addLot(frame, event.childId); return;
       case 'rework':
         addLot(frame, event.lotId); addLot(frame, event.childId);

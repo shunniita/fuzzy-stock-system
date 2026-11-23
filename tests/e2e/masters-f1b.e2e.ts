@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import * as XLSX from 'xlsx';
 import { decodeSnapshot } from '../../src/ui/storageparse.ts';
-import { selectOperation, goTo, backupButton, cell, downloadVia, exportButton, lot, opLabels, pickFile, record, recorded, row, set, startEmpty, storageBytes } from './helpers.ts';
+import { selectOperation, goTo, openMasterKind, backupButton, cell, downloadVia, exportButton, lot, opLabels, pickFile, record, recorded, row, set, startEmpty, storageBytes } from './helpers.ts';
 
 test.use({ trace: 'retain-on-failure' });
 
@@ -182,6 +182,7 @@ test('AT-35: 登録・名称の変更・利用停止、ネジSの1箱あたり�
   await goTo(page, 'issues');
   await expect(page.locator('#history')).toContainText('（記録の時点では記録の対象。場所S2は2026-09-29 13:20（日本時間）から記録の対象外）');
   await goTo(page, 'masters');
+  await openMasterKind(page, '場所');
   await expect(masters(page, '場所の登録情報').locator('tr', { hasText: '棚S2' })).toContainText('最初から記録の対象、2026-09-29 13:20（日本時間）から記録の対象外');
 });
 

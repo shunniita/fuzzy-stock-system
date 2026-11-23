@@ -25,7 +25,7 @@
 - 履歴を残して訂正し、JSONでバックアップ・復元する。
 - 閲覧用のExcelファイルを出力する。
 
-この説明の対象はv1.4.0です。配布中の版は[Releases](https://github.com/shunniita/fuzzy-stock-system/releases/latest)で確認できます。v1.4.0を初めて開くと、よく使う操作だけを出す簡単操作モードになります。「管理」の「操作モード」で、全ての操作を出す高度な操作モードへ切り替えられます。詳しい範囲は[製品定義](PRODUCT.md)を参照してください。
+この説明の対象はv1.5.0です。配布中の版は[Releases](https://github.com/shunniita/fuzzy-stock-system/releases/latest)で確認できます。初めて開くと、よく使う操作だけを出す簡単操作モードになります。「管理」の「操作モード」で、全ての操作を出す高度な操作モードへ切り替えられます。詳しい範囲は[製品定義](PRODUCT.md)を参照してください。
 
 ## 記録を保管する
 
@@ -47,6 +47,17 @@ npm.cmd run release:package
 ```
 
 `release:package`はコミット済みの入力からZIPを作ります。生成結果に示されたZIPを、`npm.cmd run release:smoke -- <ZIPのパス>`で検証できます。
+
+テストがコードの誤りを検出できるかは、[mutator](https://github.com/mizchi/mutator)で確認できます。通常は変更範囲を対象にし、必要に応じてファイルを絞ります。
+
+```powershell
+npm.cmd run test:mutation -- --since origin/main --include-test-changes --time-budget 300
+npm.cmd run test:mutation -- --include src/domain/code.ts --time-budget 120
+```
+
+全体を調べる場合は`npm.cmd run test:mutation`を使います。結果とキャッシュは`.mutator/`に保存します。時間上限で未実行になった変異は`Pending`です。現時点ではスコアによる合否閾値を設けていないため、終了コード0だけでは全変異の検出を意味しません。
+
+mutator 0.3.0のWindowsパス照合を補うため、専用の`vitest.mutator.config.mjs`を使い、dry runは毎回全テストを実行します。パッケージの更新時は、この回避設定が必要か確認してください。
 
 ## ライセンス
 

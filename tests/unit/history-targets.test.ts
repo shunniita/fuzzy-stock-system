@@ -58,6 +58,7 @@ const ledgerCases = {
   use: { event: useP, ids: ['P'] },
   handover: { event: handover, ids: ['Q'] },
   split: { event: event('split', { ...decrease, kind: 'split', lotId: 'r', childId: 'child' }), ids: ['R'] },
+  open: { event: event('open', { ...decrease, kind: 'open', lotId: 'r', basis: 'counted', value: 1, childId: 'child', childUnit: '個', childValue: 3 }), ids: ['R'] },
   transfer: { event: event('transfer', { ...decrease, kind: 'transfer', lotId: 'r', childId: 'child', from: { kind: 'common' }, to: { kind: 'case', id: 'A-001' } }), ids: ['R'] },
   rework: { event: rework, ids: ['R'] },
   stage: { event: event('stage', { ...decrease, kind: 'stage', lotId: 'r', childId: 'child', to: { kind: 'working', process: { id: '架空工程', criterion: 'workEnd' } }, correction: false }), ids: ['R'] },

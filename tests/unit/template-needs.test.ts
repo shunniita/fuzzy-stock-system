@@ -77,12 +77,14 @@ describe('セットから単独案件の必要明細を作る core（要件1・2
     expect(() => build(state, { ...input, caseCode: ' 000008 ' })).toThrow('前後の空白');
   });
 
-  test('コードなしの旧案件は内部IDで解決し、異なる案件への曖昧な一致を拒否する', () => {
+  test('案件IDは品番・コードだけで照合し、品番・コードのない案件の内部IDとは照合しない', () => {
     const legacy = { ...practiceLedger.masters.cases['A-001']!, code: null };
     const ledger: Ledger = { ...practiceLedger, masters: { ...practiceLedger.masters, cases: { 'A-001': legacy } } };
-    expect(build(stateOf(ledger), { ...input, caseCode: 'A-001' }).plan.project).toBe('A-001');
-    const ambiguous: Ledger = { ...ledger, masters: { ...ledger.masters, cases: { ...ledger.masters.cases, other: { ...legacy, id: 'other', code: 'A-001' } } } };
-    expect(() => build(stateOf(ambiguous), { ...input, caseCode: 'A-001' })).toThrow('曖昧');
+    const created = build(stateOf(ledger), { ...input, caseCode: 'A-001' });
+    expect(created.plan.project).not.toBe('A-001');
+    expect(created.newProject).toBe(true);
+    const coded: Ledger = { ...ledger, masters: { ...ledger.masters, cases: { ...ledger.masters.cases, other: { ...legacy, id: 'other', code: 'A-001' } } } };
+    expect(build(stateOf(coded), { ...input, caseCode: 'A-001' }).plan.project).toBe('other');
   });
 
   test('同内容の正規化版は再利用し、元セットの改訂と削除で生成結果が変わらない', () => {

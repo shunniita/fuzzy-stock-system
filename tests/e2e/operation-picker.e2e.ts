@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { goTo, lot, opLabels, record, recorded, selectOperation, startEmpty, storageBytes } from './helpers.ts';
+import { goTo, lot, opLabels, record, recorded, selectOperation, startEmpty, storageBytes, openCodeInput } from './helpers.ts';
 import { opNotes } from '../../src/ui/op-notes.ts';
 import { operationGroups } from '../../src/ui/operation-picker.ts';
 import { draftOf, twoPages, typeUse } from './conflict-helpers.ts';
@@ -113,6 +113,7 @@ test('作業別操作: 分類を巡回してもコード候補・保持値・両
   await form.locator('[name=project]').selectOption('B-001');
   await form.locator('[name=location]').selectOption('S2');
   const code = page.getByRole('region', { name: 'コード入力補助' });
+  await openCodeInput(page);
   await code.getByRole('button', { name: '現在の案件・用途を保持', exact: true }).click();
   await code.getByRole('button', { name: '現在の場所を保持', exact: true }).click();
   await selectOperation(form.locator('[name=op]'), 'use');
@@ -174,4 +175,22 @@ test('作業別操作: 操作名から外した説明は、選んだ操作の補
   await group.selectOption('stock');
   await select.selectOption('use');
   await expect(page.locator('.op-note')).toHaveCount(0);
+});
+
+test('コード入力・検索の有無で、すべての操作と入力欄の位置が変わらない。開いた小窓は操作を切り替えても開いたまま', async ({ page }) => {
+  await startEmpty(page);
+  const form = page.locator('#input form'), picker = page.locator('#input .operation-picker');
+  const top = () => picker.evaluate(e => e.getBoundingClientRect().top + window.scrollY);
+  await selectOperation(form.locator('[name=op]'), 'register');
+  const withCode = await top();
+  await openCodeInput(page);
+  await expect(page.getByRole('region', { name: 'コード入力補助' })).toBeVisible();
+  expect(await top()).toBe(withCode);
+  await selectOperation(form.locator('[name=op]'), 'masterRename');
+  await expect(page.getByRole('button', { name: 'コード入力・検索' })).toBeDisabled();
+  expect(await top()).toBe(withCode);
+  await selectOperation(form.locator('[name=op]'), 'use');
+  await expect(page.getByRole('region', { name: 'コード入力補助' })).toBeVisible();
+  await page.getByRole('region', { name: 'コード入力補助' }).getByRole('button', { name: '閉じる' }).click();
+  await expect(page.getByRole('button', { name: 'コード入力・検索' })).toHaveAttribute('aria-expanded', 'false');
 });

@@ -274,6 +274,16 @@ export function nextProcessOf(masters: Masters): LocationMaster | null {
   return Object.values(masters.locations).find(location => location.nextProcess) ?? null;
 }
 
+// 登録情報の変更の履歴で、以前その品番・コードを持っていた案件・用途（今の持ち主を除き、履歴に出た順）。
+export function formerCaseCodeHoldersOf(ledger: Pick<Ledger, 'history' | 'masters'>, code: string): CaseMaster[] {
+  const ids = new Set<string>();
+  for (const event of ledger.history) {
+    if (event.kind !== 'master') continue;
+    for (const { before, after } of event.masters) if (after.type === 'case' && ((before?.type === 'case' && before.code === code) || after.code === code)) ids.add(after.id);
+  }
+  return [...ids].flatMap(id => { const m = own(ledger.masters.cases, id); return m && m.code !== code ? [m] : []; });
+}
+
 export function codeOwner(masters: Masters, type: 'item' | 'location' | 'case', code: string): Master | undefined {
   const group: Readonly<Record<string, Master>> = type === 'item' ? masters.items : type === 'location' ? masters.locations : masters.cases;
   return Object.values(group).find((m) => m.type !== 'actor' && m.type !== 'process' && m.code === code);

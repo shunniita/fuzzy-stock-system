@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { goTo, opLabels, recorded, startEmpty, waitForApp } from './helpers.ts';
+import { goTo, openMasterKind, opLabels, recorded, startEmpty, waitForApp } from './helpers.ts';
 import { draftOf, snapshotOf } from './conflict-helpers.ts';
 
 test('登録情報の行から操作: 対象を固定して名称を変え、一覧と履歴を更新する', async ({ page }) => {
@@ -27,6 +27,7 @@ test('登録情報の行から利用停止: 記録後は結果を示し、同じ
   await startEmpty(page);
   await goTo(page, 'masters');
   const masters = page.locator('#masters');
+  await openMasterKind(page, '場所');
   await masters.locator('tr[data-master="location:S2"]').getByRole('button').first().click();
   await expect(page.locator('#master-selected-h')).toBeFocused();
   await masters.locator('[name=master-history]').selectOption('location:S1');
@@ -47,10 +48,15 @@ test('登録情報の行から利用停止: 記録後は結果を示し、同じ
 test('登録情報の新規登録: 区分ごとの入口が対象なしで登録の操作を開く', async ({ page }) => {
   await startEmpty(page);
   await goTo(page, 'masters');
-  for (const [name, op] of [['場所を登録', 'masterLocation'], ['品目を登録', 'masterItem'], ['担当者を登録', 'masterActor'], ['工程を登録', 'masterProcess']] as const) {
+  for (const [kind, name, op] of [['場所', '場所を登録', 'masterLocation'], ['品目', '品目を登録', 'masterItem'], ['担当者', '担当者を登録', 'masterActor'], ['工程', '工程を登録', 'masterProcess']] as const) {
+    await openMasterKind(page, kind);
     await page.locator('#masters').getByRole('button', { name, exact: true }).click();
     await expect(page.locator('#input [name=op]')).toHaveValue(op);
   }
+  await openMasterKind(page, '場所');
+  await page.locator('#masters').getByRole('button', { name: '場所を登録', exact: true }).click();
+  await expect(page.locator('#input').getByLabel('コード', { exact: true })).toBeVisible();
+  await expect(page.getByRole('table', { name: '場所の登録情報' }).getByRole('columnheader').first()).toHaveText('コード');
 });
 
 test('登録情報の絞り込み: 文字で行を絞り、該当がなければそう示し、描き直しても残る', async ({ page }) => {
@@ -59,15 +65,18 @@ test('登録情報の絞り込み: 文字で行を絞り、該当がなければ
   const masters = page.locator('#masters');
   const query = masters.getByLabel('名称・品番・コードで絞り込み', { exact: true });
   await query.fill('ｓ１');
-  await expect(masters.locator('tr[data-master="location:S1"]')).toBeVisible();
-  await expect(masters.locator('tr[data-master="location:S2"]')).toBeHidden();
+  await openMasterKind(page, '品目');
   await expect(masters.locator('tr[data-master="item:P"]')).toBeHidden();
   await expect(masters.getByRole('table', { name: '品目の登録情報' })).toBeHidden();
   await expect(masters).toContainText('品目：該当なし');
+  await openMasterKind(page, '場所');
+  await expect(masters.locator('tr[data-master="location:S1"]')).toBeVisible();
+  await expect(masters.locator('tr[data-master="location:S2"]')).toBeHidden();
   await masters.locator('tr[data-master="location:S1"]').getByRole('button').first().click();
   await expect(masters.getByLabel('名称・品番・コードで絞り込み', { exact: true })).toHaveValue('ｓ１');
   await expect(masters.locator('tr[data-master="location:S2"]')).toBeHidden();
   await masters.getByLabel('名称・品番・コードで絞り込み', { exact: true }).fill('');
+  await openMasterKind(page, '品目');
   await expect(masters.locator('tr[data-master="item:P"]')).toBeVisible();
 });
 

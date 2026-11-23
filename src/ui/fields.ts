@@ -1,7 +1,7 @@
 import { decreased, inclusionOf, InclusionRequired, noStage, processUsed, register, type Ledger, type Lot, type Meta, type Process, type Project, type Stage } from '../domain/ledger.ts';
 import { observe, quantityOf, type Basis } from '../domain/quantity.ts';
 import { choiceField, h, textField, type Values } from './dom.ts';
-import { inScopeAt, own, processOf, processRef, quantityStepOf, unassignedCode, type Masters } from '../domain/masters.ts';
+import { inScopeAt, nextProcessOf, own, processOf, processRef, quantityStepOf, unassignedCode, type Masters } from '../domain/masters.ts';
 import { parseSignedScalar, scalarLimitText, StepMismatch, type Step } from '../domain/scalar.ts';
 import type { Supply } from '../domain/supply.ts';
 import { basisLabel, criterionText, itemRef, locationRef, projectText, stageText } from './format.ts';
@@ -24,6 +24,16 @@ export function codeTarget(node: HTMLLabelElement, kind: 'item' | 'project' | 'l
   if (options.quantity !== undefined) select.dataset['codeQuantity'] = options.quantity;
   if (options.basis !== undefined) select.dataset['codeBasis'] = options.basis;
   if (options.hold !== undefined) select.dataset['codeHold'] = options.hold;
+  return node;
+}
+
+// 次工程への置き場には作業中の物を置けない（notStagedAtNextProcess）。選択肢から消すと理由が分からないので、選べない形で残す。
+export function workLocationField(masters: Masters, places: readonly (readonly [string, string])[]): HTMLLabelElement {
+  const next = nextProcessOf(masters);
+  const node = codeTarget(choiceField('location', '作業の場所', places.filter(([id]) => id !== next?.id)), 'location', { hold: 'location' });
+  if (next !== null && places.some(([id]) => id === next.id)) {
+    node.querySelector('select')!.append(h('option', { value: next.id, disabled: '', 'data-next-process': '' }, `${next.name}（${next.code}）：次工程への置き場なので作業の場所にできない`));
+  }
   return node;
 }
 
@@ -57,6 +67,7 @@ export function restrictPlaces(form: HTMLFormElement, masters: Masters, at: stri
     if (select.dataset['placeTime'] === 'fixed') continue;
     const choosing = select.dataset['required'] !== undefined;
     for (const option of select.options) {
+      if (option.dataset['nextProcess'] !== undefined) continue;
       const place = option.value === '' ? undefined : own(masters.locations, option.value);
       const outside = place !== undefined && (!inScopeAt(place, at) || place.id === excludedLocation);
       option.disabled = option.hidden = outside && (choosing || !option.selected);

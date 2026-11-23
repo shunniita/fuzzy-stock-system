@@ -191,6 +191,7 @@ function correctionOf(ledger: Ledger, e: LedgerEvent): Correction {
     case 'use':
     case 'handover':
     case 'split':
+    case 'open':
     case 'transfer':
       return { ...noCorrection, applied: appliedText(e.applied) };
     default:
@@ -377,12 +378,12 @@ function processSettingsSpec(state: State): Spec {
   const ms = state.ledger.masters;
   const next = nextProcessOf(ms);
   return {
-    name: '工程の設定', purpose: '現在の工程と次工程の場所。保管単位・工程集計のシートは工程をIDで示すので、この表で現在の名前を引く。変更前後は台帳の履歴を参照する',
-    columns: [column('種類', 14, '工程または次工程の場所'), column('ID', 24, '記録が指す変わらない識別。工程の名前を変えても変わらない'), column('名前', 30, '現在の名前'),
+    name: '工程の設定', purpose: '現在の工程と次工程への置き場。保管単位・工程集計のシートは工程をIDで示すので、この表で現在の名前を引く。変更前後は台帳の履歴を参照する',
+    columns: [column('種類', 14, '工程または次工程への置き場'), column('ID', 24, '記録が指す変わらない識別。工程の名前を変えても変わらない'), column('名前', 30, '現在の名前'),
       column('完了基準', 36, '工程の完了基準。作業終了、または作業終了後の確認の完了'), column('利用状況', 14, '利用中または利用停止')],
     rows: [
       ...Object.values(ms.processes).map(p => ['工程', p.id, p.name, criterionText(p.criterion), p.active ? '利用中' : '利用停止']),
-      ...(next === null ? [] : [['次工程の場所', next.id, next.name, '対象外', next.active ? '利用中' : '利用停止']]),
+      ...(next === null ? [] : [['次工程への置き場', next.id, next.name, '対象外', next.active ? '利用中' : '利用停止']]),
     ],
   };
 }

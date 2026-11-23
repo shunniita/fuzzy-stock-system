@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { goTo, lot, record, recorded, selectOperation, startEmpty, storageBytes, waitForApp } from './helpers.ts';
+import { goTo, lot, record, recorded, selectOperation, startEmpty, storageBytes, waitForApp, openCodeInput } from './helpers.ts';
 
 declare global {
   interface Window {
@@ -72,6 +72,7 @@ test('FH-UX: 入力先と検索を一組にし、検索・候補表示だけで�
   await startEmpty(page);
   const form = page.getByRole('form', { name: '操作の入力' });
   const code = page.getByRole('region', { name: 'コード入力補助' });
+  await openCodeInput(page);
   const search = code.getByRole('button', { name: '検索', exact: true });
   await expect(search).toBeDisabled();
   const group = code.getByRole('group', { name: '検索して入力する対象' });

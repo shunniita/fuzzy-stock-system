@@ -214,8 +214,8 @@ export function masterOps(ctx: Ctx): Record<string, UiOp> {
       },
       (v) => ({ action: 'criterion', id: targetOf(v, ['process']).id, criterion: criterionOf(v), reason: v.text('reason') }), ctx,
       m => m.type === 'process' && !processUsed(ctx.ledger(), m.id)),
-    masterNextProcess: masterOp('次工程の場所の指定・解除',
-      (ms) => [selectField('location', '次工程の場所', [['', '指定しない（解除する）'], ...Object.values(ms.locations).filter((l) => l.active).map((l): [string, string] => [l.id, `${l.name}（${l.code}）`])], nextProcessOf(ms)?.id ?? ''), reasonField()],
+    masterNextProcess: masterOp('次工程への置き場の指定・解除',
+      (ms) => [selectField('location', '次工程への置き場', [['', '指定しない（解除する）'], ...Object.values(ms.locations).filter((l) => l.active).map((l): [string, string] => [l.id, `${l.name}（${l.code}）`])], nextProcessOf(ms)?.id ?? ''), reasonField()],
       (v) => ({ action: 'nextProcess', id: v.text('location') === '' ? null : v.text('location'), reason: v.text('reason') }), ctx),
     masterItem: masterOp('品目の登録', () => [...codeFields('品番・コード（文字列のまま保存）'), textField('name', '呼び名'), ...unitStepFields(), ...sourceFields()],
       register((v) => {
@@ -302,11 +302,48 @@ export type MastersPanelHandlers = {
   openSets?: (item: string) => void;
   query: string;
   setQuery: (query: string) => void;
+  kind: Master['type'];
+  setKind: (kind: Master['type']) => void;
 };
 
 const keyOf = (m: Master) => `${m.type}:${m.id}`;
+// キーは`${type}:${id}`。idに「:」があっても最初の「:」までが種類。
+export const masterKindOf = (key: string): Master['type'] => key.slice(0, key.indexOf(':')) as Master['type'];
 // 全角・半角と大文字・小文字の違いで見落とさないよう、比べる前に揃える。
 const searchable = (text: string) => text.normalize('NFKC').toLowerCase();
+
+const kinds: readonly Master['type'][] = ['item', 'location', 'case', 'actor', 'process'];
+const sourceText = (s: Source | null) => (s ? `${s.name}（版${s.revision}）` : 'なし');
+
+// 表の行の文字。絞り込みと件数が同じ文字を比べるよう、表示と照合の両方がここを使う。
+function masterCells(m: Master): string[] {
+  switch (m.type) {
+    case 'item': return [m.code ?? unassignedCode, m.code === null ? '仮' : '', m.name, stateText(m),
+      m.units.join('・'), m.units.map((u) => `${u}：${m.unitSteps[u]}`).join('、'), packagingSettingText(m.packaging), consumableSettingText(m.consumable), sourceText(m.source)];
+    case 'location': return [m.code, m.name, stateText(m), m.scope.map((s) => `${sinceText(s.from)}${s.inScope ? '記録の対象' : '記録の対象外'}`).join('、')];
+    case 'case': return [m.code ?? unassignedCode, m.code === null ? '仮' : '', m.name ?? 'なし', stateText(m), sourceText(m.source)];
+    case 'actor': return [m.id, stateText(m)];
+    case 'process': return [m.name, m.id, criterionText(m.criterion), stateText(m)];
+  }
+}
+const mastersOf = (ms: Masters): Record<Master['type'], Master[]> => ({
+  item: Object.values(ms.items), location: Object.values(ms.locations), case: Object.values(ms.cases), actor: Object.values(ms.actors), process: Object.values(ms.processes),
+});
+const matches = (m: Master, needle: string) => needle.trim() === '' || searchable(masterCells(m).join('')).includes(searchable(needle.trim()));
+
+// 絞り込み中に各種類へ何件当たるか。表の絞り込みと同じ照合を使う。
+export function masterKindCounts(ms: Masters, query: string): Record<Master['type'], number> {
+  const by = mastersOf(ms);
+  return Object.fromEntries(kinds.map((k) => [k, by[k].filter((m) => matches(m, query)).length])) as Record<Master['type'], number>;
+}
+
+const heads = {
+  item: { op: 'masterItem', header: ['品番・コード', '仮', '名称', '状態', '単位', '単位ごとの最小単位（登録後は変えない）', '包装・入り数', '共通消耗品・補充基準', '元の資料'] },
+  location: { op: 'masterLocation', header: ['コード', '名称', '状態', '記録の対象'] },
+  case: { op: 'masterCase', header: ['品番・コード', '仮', '名称', '状態', '元の資料'] },
+  actor: { op: 'masterActor', header: ['名前', '状態'] },
+  process: { op: 'masterProcess', header: ['名前', 'ID', '完了基準', '状態'] },
+} as const;
 
 // 登録情報の一覧と、選んだ登録情報の操作・変更の履歴（要件10.1〜10.4）。値は利用者の入力なので文字としてだけ出す。
 export function mastersPanel(ledger: Ledger, ops: Readonly<Record<string, UiOp>>, selected: string, on: MastersPanelHandlers): HTMLElement[] {
@@ -317,44 +354,43 @@ export function mastersPanel(ledger: Ledger, ops: Readonly<Record<string, UiOp>>
     return node;
   };
   const pick = (m: Master, text: string) => button(text, () => on.select(keyOf(m), 'master-selected-h'), { class: 'link' });
-  const items = Object.values(ms.items), locations = Object.values(ms.locations), cases = Object.values(ms.cases), actors = Object.values(ms.actors), processes = Object.values(ms.processes);
+  const by = mastersOf(ms);
   const next = nextProcessOf(ms);
-  const groups = [
-    { title: '品目', op: 'masterItem', header: ['品番・コード', '仮', '名称', '状態', '単位', '単位ごとの最小単位（登録後は変えない）', '包装・入り数', '共通消耗品・補充基準', '元の資料'], masters: items, rows: items.map((i) => [
-      pick(i, i.code ?? unassignedCode), i.code === null ? '仮' : '', i.name, stateText(i),
-      i.units.join('・'), i.units.map((u) => `${u}：${i.unitSteps[u]}`).join('、'), packagingSettingText(i.packaging), consumableSettingText(i.consumable),
-      i.source ? `${i.source.name}（版${i.source.revision}）` : 'なし',
-    ]) },
-    { title: '場所', op: 'masterLocation', header: ['品番・コード', '名称', '状態', '記録の対象'], masters: locations, rows: locations.map((l) => [
-      pick(l, l.code), l.name, stateText(l), l.scope.map((s) => `${sinceText(s.from)}${s.inScope ? '記録の対象' : '記録の対象外'}`).join('、'),
-    ]) },
-    { title: '案件・用途', op: 'masterCase', header: ['品番・コード', '仮', '名称', '状態', '元の資料'], masters: cases, rows: cases.map((c) => [
-      pick(c, c.code ?? unassignedCode), c.code === null ? '仮' : '', c.name ?? 'なし', stateText(c), c.source ? `${c.source.name}（版${c.source.revision}）` : 'なし',
-    ]) },
-    { title: '担当者', op: 'masterActor', header: ['名前', '状態'], masters: actors, rows: actors.map((a) => [pick(a, a.id), stateText(a)]) },
-    { title: '工程', op: 'masterProcess', header: ['名前', 'ID', '完了基準', '状態'], masters: processes, rows: processes.map((p) => [pick(p, p.name), p.id, criterionText(p.criterion), stateText(p)]) },
-  ].map((g) => {
-    const list = table(`${g.title}の登録情報`, g.header, g.rows, g.masters.map(keyOf));
-    return { ...g, list, box: h('div', {}, list), empty: h('p', {}, `${g.title}：該当なし`) };
+  const groups = kinds.map((kind) => {
+    const title = masterTypeDisplayLabel[kind], g = { kind, title, ...heads[kind], masters: by[kind] };
+    const rows = g.masters.map((m) => { const [first, ...rest] = masterCells(m); return [pick(m, first!), ...rest]; });
+    const list = table(`${title}の登録情報`, g.header, rows, g.masters.map(keyOf));
+    const extra = g.op === 'masterProcess' ? h('p', {}, `次工程への置き場：${next === null ? '指定なし' : `${next.name}（${next.code}）${next.active ? '' : '（利用停止）'}`}`, ...(Object.hasOwn(ops, 'masterNextProcess') ? [' ', button('次工程への置き場を指定', () => on.open('masterNextProcess'))] : [])) : null;
+    const register = Object.hasOwn(ops, g.op) ? button(`${title}を登録`, () => on.open(g.op)) : null;
+    return { ...g, list, box: h('div', {}, list), empty: h('p', {}, `${title}：該当なし`), register, extra, heading: h('h3', {}, title) };
   });
   const query = h('input', { type: 'search', name: 'master-query' });
   query.value = on.query;
+  let kind = on.kind;
+  const kindButtons = new Map(kinds.map((k) => [k, button('', () => { kind = k; on.setKind(k); filter(); }, { 'data-kind': k })]));
+  // 表・登録ボタン・該当なしは種類ごとに作り、選んだ種類だけを見せる。
   const filter = () => {
-    const needle = searchable(query.value.trim());
+    const needle = query.value.trim();
+    const counts = masterKindCounts(ms, needle);
     for (const g of groups) {
-      let shown = 0;
-      for (const row of g.list.tBodies[0]!.rows) {
-        row.hidden = needle !== '' && !searchable(row.textContent ?? '').includes(needle);
-        if (!row.hidden) shown++;
-      }
-      g.box.hidden = needle !== '' && shown === 0;
-      g.empty.hidden = !g.box.hidden;
+      const rows = g.list.tBodies[0]!.rows;
+      g.masters.forEach((m, i) => { rows[i]!.hidden = !matches(m, needle); });
+      const none = counts[g.kind] === 0 && needle !== '';
+      const shown = g.kind === kind;
+      g.box.hidden = !shown || none;
+      g.empty.hidden = !shown || !none;
+      g.heading.hidden = !shown;
+      if (g.register) g.register.hidden = !shown;
+      if (g.extra) g.extra.hidden = !shown;
+      const node = kindButtons.get(g.kind)!;
+      node.textContent = needle === '' ? g.title : `${g.title}（${counts[g.kind]}件）`;
+      if (shown) node.setAttribute('aria-current', 'true'); else node.removeAttribute('aria-current');
     }
   };
   query.addEventListener('input', () => { on.setQuery(query.value); filter(); });
   filter();
 
-  const all: Master[] = [...items, ...locations, ...cases, ...actors, ...processes];
+  const all: Master[] = kinds.flatMap((k) => by[k]);
   const current = all.find((m) => keyOf(m) === selected) ?? all[0];
   const choice = selectField('master-history', '対象', all.map((m) => [keyOf(m), masterLabel(ms, m)]), current ? keyOf(current) : '');
   choice.addEventListener('change', (event) => { if (event.target instanceof HTMLSelectElement) on.select(event.target.value, 'master-history'); });
@@ -365,10 +401,8 @@ export function mastersPanel(ledger: Ledger, ops: Readonly<Record<string, UiOp>>
   const events = current ? ledger.history.filter((e) => e.kind === 'master' && e.masters.some((c) => c.after.type === current.type && c.after.id === current.id)) : [];
   return [
     h('div', { class: 'filters' }, h('label', {}, '名称・品番・コードで絞り込み', query)),
-    ...groups.flatMap((g) => [
-      h('h3', {}, g.title), ...(Object.hasOwn(ops, g.op) ? [button(`${g.title}を登録`, () => on.open(g.op))] : []), g.box, g.empty,
-      ...(g.op === 'masterProcess' ? [h('p', {}, `次工程の場所：${next === null ? '指定なし' : `${next.name}（${next.code}）${next.active ? '' : '（利用停止）'}`}`, ...(Object.hasOwn(ops, 'masterNextProcess') ? [' ', button('次工程の場所を指定', () => on.open('masterNextProcess'))] : []))] : []),
-    ]),
+    h('div', { role: 'group', 'aria-label': '登録情報の種類', class: 'kinds' }, ...kinds.map((k) => kindButtons.get(k)!)),
+    ...groups.flatMap((g) => [g.heading, ...(g.register ? [g.register] : []), g.box, g.empty, ...(g.extra ? [g.extra] : [])]),
     h('h3', { id: 'master-selected-h', tabindex: '-1' }, '選んだ登録情報'), choice,
     ...(actions.length === 0 ? [] : [h('div', { role: 'group', 'aria-label': 'この登録情報にできる操作' },
       ...primary.flatMap((key) => actions.filter(([candidate]) => candidate === key)).map(actionButton),

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { decodeSnapshot } from '../../src/ui/storageparse.ts';
-import { selectOperation, goTo, answer, backupButton, cell, downloadVia, lot, pickFile, record, recorded, row, set, startEmpty, storageBytes, waitForApp } from './helpers.ts';
+import { selectOperation, goTo, answer, backupButton, cell, downloadVia, lot, pickFile, record, recorded, row, set, startEmpty, storageBytes, waitForApp, openCodeInput } from './helpers.ts';
 
 const source = (entry: string) => ({ alternative: true, alternativeSource: '架空元票<img src=x onerror=alert(1)>', alternativeEntry: entry, alternativeActor: '架空原票記入B' });
 const panelOf = (page: Page) => page.getByRole('region', { name: 'この保管単位の証拠', exact: true });
@@ -153,6 +153,7 @@ test('読取原文の先頭空白・改行を証拠欄に保ち、文字とし�
   await selectOperation(form.locator('[name=op]'), 'receive');
   await set(form.locator('[name=project]'), 'A-001');
   await set(form.locator('[name=location]'), 'S1');
+  await openCodeInput(page);
   await code.getByRole('button', { name: '現在の案件・用途を保持' }).click();
   await code.getByRole('button', { name: '現在の場所を保持' }).click();
   const raw = ' LABA|A-001|P\t\r\n';

@@ -1,6 +1,6 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { browserZoomProfile, saveBrowserCapture } from './browser-zoom-profile.mjs';
-import { selectOperation, backupButton, bannerText, downloadVia, exportButton, goTo, jsonFile, lot, opLabels, pickFile, record, recorded, startEmpty, storageBytes, usePractice, waitForApp, launchAdvanced } from './helpers.ts';
+import { selectOperation, backupButton, bannerText, downloadVia, exportButton, goTo, jsonFile, lot, opLabels, pickFile, record, recorded, startEmpty, storageBytes, usePractice, waitForApp, launchAdvanced, openCodeInput } from './helpers.ts';
 
 test('UI構成基盤: 既存区画と操作を一つずつ配置し、共通入力と上部通知を保つ', async ({ page }) => {
   await page.goto('/');
@@ -387,7 +387,7 @@ test('表示統合: 長い原文と動的な表を保ち、狭幅ではページ
 test('表示統合: 記録と管理の強調を分け、強制配色でも枠とフォーカスを残す', async ({ page }) => {
   await page.goto('/'); await waitForApp(page);
   const recordButton = page.locator('#input button[type=submit]');
-  await expect(recordButton).toHaveCSS('background-color', 'rgb(36, 87, 197)');
+  await expect(recordButton).toHaveCSS('background-color', 'rgb(0, 100, 217)');
   await expect(recordButton).toHaveCSS('color', 'rgb(255, 255, 255)');
   await page.locator('#nav-management').click();
   await expect(page.locator('#reset-empty')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
@@ -540,6 +540,7 @@ test('受け取り6.1: 不明・コード候補・保持案件・用途場所・
   await form.locator('[name=project]').selectOption('B-001');
   await form.locator('[name=location]').selectOption('S2');
   const code = page.getByRole('region', { name: 'コード入力補助' });
+  await openCodeInput(page);
   await code.getByRole('button', { name: '現在の案件・用途を保持', exact: true }).click();
   await code.getByRole('button', { name: '現在の場所を保持', exact: true }).click();
   await selectOperation(form.locator('[name=op]'), { label: opLabels.use });
@@ -880,6 +881,24 @@ function contrastOf(foreground: string, background: string): number {
   const a = luminance(foreground), b = luminance(background);
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
+
+test('受け取り6.3: 通常配色の一般ボタンは押下中も文字のコントラストを保つ', async ({ page }) => {
+  await emptyNavigable(page);
+  await goTo(page, 'management');
+  const button = page.locator('#reset-empty');
+  await button.hover();
+  await page.mouse.down();
+  try {
+    const colors = await button.evaluate(node => {
+      const style = getComputedStyle(node);
+      return { active: node.matches(':active'), color: style.color, background: style.backgroundColor };
+    });
+    expect(colors.active).toBe(true);
+    expect(contrastOf(colors.color, colors.background)).toBeGreaterThanOrEqual(4.5);
+  } finally {
+    await page.mouse.up();
+  }
+});
 
 test('受け取り6.3: 通常配色の文字と境界のコントラストを測り、通知のARIAを維持する', async ({ page }, testInfo) => {
   await emptyNavigable(page);

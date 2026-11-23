@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { selectOperation, goTo, backupButton, cell, downloadVia, filePayload, lot, opLabels, pickFile, recorded, startEmpty, waitForApp } from './helpers.ts';
+import { selectOperation, goTo, backupButton, cell, downloadVia, filePayload, lot, opLabels, pickFile, recorded, startEmpty, waitForApp, openCodeInput } from './helpers.ts';
 import { installLegacyFileDraft } from './legacy-compat.ts';
 import { parseConflictDraft } from '../../src/ui/conflictrecord.ts';
 import { draftKey, draftOf, openWithHooks, oversizedConflict, readyToSave, sharedKeys, snapshotOf, twoPages, typeUse, withdrawButton } from './conflict-helpers.ts';
@@ -47,6 +47,7 @@ test('更新競合：未送信の入力を退避し、再読込後に最新記�
   await expect(fresh.locator('[name=op]')).toHaveValue('register');
   await expect(fresh.locator('[name=confirmed]')).not.toBeChecked();
   await expect(fresh.locator('[name=inclusion]')).toHaveValue('');
+  await openCodeInput(other);
   await expect(codeArea(other).getByLabel('読取原文・品目ID')).toHaveValue('');
   await selectOperation(fresh.locator('[name=op]'), { label: opLabels.use });
   await expect(fresh.locator('[name=value]')).toHaveValue('');
@@ -343,6 +344,7 @@ const codeArea = (page: Page) => page.getByRole('region', { name: 'コード入�
 async function adoptCode(page: Page): Promise<void> {
   const form = page.getByRole('form', { name: '操作の入力' });
   await selectOperation(form.locator('[name=op]'), { label: opLabels.register });
+  await openCodeInput(page);
   await codeArea(page).getByLabel('読取原文・品目ID').fill('LABA|B-001|P');
   await codeArea(page).getByRole('button', { name: '解釈', exact: true }).click();
   await codeArea(page).getByLabel('コードの入力先').selectOption('item');
@@ -364,6 +366,7 @@ test('更新競合：コードを採用して対象を確認する前に外部�
 test('更新競合：コード入力補助の読取原文だけを入れた状態も、変更ありとして元入力に含める', async ({ page, context }) => {
   const other = await twoPages(page, context);
   await selectOperation(other.getByRole('form', { name: '操作の入力' }).locator('[name=op]'), { label: opLabels.register });
+  await openCodeInput(other);
   await codeArea(other).getByLabel('読取原文・品目ID').fill('LABA|B-001|P');
   await recorded(page, 'move', { lot: 'p', location: 'T' }, '09:00');
   await expect(other.locator('#conflict')).toContainText('コード入力補助の読取原文');
@@ -408,6 +411,7 @@ test('更新競合：署名の計算中に「元入力を控えた」を外す�
 test('更新競合：コード入力補助の検索語だけを入れた状態も、変更ありとして元入力に含める', async ({ page, context }) => {
   const other = await twoPages(page, context);
   await selectOperation(other.getByRole('form', { name: '操作の入力' }).locator('[name=op]'), { label: opLabels.register });
+  await openCodeInput(other);
   await codeArea(other).getByLabel('名称・品番・コードで検索').fill('架空部品');
   await recorded(page, 'move', { lot: 'p', location: 'T' }, '09:00');
   await expect(other.locator('#conflict')).toContainText('コード入力補助の検索語');
@@ -419,6 +423,7 @@ test('更新競合：コード入力補助の検索語だけを入れた状態�
 test('更新競合：コード入力補助の入力先だけを選んだ状態も、変更ありとして元入力に含める', async ({ page, context }) => {
   const other = await twoPages(page, context);
   await selectOperation(other.getByRole('form', { name: '操作の入力' }).locator('[name=op]'), { label: opLabels.register });
+  await openCodeInput(other);
   await codeArea(other).getByLabel('コードの入力先').selectOption('item');
   await recorded(page, 'move', { lot: 'p', location: 'T' }, '09:00');
   await expect(other.locator('#conflict')).toContainText('コード入力補助の入力先の選択');

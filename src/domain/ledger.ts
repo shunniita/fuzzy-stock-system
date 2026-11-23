@@ -1,6 +1,6 @@
 import { checkedConsumable, codeOwner, deepFreeze, nextProcessOf, practiceMasters, inScopeAt, inputStepOf, processRef, masterTypeDisplayLabel, own, perBoxAt, quantityStepOf, refOf, reservedCaseIds, unassignedCode, type ConsumableSetting, type LocationMaster, type Master, type Masters, type ProcessMaster, type Source } from './masters.ts';
 import { initialPackaging, checkCaseCode, checkTrialReview, effectiveFrom, masterOf, masterRef, processNameFree, registered, type NewMaster, type TrialReview } from './master-edit.ts';
-import { add, observe, quantityOf, sameQuantity, subtract, type Basis, type Observation, type Quantity } from './quantity.ts';
+import { add, observe, quantityOf, sameQuantity, subtract, sumQuantities, type Basis, type Observation, type Quantity } from './quantity.ts';
 import { sumScalarsFinal, validateScalar, type Step } from './scalar.ts';
 import type { Scan } from './code.ts';
 import { checkAlternativeSource, type AlternativeOperation, type AlternativeRecord, type AlternativeSource } from './alternative-record.ts';
@@ -97,7 +97,7 @@ export function requireConsistentProcesses(ledger: Ledger): void {
     names.add(p.name.trim());
   }
   const next = Object.values(locations).filter(l => l.nextProcess);
-  if (next.length > 1) throw new Error('次工程の場所は一か所まで');
+  if (next.length > 1) throw new Error('次工程への置き場は一か所まで');
   // 記録の完了基準は写した値で進むので、登録との一致は照合しない。一致は着手時と完了基準の変更時に守る。
   for (const stop of Object.values(ledger.stops)) if (own(processes, stop.process) === undefined) throw new Error(`停止 ${stop.id} の工程 ${stop.process} が登録されていない`);
   for (const p of embeddedProcesses(ledger)) if (own(processes, p.id) === undefined) throw new Error(`記録に使われた工程 ${p.id} が登録されていない`);
@@ -137,14 +137,14 @@ function requireProcessHistory(ledger: Ledger, processes: Masters['processes']):
 // 登録では指定しない。ただし版11までは場所IDがNの場所を次工程として読むので、その登録だけは指定つきで現れる。
 function requireNextProcessHistory(events: readonly (LedgerEvent & { kind: 'master' })[], locations: Masters['locations']): void {
   const flags = flagsBeforeHistory(events, locations);
-  const requireOne = () => { if ([...flags.values()].filter(Boolean).length > 1) throw new Error('次工程の場所は一か所まで'); };
+  const requireOne = () => { if ([...flags.values()].filter(Boolean).length > 1) throw new Error('次工程への置き場は一か所まで'); };
   requireOne();
   const last = new Map<string, boolean>();
   for (const event of events) {
     for (const { before, after } of event.masters) {
       if (after.type !== 'location') continue;
       if (before !== null && (before.type !== 'location' || before.id !== after.id)) throw new Error('場所の変更前と変更後が同じ場所を指さない');
-      if (before === null && after.nextProcess && after.id !== 'N') throw new Error(`場所 ${after.code} は次工程の場所として登録できない`);
+      if (before === null && after.nextProcess && after.id !== 'N') throw new Error(`場所 ${after.code} は次工程への置き場として登録できない`);
       const previous = last.get(after.id);
       const was = before?.type === 'location' ? before.nextProcess : null;
       if (previous !== undefined && was !== previous) throw new Error(`場所 ${after.code} の次工程の指定が直前の変更後と一致しない`);
@@ -201,6 +201,8 @@ export type Decrease = { lotId: string; basis: Basis; value: number | null } & (
   | { kind: 'use'; usedFor: string }
   | { kind: 'handover'; counterpart: string }
   | { kind: 'split'; childId: string }
+  // 箱を開けて、数えた中身を中身の単位の子へ移す。value は開けた箱の数。入り数から中身を推計しない（p2-box-opening）。
+  | { kind: 'open'; childId: string; childUnit: string; childValue: number }
   | { kind: 'transfer'; childId: string; from: Project; to: Project }
   | { kind: 'rework'; childId: string; reason: string; returnSource?: { adoptEventId: string; process: Process; confirmedPhysical: true } }
   // 一部の数量の工程上の位置を変える。分割と同じく、変えた分を子として分ける（MFG-01a）。
@@ -417,7 +419,7 @@ function usableProject(ledger: Ledger, project: Project): void {
   if (!master.active) throw new Error(`案件・用途 ${master.code ?? master.name ?? project.id} は利用停止中`);
 }
 
-// 位置を保ったまま次工程の場所に置くと、現物は次工程にあるのに完成（渡す前）や作業中のままで、引渡済みにも数えられない。
+// 位置を保ったまま次工程への置き場に置くと、現物は次工程にあるのに完成（渡す前）や作業中のままで、引渡済みにも数えられない。
 // 次工程へは次工程への引渡しで渡す（MFG-06）。
 function notStagedAtNextProcess(masters: Masters, lotId: string, stage: Stage, location: string, guidance = '次工程への引渡しで記録する'): void {
   const next = nextProcessOf(masters);
@@ -512,7 +514,7 @@ export function decreased(ledger: Ledger, lot: Lot, taken: Quantity): Lot | null
 }
 
 function isDecreaseEvent(e: LedgerEvent): e is LedgerEvent & Decrease & { applied: boolean; inclusion: Inclusion | null } {
-  return e.kind === 'use' || e.kind === 'handover' || e.kind === 'split' || e.kind === 'stage' || e.kind === 'transfer' || e.kind === 'rework';
+  return e.kind === 'use' || e.kind === 'handover' || e.kind === 'split' || e.kind === 'open' || e.kind === 'stage' || e.kind === 'transfer' || e.kind === 'rework';
 }
 
 // 工程内の物は、外へ直接渡すと位置の変更を飛ばして現物が消える。完成（渡す前）にしてから渡す（MFG-01a）。
@@ -823,15 +825,7 @@ export function recount(ledger: Ledger, meta: Meta, lotId: string, value: number
 export function totalOf(ledger: Ledger, item: string, include: (lot: Lot) => boolean = () => true): Quantity {
   const lots = Object.values(ledger.lots).filter((lot) => lot.item === item && lot.mergedInto === null && include(lot));
   if (new Set(lots.map((lot) => lot.unit)).size > 1) throw new Error(`品目 ${item} の単位が違う保管単位は合計しない。単位を指定する`);
-  return sum(lots.map((lot) => lot.quantity), quantityStepOf(ledger.masters, item, lots[0]?.unit ?? ''));
-}
-
-// 0を初期値にして足すと、ラベルだけの合計が「中身未確認」から「未確認部分あり」へ変わってしまう。
-function sum(quantities: Quantity[], step: Step): Quantity {
-  if (quantities.length === 0) {
-    return { kind: 'known', numeric: { value: 0, approximate: false, unconfirmed: 'none' }, computed: true, terms: [] };
-  }
-  return quantities.reduce((total, quantity) => add(total, quantity, step));
+  return sumQuantities(lots.map((lot) => lot.quantity), quantityStepOf(ledger.masters, item, lots[0]?.unit ?? ''));
 }
 
 // apply は保留した操作を元の操作IDと実際の日時のまま親へ適用し、close は親から減らさずに閉じる。対象の事項だけを閉じる（CHK-04）。
@@ -1092,18 +1086,19 @@ export function voidRecord(ledger: Ledger, meta: Meta, targetEventId: string, re
   const detail = { kind: 'void', targetEventId, lotId: source.id, reason, applied: lot !== null } as const;
   if (lot === null) return commit(ledger, detail, meta, []);
   // 足し戻すと、表示の数（ラベル・パッケージ）やだいたいの誤りを取り消しても中身未確認・約が残り、根拠が劣化する。
-  // 最後に数えた数（なければ登録）の数量から、誤りを除いて引き直して戻す。引き直せない操作が間にあれば足し戻す。
+  // 最後に数えた数（なければ保管単位を作った記録）の数量から、誤りを除いて引き直して戻す。引き直せない操作が間にあれば足し戻す。
   const restored = rebuiltWithout(ledger, lot, targetEventId) ?? add(lot.quantity, quantityOf(observeFor(ledger, lot, meta.eventId, target.basis, target.value)), quantityStepOf(ledger.masters, lot.item, lot.unit));
   return commit(ledger, detail, meta, [{ ...lot, quantity: restored }]);
 }
 
-// 最後に数えた数（なければ登録）の数量から、指定の操作と取り消し済みの操作（誤りの前後どちらも、取消と対で打ち消し合う）を
+// 最後に数えた数（なければ保管単位を作った記録）の数量から、指定の操作と取り消し済みの操作（誤りの前後どちらも、取消と対で打ち消し合う）を
 // 除いて、減算とまとめ直しの加算だけを引き直した数量。まとめ直しの元も同じ規則で引き直し、引き直せなくても
 // 除く操作・取り消し済みの操作を含まなければ統合時の数量を使う。引き直せなければundefined。
 function rebuiltWithout(ledger: Ledger, lot: Lot, excludedOpId: string): Quantity | undefined {
   const chain = reflectedIn(ledger.history, lot);
   const first = chain[0];
-  const creates = first && ['register', 'recount', 'split', 'stage', 'transfer', 'rework', 'start'].includes(first.kind);
+  // 仮記録からの登録も newLot の数量を保存しているため、誤記を除いて根拠から戻せる。
+  const creates = first && ['register', 'adopt', 'recount', 'split', 'open', 'stage', 'transfer', 'rework', 'start'].includes(first.kind);
   const base = creates ? first.changes.find((c) => c.after.id === lot.id)?.after.quantity : undefined;
   if (base === undefined) return undefined;
   let quantity: Quantity = base;
@@ -1168,7 +1163,7 @@ function inProcessTotalAt(ledger: Ledger, stop: StopScope, occurredAt: string | 
   if (occurredAt === null) return current.numeric.value;
   const inGroup = (l: Lot | null): l is Lot =>
     l !== null && l.mergedInto === null && l.item === stop.item && l.unit === stop.unit && sameProject(l.project, stop.project) && inProcess(l.stage, stop.process);
-  const totalIn = (lots: (Lot | null)[]): Quantity => sum(lots.filter(inGroup).map((l) => l.quantity), quantityStepOf(ledger.masters, stop.item, stop.unit));
+  const totalIn = (lots: (Lot | null)[]): Quantity => sumQuantities(lots.filter(inGroup).map((l) => l.quantity), quantityStepOf(ledger.masters, stop.item, stop.unit));
   const terms = [current.numeric.value];
   for (const e of ledger.history) {
     if (e.kind === 'correctTime') continue;
@@ -1355,10 +1350,10 @@ export function productionOf(ledger: Ledger, process: string, item: string, unit
     inspecting,
     inProcess: add(working, inspecting, quantityStepOf(ledger.masters, item, unit)),
     awaitingHandover: at('awaitingHandover'),
-    completed: sum(tallies.completed, quantityStepOf(ledger.masters, item, unit)),
-    reworkStarted: sum(tallies.reworkStarted, quantityStepOf(ledger.masters, item, unit)),
-    returned: sum(tallies.returned, quantityStepOf(ledger.masters, item, unit)),
-    handedOver: sum(tallies.handedOver, quantityStepOf(ledger.masters, item, unit)),
+    completed: sumQuantities(tallies.completed, quantityStepOf(ledger.masters, item, unit)),
+    reworkStarted: sumQuantities(tallies.reworkStarted, quantityStepOf(ledger.masters, item, unit)),
+    returned: sumQuantities(tallies.returned, quantityStepOf(ledger.masters, item, unit)),
+    handedOver: sumQuantities(tallies.handedOver, quantityStepOf(ledger.masters, item, unit)),
   };
 }
 
@@ -1393,10 +1388,10 @@ export function perBoxOfLot(ledger: Ledger, lot: Lot, created: ReadonlyMap<strin
   return at === undefined ? null : perBoxAt(packaging, at);
 }
 
-// 確認が要る変更（既存IDの付替え・元の資料の更新・仮の記録の新しいまとまり・案件・用途の結び付け）。
+// 確認が要る変更（既存IDの付替え・元の資料の更新・仮の記録の新しいまとまり・案件・用途の結び付け・総予定数の超過）。
 // 画面は内容を示して確認の欄を出し、同じ入力を確認つきで再送させる。確認の前は何も記録しない。
 export class ConfirmationRequired extends Error {
-  readonly kind: 'code' | 'source' | 'adopt' | 'identify' | 'assignProject';
+  readonly kind: 'code' | 'source' | 'adopt' | 'identify' | 'assignProject' | 'progress';
   readonly lots: readonly string[];
   readonly master: Master | null;
 
@@ -1425,7 +1420,7 @@ export type MasterRequest =
   | { action: 'consumable'; id: string; setting: ConsumableSetting | null; reason: string }
   | { action: 'scope'; id: string; inScope: boolean; reason: string }
   | { action: 'criterion'; id: string; criterion: Process['criterion']; reason: string }
-  // idがnullなら次工程の場所の指定を解除する。
+  // idがnullなら次工程への置き場の指定を解除する。
   | { action: 'nextProcess'; id: string | null; reason: string };
 
 export type MasterChange = { before: Master | null; after: Master };
@@ -1477,7 +1472,7 @@ function planActive(ledger: Ledger, meta: Meta, request: Request<'deactivate' | 
   if (m.active === active) throw new Error(active ? `${masterRef(m)}はすでに利用中` : `${masterRef(m)}はすでに利用停止中`);
   // 利用停止中の担当者は記録できないので、操作中の自分を止めると、画面が記録を受け付けなくなり、抜けるには初期化か復元しかない。
   if (m.type === 'actor' && !active && m.id === meta.actor) throw new Error('操作している担当者は利用停止できない。別の担当者に切り替えてから止める');
-  if (m.type === 'location' && !active && m.nextProcess) throw new Error(`場所 ${m.code} は次工程の場所に指定している。先に次工程の指定を解除する`);
+  if (m.type === 'location' && !active && m.nextProcess) throw new Error(`場所 ${m.code} は次工程への置き場に指定している。先に次工程の指定を解除する`);
   return planOne(m, { ...m, active });
 }
 
@@ -1698,7 +1693,7 @@ function planCriterion(ledger: Ledger, request: Request<'criterion'>): MasterPla
 function planNextProcess(ledger: Ledger, request: Request<'nextProcess'>): MasterPlan {
   required(request.reason, '理由');
   const current = nextProcessOf(ledger.masters);
-  if ((current?.id ?? null) === request.id) throw new Error(request.id === null ? '次工程の場所は指定していない' : '今と同じ次工程の場所');
+  if ((current?.id ?? null) === request.id) throw new Error(request.id === null ? '次工程への置き場は指定していない' : '今と同じ次工程への置き場');
   const changes: MasterChange[] = current === null ? [] : [{ before: current, after: { ...current, nextProcess: false } }];
   if (request.id !== null) {
     const target = masterOf(ledger.masters, 'location', request.id);
@@ -1880,9 +1875,14 @@ function confirmedDecrease(ledger: Ledger, lot: Lot, taken: Quantity, inclusion:
   return parent;
 }
 
+// 確認待ちは、確認で不合格になった物を完成と偽らずに戻すため（p2-inspection-rework）。
+export function isReworkSource(stage: Stage): stage is { kind: 'awaitingHandover' | 'inspecting'; process: Process } {
+  return stage.kind === 'awaitingHandover' || stage.kind === 'inspecting';
+}
+
 export function beginRework(ledger: Ledger, meta: Meta, lotId: string, childId: string, basis: Basis, value: number | null, reason: string, answer?: Inclusion): Ledger {
   const lot = open(ledger, lotId);
-  if (lot.stage.kind !== 'awaitingHandover') throw new Error('やり直し・修理開始は手元の完成（渡す前）の現物を選ぶ');
+  if (!isReworkSource(lot.stage)) throw new Error('やり直し・修理開始は手元の完成（渡す前）または確認待ちの現物を選ぶ');
   if (lot.project.kind === 'unassigned') throw new Error('やり直し・修理の元の案件・用途を確認する');
   const place = own(ledger.masters.locations, lot.location);
   if (!place) throw new Error(`場所 ${lot.location} は手元の管理場所ではない`);
@@ -1895,6 +1895,29 @@ export function beginRework(ledger: Ledger, meta: Meta, lotId: string, childId: 
   const parent = confirmedDecrease(ledger, lot, taken, inclusion);
   const child: Lot = { ...lot, id: childId, quantity: taken, lastCount: countOf(meta.eventId, basis, value), splitFrom: lot.id, mergedInto: null, stage: { kind: 'working', process: { ...lot.stage.process } } };
   return commit(ledger, { kind: 'rework', lotId, childId, reason, basis, value, applied: true, inclusion }, meta, [parent, child]);
+}
+
+export type OpenRequest = { lotId: string; childId: string; boxes: number; counted: number };
+
+// 未開封の箱はラベルの数のまま持ち、開けた分は数えた中身で持つ（2026-11-20、利用者決定）。
+export function openBox(ledger: Ledger, meta: Meta, request: OpenRequest, answer?: Inclusion): Ledger {
+  const lot = open(ledger, request.lotId);
+  const packaging = own(ledger.masters.items, lot.item)?.packaging ?? null;
+  if (packaging === null) throw new Error(`品目 ${lot.item} は包装・入り数を設定していない`);
+  if (lot.unit !== packaging.boxUnit) throw new Error(`開封は包装の単位（${packaging.boxUnit}）の保管単位を選ぶ`);
+  if (lot.stage.kind !== 'none') throw new Error('開封は作業なしの保管単位を選ぶ');
+  if (lot.quantity.kind === 'known' && lot.quantity.numeric.approximate) throw new Error('だいたいの箱数からは開封しない。先に箱を数える');
+  if (!Number.isSafeInteger(request.boxes) || request.boxes <= 0) throw new Error('開ける箱の数は正の整数');
+  if (!Number.isFinite(request.counted) || request.counted < 0) throw new Error('開けた中身を数えた数（0以上）を入力する');
+  required(request.childId, '開けた中身の新しいID');
+  unused(ledger, request.childId);
+  const taken = quantityOf(observeFor(ledger, lot, meta.eventId, 'counted', request.boxes));
+  const inclusion = inclusionOf(ledger, lot, meta.occurredAt, answer);
+  const parent = confirmedDecrease(ledger, lot, taken, inclusion);
+  const ref = { item: lot.item, unit: packaging.pieceUnit };
+  const child: Lot = { ...lot, id: request.childId, unit: packaging.pieceUnit, quantity: quantityOf(observeFor(ledger, ref, meta.eventId, 'counted', request.counted)),
+    lastCount: countOf(meta.eventId, 'counted', request.counted), splitFrom: lot.id, mergedInto: null };
+  return commit(ledger, { kind: 'open', lotId: lot.id, basis: 'counted', value: request.boxes, childId: child.id, childUnit: child.unit, childValue: request.counted, applied: true, inclusion }, meta, [parent, child]);
 }
 
 export function reworksOf(ledger: Ledger, lotId: string): ReworkEvent[] {
@@ -1929,7 +1952,7 @@ function recoveredRegisters(ledger: Ledger): ReadonlySet<string> {
 }
 
 function createdLotId(e: LedgerEvent, recovered: ReadonlySet<string>): string | null {
-  if (e.kind === 'split' || e.kind === 'stage' || e.kind === 'transfer' || e.kind === 'rework') return e.childId;
+  if (e.kind === 'split' || e.kind === 'open' || e.kind === 'stage' || e.kind === 'transfer' || e.kind === 'rework') return e.childId;
   if (e.kind === 'start') return e.lotId;
   if (e.kind === 'register' && recovered.has(e.eventId)) return e.changes[0]?.after.id ?? null;
   return null;
@@ -2097,7 +2120,7 @@ function validateReworkChange(ledger: Ledger, e: ReworkEvent): void {
     if (!sameReworkIdentity(currentParent, before) || !sameReworkIdentity(currentChild, child.after)
       || currentChild.stage.kind !== 'working' || currentChild.stage.process.criterion !== process.criterion) throw new Error('返ってきた物のやり直し・修理の現在の元現物・子と生成時の識別・工程が一致しない');
   } else {
-    if (before.stage.kind !== 'awaitingHandover') throw new Error('やり直し・修理元は完成（渡す前）でない');
+    if (!isReworkSource(before.stage)) throw new Error('やり直し・修理元は完成（渡す前）・確認待ちでない');
     process = before.stage.process;
   }
   if (before.quantity.kind !== 'known' || before.project.kind === 'unassigned' || before.mergedInto !== null || !after || !sameLotRecord(parent.after, after)) throw new Error('やり直し・修理元の減算が不正');
@@ -2112,6 +2135,23 @@ function checkReturnedReworkTime(adoptedAt: string | null, startedAt: string | n
 function checkReturnedReworkTimes(ledger: Ledger, at: (id: string) => string | null): void {
   for (const e of ledger.history) {
     if (e.kind === 'rework' && e.returnSource !== undefined) checkReturnedReworkTime(at(e.returnSource.adoptEventId), at(e.eventId));
+  }
+}
+
+// 開封の記録と、親（箱）・子（中身）の前後の整合。画面は作らない組合せを、書き換えた保存やバックアップから受け取らない。
+export function validateOpenLinks(ledger: Ledger): void {
+  for (const e of ledger.history) {
+    if (e.kind !== 'open') continue;
+    const parent = e.changes.find(c => c.after.id === e.lotId), child = e.changes.find(c => c.after.id === e.childId);
+    if (e.changes.length !== 2 || !parent?.before || !child || child.before !== null) throw new Error('開封の元の箱と中身の対応が不正');
+    const before = parent.before, packaging = own(ledger.masters.items, before.item)?.packaging ?? null;
+    if (packaging === null || before.unit !== packaging.boxUnit || e.childUnit !== packaging.pieceUnit || before.stage.kind !== 'none') throw new Error('開封の単位・作業の状態が不正');
+    const after = before.quantity.kind === 'known' && !before.quantity.numeric.approximate ? decreased(ledger, before, quantityOf(observeFor(ledger, before, e.eventId, e.basis, e.value))) : null;
+    if (!after || !sameLotRecord(parent.after, after)) throw new Error('開封の元の箱の減算が不正');
+    const ref = { item: before.item, unit: e.childUnit };
+    const expected: Lot = { ...before, id: e.childId, unit: e.childUnit, quantity: quantityOf(observeFor(ledger, ref, e.eventId, 'counted', e.childValue)),
+      lastCount: countOf(e.eventId, 'counted', e.childValue), splitFrom: before.id, mergedInto: null };
+    if (child.after.unit !== expected.unit || !sameLotRecord(child.after, expected)) throw new Error('開封の中身の数量・属性が不正');
   }
 }
 

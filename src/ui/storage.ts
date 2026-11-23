@@ -1014,7 +1014,7 @@ export function targetsOf(before: UnitState | { ledger: Ledger; supply: Supply; 
       }
       case 'alternativeRecord': local.add(`元票「${event.source.source}」・動き「${event.source.entry}」`); break;
       case 'register': case 'move': case 'merge': case 'recount': case 'hold': case 'release': case 'declare':
-      case 'provisional': case 'start': case 'use': case 'handover': case 'split': case 'stage': case 'transfer': break;
+      case 'provisional': case 'start': case 'use': case 'handover': case 'split': case 'open': case 'stage': case 'transfer': break;
       default: { const exhaustive: never = event; return exhaustive; }
     }
     if (local.size === 0) local.add(`操作${event.eventId}`);

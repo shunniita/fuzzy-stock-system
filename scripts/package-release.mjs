@@ -5,14 +5,15 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const manualNames = ['README', '01-getting-started', '02-guide', '03-reference', '04-troubleshooting', '05-checklist', '06-sets'];
+export const manualNames = ['README', '01-getting-started', '02-guide', '03-reference', '04-troubleshooting', '05-sets'];
+export const guidePdf = 'fuzzy-stock-system-guide.pdf';
 
 export const releaseFiles = [
   { source: 'LICENSE', path: 'LICENSE', eol: 'crlf' },
   { source: 'start-local.cmd', path: 'start-local.cmd', eol: 'crlf' },
   { source: 'manual/RELEASE_README.md', path: 'README.md', eol: 'lf' },
   ...manualNames.map(name => ({ source: `manual/${name}.md`, path: `manual/${name}.md`, eol: 'lf' })),
-  ...manualNames.map(name => ({ source: `web/dist/manual/${name}.pdf`, path: `manual/${name}.pdf` })),
+  { source: `web/dist/manual/${guidePdf}`, path: `manual/${guidePdf}` },
   { source: 'web/help.html', path: 'web/help.html', eol: 'lf' },
   { source: 'web/index.html', path: 'web/index.html', eol: 'lf' },
   { source: 'web/style.css', path: 'web/style.css', eol: 'lf' },
